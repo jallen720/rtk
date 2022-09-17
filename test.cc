@@ -16,36 +16,22 @@ static void Controls(Window* window) {
     }
 }
 
-static void FindPhysicalDevice(Context* rtk, Stack temp_mem, DeviceFeatures* required_features) {
-    Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_mem, rtk->instance);
-    auto discrete_devices = create_array<PhysicalDevice>(&temp_mem, vk_physical_devices->count);
-    auto integrated_devices = create_array<PhysicalDevice>(&temp_mem, vk_physical_devices->count);
-    for (u32 i = 0; i < vk_physical_devices->count; ++i) {
-        PhysicalDevice physical_device = { .hnd = get_copy(vk_physical_devices, i) };
-        GetPhysicalDeviceInfo(&physical_device, temp_mem, &rtk->surface);
+static void SelectPhysicalDevice(RTKContext* rtk) {
+    // Default to first physical device.
+    UsePhysicalDevice(rtk, 0);
 
-        if (physical_device.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-            push(discrete_devices, physical_device);
-        }
-        else if (physical_device.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
-            push(integrated_devices, physical_device);
-        }
-        else {
-            CTK_FATAL("unknown physical device type");
+    // Use first discrete device if any are available.
+    for (u32 i = 0; i < rtk->physical_devices.count; ++i) {
+        if (get(&rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+            UsePhysicalDevice(rtk, i);
+            break;
         }
     }
 
-    // Find compatible physical device, prioritizing descrete devices.
-    if (!UseCompatiblePhysicalDevice(rtk, discrete_devices, required_features) &&
-        !UseCompatiblePhysicalDevice(rtk, integrated_devices, required_features))
-    {
-        CTK_FATAL("failed to find physical device");
-    }
-
-    LogPhysicalDevice(&rtk->physical_device, "selected physical device");
+    LogPhysicalDevice(rtk->physical_device, "selected physical device");
 }
 
-static void InitRTK(Context* rtk, Stack* mem, Stack temp_mem, Window* window) {
+static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window) {
     // Initialize RTK instance.
     InitInstance(rtk, {
         .application_name = "RTK Test",
@@ -60,10 +46,14 @@ static void InitRTK(Context* rtk, Stack* mem, Stack temp_mem, Window* window) {
             .samplerAnisotropy = VK_TRUE,
         },
     };
-    FindPhysicalDevice(rtk, temp_mem, &required_features);
+    LoadCapablePhysicalDevices(rtk, temp_mem, &required_features);
+    SelectPhysicalDevice(rtk);
     InitDevice(rtk, &required_features);
     InitQueues(rtk);
     GetSurfaceInfo(rtk, mem);
+
+    // Initialize rendering state.
+    InitSwapchain(rtk, mem, temp_mem);
 }
 
 s32 main() {
@@ -82,7 +72,7 @@ s32 main() {
         .callback = default_window_callback,
     });
 
-    auto rtk = allocate<Context>(mem, 1);
+    auto rtk = allocate<RTKContext>(mem, 1);
     InitRTK(rtk, mem, *temp_mem, window);
 
     // Run test.

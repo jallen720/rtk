@@ -101,15 +101,25 @@ struct VertexLayout {
     u32 attribute_location;
 };
 
-struct Context {
+struct Swapchain {
+    VkSwapchainKHR hnd;
+    Array<VkImageView>* image_views;
+    VkFormat image_format;
+    VkExtent2D extent;
+};
+
+static constexpr u32 MAX_DEVICE_COUNT = 8;
+
+struct RTKContext {
     VkInstance instance;
     VkDebugUtilsMessengerEXT debug_messenger;
-
     Surface surface;
-    PhysicalDevice physical_device;
+    FixedArray<PhysicalDevice, MAX_DEVICE_COUNT> physical_devices;
+    PhysicalDevice* physical_device;
     VkDevice device;
     VkQueue graphics_queue;
     VkQueue present_queue;
+    Swapchain swapchain;
 };
 
 /// Internal
@@ -183,7 +193,7 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(u32 queue_family_index) {
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitInstance(Context* ctx, InstanceInfo info) {
+static void InitInstance(RTKContext* rtk, InstanceInfo info) {
     VkResult res = VK_SUCCESS;
 
 #ifdef RTK_ENABLE_VALIDATION
@@ -241,36 +251,25 @@ static void InitInstance(Context* ctx, InstanceInfo info) {
     create_info.ppEnabledLayerNames = NULL,
 #endif
 
-    res = vkCreateInstance(&create_info, NULL, &ctx->instance);
+    res = vkCreateInstance(&create_info, NULL, &rtk->instance);
     Validate(res, "failed to create Vulkan instance");
 
 #ifdef RTK_ENABLE_VALIDATION
-    RTK_LOAD_INSTANCE_EXTENSION_FUNCTION(ctx->instance, vkCreateDebugUtilsMessengerEXT);
-    res = vkCreateDebugUtilsMessengerEXT(ctx->instance, &debug_msgr_info, NULL, &ctx->debug_messenger);
+    RTK_LOAD_INSTANCE_EXTENSION_FUNCTION(rtk->instance, vkCreateDebugUtilsMessengerEXT);
+    res = vkCreateDebugUtilsMessengerEXT(rtk->instance, &debug_msgr_info, NULL, &rtk->debug_messenger);
     Validate(res, "failed to create debug messenger");
 #endif
 }
 
-static void InitSurface(Context* ctx, Window* window) {
+static void InitSurface(RTKContext* rtk, Window* window) {
     VkWin32SurfaceCreateInfoKHR info = {
         .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
         .hinstance = window->instance,
         .hwnd = window->handle,
     };
 
-    VkResult res = vkCreateWin32SurfaceKHR(ctx->instance, &info, NULL, &ctx->surface.hnd);
+    VkResult res = vkCreateWin32SurfaceKHR(rtk->instance, &info, NULL, &rtk->surface.hnd);
     Validate(res, "failed to create win32 surface");
-}
-
-static void GetPhysicalDeviceInfo(PhysicalDevice* physical_device, Stack temp_mem, Surface* surface) {
-    VkPhysicalDevice vk_physical_device = physical_device->hnd;
-
-    // Collect all info about physical device.
-    physical_device->queue_families = FindQueueFamilies(temp_mem, vk_physical_device, surface);
-    physical_device->depth_image_format = FindDepthImageFormat(vk_physical_device);
-    vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device->properties);
-    vkGetPhysicalDeviceFeatures(vk_physical_device, &physical_device->features.as_struct);
-    vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device->mem_properties);
 }
 
 static bool HasRequiredFeatures(PhysicalDevice* physical_device, DeviceFeatures* required_features) {
@@ -283,35 +282,63 @@ static bool HasRequiredFeatures(PhysicalDevice* physical_device, DeviceFeatures*
     return true;
 }
 
-static bool UseCompatiblePhysicalDevice(Context* rtk, Array<PhysicalDevice>* physical_devices,
-                                        DeviceFeatures* required_features)
-{
-    for (u32 i = 0; i < physical_devices->count; ++i) {
-        PhysicalDevice* physical_device = get(physical_devices, i);
+static void UsePhysicalDevice(RTKContext* rtk, u32 index) {
+    if (index >= rtk->physical_devices.count) {
+        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, rtk->physical_devices.count - 1);
+    }
+
+    rtk->physical_device = get(&rtk->physical_devices, index);
+}
+
+static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFeatures* required_features) {
+    // Get system physical devices and ensure there is enough space in the context's physical devices list.
+    Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_mem, rtk->instance);
+    if (vk_physical_devices->count > MAX_DEVICE_COUNT) {
+        CTK_FATAL("can't load physical devices: max device count is %u, system device count is %u", MAX_DEVICE_COUNT,
+                  vk_physical_devices->count);
+    }
+
+    // Reset context's physical device list to store new list.
+    rtk->physical_devices.count = 0;
+
+    // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
+    for (u32 i = 0; i < vk_physical_devices->count; ++i) {
+        VkPhysicalDevice vk_physical_device = get_copy(vk_physical_devices, i);
+
+        // Collect all info about physical device.
+        PhysicalDevice physical_device = {
+            .hnd = vk_physical_device,
+            .queue_families = FindQueueFamilies(temp_mem, vk_physical_device, &rtk->surface),
+            .depth_image_format = FindDepthImageFormat(vk_physical_device),
+        };
+        vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
+        vkGetPhysicalDeviceFeatures(vk_physical_device, &physical_device.features.as_struct);
+        vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
 
         // Graphics and present queue families required.
-        if (physical_device->queue_families.graphics == QueueFamilies::NO_INDEX ||
-            physical_device->queue_families.present == QueueFamilies::NO_INDEX)
+        if (physical_device.queue_families.graphics == QueueFamilies::NO_INDEX ||
+            physical_device.queue_families.present == QueueFamilies::NO_INDEX)
         {
             continue;
         }
 
         // Depth image format required.
-        if (physical_device->depth_image_format == VK_FORMAT_UNDEFINED) {
+        if (physical_device.depth_image_format == VK_FORMAT_UNDEFINED) {
             continue;
         }
 
         // All required features must be supported.
-        if (!HasRequiredFeatures(physical_device, required_features)) {
+        if (!HasRequiredFeatures(&physical_device, required_features)) {
             continue;
         }
 
-        // Physical device meets all requirements.
-        rtk->physical_device = *physical_device;
-        return true;
+        push(&rtk->physical_devices, physical_device);
     }
 
-    return false;
+    // Ensure atleast 1 capable physical device was loaded.
+    if (rtk->physical_devices.count == 0) {
+        CTK_FATAL("failed to load any capable physical devices");
+    }
 }
 
 static void LogPhysicalDevice(PhysicalDevice* physical_device, cstr message) {
@@ -335,8 +362,8 @@ static void LogPhysicalDevice(PhysicalDevice* physical_device, cstr message) {
         "UNKNWON");
 }
 
-static void InitDevice(Context* ctx, DeviceFeatures* enabled_features) {
-    QueueFamilies* queue_families = &ctx->physical_device.queue_families;
+static void InitDevice(RTKContext* rtk, DeviceFeatures* enabled_features) {
+    QueueFamilies* queue_families = &rtk->physical_device->queue_families;
 
     // Add queue creation info for 1 queue in each queue family.
     FixedArray<VkDeviceQueueCreateInfo, 2> queue_infos = {};
@@ -360,25 +387,133 @@ static void InitDevice(Context* ctx, DeviceFeatures* enabled_features) {
         .ppEnabledExtensionNames = enabled_extensions,
         .pEnabledFeatures = &enabled_features->as_struct,
     };
-    VkResult res = vkCreateDevice(ctx->physical_device.hnd, &create_info, NULL, &ctx->device);
+    VkResult res = vkCreateDevice(rtk->physical_device->hnd, &create_info, NULL, &rtk->device);
     Validate(res, "failed to create device");
 }
 
-static void InitQueues(Context* ctx) {
-    QueueFamilies* queue_families = &ctx->physical_device.queue_families;
-    vkGetDeviceQueue(ctx->device, queue_families->graphics, 0, &ctx->graphics_queue);
-    vkGetDeviceQueue(ctx->device, queue_families->present, 0, &ctx->present_queue);
+static void InitQueues(RTKContext* rtk) {
+    QueueFamilies* queue_families = &rtk->physical_device->queue_families;
+    vkGetDeviceQueue(rtk->device, queue_families->graphics, 0, &rtk->graphics_queue);
+    vkGetDeviceQueue(rtk->device, queue_families->present, 0, &rtk->present_queue);
 }
 
-static void GetSurfaceInfo(Context* ctx, Stack* mem) {
-    Surface* surface = &ctx->surface;
-    VkPhysicalDevice vk_physical_device = ctx->physical_device.hnd;
+static void GetSurfaceInfo(RTKContext* rtk, Stack* mem) {
+    Surface* surface = &rtk->surface;
+    VkPhysicalDevice vk_physical_device = rtk->physical_device->hnd;
 
     VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, surface->hnd, &surface->capabilities);
     Validate(res, "failed to get physical device surface capabilities");
 
     surface->formats = GetVkPhysicalDeviceSurfaceFormats(mem, vk_physical_device, surface->hnd);
     surface->present_modes = GetVkPhysicalDeviceSurfacePresentModes(mem, vk_physical_device, surface->hnd);
+}
+
+static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
+    VkDevice device = rtk->device;
+    Surface* surface = &rtk->surface;
+    Swapchain* swapchain = &rtk->swapchain;
+    VkResult res = VK_SUCCESS;
+
+    // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
+    // color space.
+    VkSurfaceFormatKHR selected_format = get_copy(surface->formats, 0);
+    for (u32 i = 0; i < surface->formats->count; ++i) {
+        VkSurfaceFormatKHR surface_format = get_copy(surface->formats, i);
+        if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM &&
+            surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        {
+            selected_format = surface_format;
+            break;
+        }
+    }
+
+    // Default to FIFO (only present mode with guarenteed availability), check for preferred mailbox present mode.
+    VkPresentModeKHR selected_present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    for (u32 i = 0; i < surface->present_modes->count; ++i) {
+        VkPresentModeKHR surface_present_mode = get_copy(surface->present_modes, i);
+        if (surface_present_mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+            selected_present_mode = surface_present_mode;
+            break;
+        }
+    }
+
+    // Set image count to min image count + 1 or max image count (whichever is smaller).
+    u32 min_image_count = surface->capabilities.minImageCount + 1;
+    if (surface->capabilities.maxImageCount > 0 && min_image_count > surface->capabilities.maxImageCount) {
+        min_image_count = surface->capabilities.maxImageCount;
+    }
+
+    // Verify current extent has been set for surface.
+    if (surface->capabilities.currentExtent.width == UINT32_MAX) {
+        CTK_FATAL("current extent not set for surface")
+    }
+
+    VkSwapchainCreateInfoKHR info = {
+        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .flags = 0,
+        .surface = surface->hnd,
+        .minImageCount = min_image_count,
+        .imageFormat = selected_format.format,
+        .imageColorSpace = selected_format.colorSpace,
+        .imageExtent = surface->capabilities.currentExtent,
+        .imageArrayLayers = 1, // Always 1 for standard images.
+        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .preTransform = surface->capabilities.currentTransform,
+        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode = selected_present_mode,
+        .clipped = VK_TRUE,
+        .oldSwapchain = VK_NULL_HANDLE,
+    };
+
+    // Determine image sharing mode based on queue family indexes.
+    QueueFamilies* queue_families = &rtk->physical_device->queue_families;
+    if (queue_families->graphics != queue_families->present) {
+        info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(u32);
+        info.pQueueFamilyIndices = (u32*)queue_families;
+    }
+    else {
+        info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        info.queueFamilyIndexCount = 0;
+        info.pQueueFamilyIndices = NULL;
+    }
+
+    res = vkCreateSwapchainKHR(device, &info, NULL, &swapchain->hnd);
+    Validate(res, "failed to create swapchain");
+
+    // Store surface state used to create swapchain for future reference.
+    swapchain->image_format = selected_format.format;
+    swapchain->extent = surface->capabilities.currentExtent;
+
+    // Create swapchain image views.
+    Array<VkImage>* swapchain_images = GetVkSwapchainImages(&temp_mem, device, swapchain->hnd);
+    swapchain->image_views = create_array_full<VkImageView>(mem, swapchain_images->count);
+
+    for (u32 i = 0; i < swapchain_images->count; ++i) {
+        VkImageViewCreateInfo view_info = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .flags = 0,
+            .image = get_copy(swapchain_images, i),
+            .viewType = VK_IMAGE_VIEW_TYPE_2D,
+            .format = swapchain->image_format,
+            .components = {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+            .subresourceRange = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        };
+        res = vkCreateImageView(device, &view_info, NULL, get(swapchain->image_views, i));
+        Validate(res, "failed to create swapchain image view");
+    }
 }
 
 // static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* physical_device,

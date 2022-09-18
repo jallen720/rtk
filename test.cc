@@ -34,16 +34,18 @@ static void SelectPhysicalDevice(RTKContext* rtk) {
 static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window) {
     // Initialize RTK instance.
     InitInstance(rtk, {
-        .application_name       = "RTK Test",
+        .application_name = "RTK Test",
 #ifdef RTK_ENABLE_VALIDATION
-        .debug_callback         = DefaultDebugCallback,
+        .debug_callback = DefaultDebugCallback,
+
         .debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                   // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        .debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+
+        .debug_message_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 #endif
     });
     InitSurface(rtk, window);
@@ -66,18 +68,17 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 
     RenderPassInfo render_pass_info = {};
     PushColorAttachment(&render_pass_info, {
-        .flags          = 0,
-        .format         = rtk->swapchain.image_format,
-        .samples        = VK_SAMPLE_COUNT_1_BIT,
+        .flags   = 0,
+        .format  = rtk->swapchain.image_format,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
 
         .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-
         .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
         .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 
-        .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-        .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .finalLayout   = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     });
 
     InitRenderPass(rtk, &render_pass_info);

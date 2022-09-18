@@ -108,6 +108,7 @@ struct VertexLayout {
 struct Swapchain {
     VkSwapchainKHR      hnd;
     Array<VkImageView>* image_views;
+    u32                 image_count;
     VkFormat            image_format;
     VkExtent2D          extent;
 };
@@ -115,7 +116,7 @@ struct Swapchain {
 struct RenderPassInfo {
     FixedArray<VkAttachmentDescription, MAX_RENDER_PASS_ATTACHMENTS> attachment_descriptions;
     FixedArray<VkAttachmentReference, MAX_RENDER_PASS_ATTACHMENTS>   color_attachment_references;
-    FixedArray<VkAttachmentReference, 1>                             depth_attachment_reference;
+    Optional<VkAttachmentReference>                                  depth_attachment_reference;
 };
 
 struct RTKContext {
@@ -494,7 +495,8 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
 
     // Create swapchain image views.
     Array<VkImage>* swapchain_images = GetVkSwapchainImages(&temp_mem, device, swapchain->hnd);
-    swapchain->image_views = create_array_full<VkImageView>(mem, swapchain_images->count);
+    swapchain->image_count = swapchain_images->count;
+    swapchain->image_views = create_array_full<VkImageView>(mem, swapchain->image_count);
 
     for (u32 i = 0; i < swapchain_images->count; ++i) {
         VkImageViewCreateInfo view_info = {
@@ -542,11 +544,11 @@ static void PushDepthAttachment(RenderPassInfo* info, VkAttachmentDescription de
         CTK_FATAL("cannot push depth attachment: already at max attachment count of %u", MAX_RENDER_PASS_ATTACHMENTS);
     }
 
-    if (info->depth_attachment_reference.count == 1) {
+    if (info->depth_attachment_reference.exists) {
         CTK_FATAL("cannot push depth attachment: one has already been pushed (only one allowed)");
     }
 
-    push(&info->depth_attachment_reference, {
+    set(&info->depth_attachment_reference, {
         .attachment = attachment_index,
         .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
     });
@@ -558,11 +560,10 @@ static void InitRenderPass(RTKContext* rtk, RenderPassInfo* info) {
         .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
         .colorAttachmentCount    = info->color_attachment_references.count,
         .pColorAttachments       = info->color_attachment_references.data,
-        .pDepthStencilAttachment = info->depth_attachment_reference.count == 1
-                                   ? info->depth_attachment_reference.data
+        .pDepthStencilAttachment = info->depth_attachment_reference.exists
+                                   ? &info->depth_attachment_reference.value
                                    : NULL,
     };
-
     VkRenderPassCreateInfo create_info = {
         .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .attachmentCount = info->attachment_descriptions.count,

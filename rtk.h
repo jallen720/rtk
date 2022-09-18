@@ -24,23 +24,27 @@ namespace RTK {
 
 /// Data
 ////////////////////////////////////////////////////////////
-static constexpr VkColorComponentFlags COLOR_COMPONENT_RGBA = VK_COLOR_COMPONENT_R_BIT
-                                                            | VK_COLOR_COMPONENT_G_BIT
-                                                            | VK_COLOR_COMPONENT_B_BIT
-                                                            | VK_COLOR_COMPONENT_A_BIT;
-
+static constexpr VkColorComponentFlags COLOR_COMPONENT_RGBA = VK_COLOR_COMPONENT_R_BIT |
+                                                              VK_COLOR_COMPONENT_G_BIT |
+                                                              VK_COLOR_COMPONENT_B_BIT |
+                                                              VK_COLOR_COMPONENT_A_BIT;
 static constexpr u32 MAX_DEVICE_FEATURES = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
+static constexpr u32 MAX_DEVICES = 8;
+static constexpr u32 MAX_FRAMEBUFFER_IMAGES = 8;
+static constexpr u32 MAX_RENDER_PASS_ATTACHMENTS = MAX_FRAMEBUFFER_IMAGES;
 
 struct InstanceInfo {
-    cstr application_name;
-    DebugCallback debug_callback;
+    cstr                                application_name;
+    DebugCallback                       debug_callback;
+    VkDebugUtilsMessageSeverityFlagsEXT debug_message_severity;
+    VkDebugUtilsMessageTypeFlagsEXT     debug_message_type;
 };
 
 struct Surface {
-    VkSurfaceKHR hnd;
-    VkSurfaceCapabilitiesKHR capabilities;
+    VkSurfaceKHR               hnd;
+    VkSurfaceCapabilitiesKHR   capabilities;
     Array<VkSurfaceFormatKHR>* formats;
-    Array<VkPresentModeKHR>* present_modes;
+    Array<VkPresentModeKHR>*   present_modes;
 };
 
 struct QueueFamilies {
@@ -51,75 +55,80 @@ struct QueueFamilies {
 
 union DeviceFeatures {
     VkPhysicalDeviceFeatures as_struct;
-    VkBool32 as_array[MAX_DEVICE_FEATURES];
+    VkBool32                 as_array[MAX_DEVICE_FEATURES];
 };
 
 struct PhysicalDevice {
-    VkPhysicalDevice hnd;
-    QueueFamilies queue_families;
-    VkPhysicalDeviceProperties properties;
-    DeviceFeatures features;
+    VkPhysicalDevice                 hnd;
+    QueueFamilies                    queue_families;
+    VkPhysicalDeviceProperties       properties;
+    DeviceFeatures                   features;
     VkPhysicalDeviceMemoryProperties mem_properties;
-    VkFormat depth_image_format;
+    VkFormat                         depth_image_format;
 };
 
 struct BufferInfo {
-    VkDeviceSize size;
-    VkSharingMode sharing_mode;
-    VkBufferUsageFlags usage_flags;
+    VkDeviceSize          size;
+    VkSharingMode         sharing_mode;
+    VkBufferUsageFlags    usage_flags;
     VkMemoryPropertyFlags mem_property_flags;
 };
 
 struct Buffer {
-    VkBuffer hnd;
+    VkBuffer       hnd;
     VkDeviceMemory mem;
-    VkDeviceSize size;
-    u8* mapped_mem;
+    VkDeviceSize   size;
+    u8*            mapped_mem;
 };
 
 struct ImageInfo {
-    VkImageCreateInfo image;
-    VkImageViewCreateInfo view;
+    VkImageCreateInfo        image;
+    VkImageViewCreateInfo    view;
     VkMemoryPropertyFlagBits mem_property_flags;
 };
 
 struct Image {
-    VkImage hnd;
-    VkImageView view;
+    VkImage        hnd;
+    VkImageView    view;
     VkDeviceMemory mem;
-    VkExtent3D extent;
+    VkExtent3D     extent;
 };
 
 struct Shader {
-    VkShaderModule hnd;
+    VkShaderModule        hnd;
     VkShaderStageFlagBits stage;
 };
 
 struct VertexLayout {
-    FixedArray<VkVertexInputBindingDescription, 4> bindings;
+    FixedArray<VkVertexInputBindingDescription, 4>    bindings;
     FixedArray<VkVertexInputAttributeDescription, 16> attributes;
-    u32 attribute_location;
+    u32                                               attribute_location;
 };
 
 struct Swapchain {
-    VkSwapchainKHR hnd;
+    VkSwapchainKHR      hnd;
     Array<VkImageView>* image_views;
-    VkFormat image_format;
-    VkExtent2D extent;
+    VkFormat            image_format;
+    VkExtent2D          extent;
 };
 
-static constexpr u32 MAX_DEVICE_COUNT = 8;
+struct RenderPassInfo {
+    FixedArray<VkAttachmentDescription, MAX_RENDER_PASS_ATTACHMENTS> attachment_descriptions;
+    FixedArray<VkAttachmentReference, MAX_RENDER_PASS_ATTACHMENTS>   color_attachment_references;
+    FixedArray<VkAttachmentReference, 1>                             depth_attachment_reference;
+};
 
 struct RTKContext {
-    VkInstance instance;
-    VkDebugUtilsMessengerEXT debug_messenger;
-    Surface surface;
-    FixedArray<PhysicalDevice, MAX_DEVICE_COUNT> physical_devices;
-    PhysicalDevice* physical_device;
-    VkDevice device;
-    VkQueue graphics_queue;
-    VkQueue present_queue;
-    Swapchain swapchain;
+    VkInstance                              instance;
+    VkDebugUtilsMessengerEXT                debug_messenger;
+    Surface                                 surface;
+    FixedArray<PhysicalDevice, MAX_DEVICES> physical_devices;
+    PhysicalDevice*                         physical_device;
+    VkDevice                                device;
+    VkQueue                                 graphics_queue;
+    VkQueue                                 present_queue;
+    Swapchain                               swapchain;
+    VkRenderPass                            render_pass;
 };
 
 /// Internal
@@ -127,7 +136,7 @@ struct RTKContext {
 static QueueFamilies FindQueueFamilies(Stack temp_mem, VkPhysicalDevice physical_device, Surface* surface) {
     QueueFamilies queue_families = {
         .graphics = QueueFamilies::NO_INDEX,
-        .present = QueueFamilies::NO_INDEX,
+        .present  = QueueFamilies::NO_INDEX,
     };
     Array<VkQueueFamilyProperties>* queue_family_properties = GetVkQueueFamilyProperties(&temp_mem, physical_device);
 
@@ -181,10 +190,10 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(u32 queue_family_index) {
     static constexpr f32 QUEUE_PRIORITIES[] = { 1.0f };
 
     VkDeviceQueueCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        .flags = 0,
+        .sType            = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+        .flags            = 0,
         .queueFamilyIndex = queue_family_index,
-        .queueCount = CTK_ARRAY_SIZE(QUEUE_PRIORITIES),
+        .queueCount       = CTK_ARRAY_SIZE(QUEUE_PRIORITIES),
         .pQueuePriorities = QUEUE_PRIORITIES,
     };
 
@@ -198,29 +207,24 @@ static void InitInstance(RTKContext* rtk, InstanceInfo info) {
 
 #ifdef RTK_ENABLE_VALIDATION
     VkDebugUtilsMessengerCreateInfoEXT debug_msgr_info = {
-        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
-        .pNext = NULL,
-        .flags = 0,
-        .messageSeverity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                           // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                           VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        .messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                       VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                       VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .pNext           = NULL,
+        .flags           = 0,
+        .messageSeverity = info.debug_message_severity,
+        .messageType     = info.debug_message_type,
         .pfnUserCallback = info.debug_callback,
-        .pUserData = NULL,
+        .pUserData       = NULL,
     };
 #endif
 
     VkApplicationInfo app_info = {
-        .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pNext = NULL,
-        .pApplicationName = info.application_name,
+        .sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+        .pNext              = NULL,
+        .pApplicationName   = info.application_name,
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-        .pEngineName = info.application_name,
-        .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_0,
+        .pEngineName        = info.application_name,
+        .engineVersion      = VK_MAKE_VERSION(1, 0, 0),
+        .apiVersion         = VK_API_VERSION_1_0,
     };
 
     cstr extensions[] = {
@@ -236,19 +240,19 @@ static void InitInstance(RTKContext* rtk, InstanceInfo info) {
 #endif
 
     VkInstanceCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-    create_info.flags = 0,
-    create_info.pApplicationInfo = &app_info,
-    create_info.enabledExtensionCount = CTK_ARRAY_SIZE(extensions),
+    create_info.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+    create_info.flags                   = 0,
+    create_info.pApplicationInfo        = &app_info,
+    create_info.enabledExtensionCount   = CTK_ARRAY_SIZE(extensions),
     create_info.ppEnabledExtensionNames = extensions,
 #ifdef RTK_ENABLE_VALIDATION
-    create_info.pNext = &debug_msgr_info,
-    create_info.enabledLayerCount = 1,
-    create_info.ppEnabledLayerNames = &validation_layer,
+    create_info.pNext                   = &debug_msgr_info,
+    create_info.enabledLayerCount       = 1,
+    create_info.ppEnabledLayerNames     = &validation_layer,
 #else
-    create_info.pNext = NULL,
-    create_info.enabledLayerCount = 0,
-    create_info.ppEnabledLayerNames = NULL,
+    create_info.pNext                   = NULL,
+    create_info.enabledLayerCount       = 0,
+    create_info.ppEnabledLayerNames     = NULL,
 #endif
 
     res = vkCreateInstance(&create_info, NULL, &rtk->instance);
@@ -263,9 +267,9 @@ static void InitInstance(RTKContext* rtk, InstanceInfo info) {
 
 static void InitSurface(RTKContext* rtk, Window* window) {
     VkWin32SurfaceCreateInfoKHR info = {
-        .sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
+        .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
         .hinstance = window->instance,
-        .hwnd = window->handle,
+        .hwnd      = window->handle,
     };
 
     VkResult res = vkCreateWin32SurfaceKHR(rtk->instance, &info, NULL, &rtk->surface.hnd);
@@ -293,8 +297,8 @@ static void UsePhysicalDevice(RTKContext* rtk, u32 index) {
 static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFeatures* required_features) {
     // Get system physical devices and ensure there is enough space in the context's physical devices list.
     Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_mem, rtk->instance);
-    if (vk_physical_devices->count > MAX_DEVICE_COUNT) {
-        CTK_FATAL("can't load physical devices: max device count is %u, system device count is %u", MAX_DEVICE_COUNT,
+    if (vk_physical_devices->count > MAX_DEVICES) {
+        CTK_FATAL("can't load physical devices: max device count is %u, system device count is %u", MAX_DEVICES,
                   vk_physical_devices->count);
     }
 
@@ -307,8 +311,8 @@ static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFe
 
         // Collect all info about physical device.
         PhysicalDevice physical_device = {
-            .hnd = vk_physical_device,
-            .queue_families = FindQueueFamilies(temp_mem, vk_physical_device, &rtk->surface),
+            .hnd                = vk_physical_device,
+            .queue_families     = FindQueueFamilies(temp_mem, vk_physical_device, &rtk->surface),
             .depth_image_format = FindDepthImageFormat(vk_physical_device),
         };
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
@@ -377,15 +381,15 @@ static void InitDevice(RTKContext* rtk, DeviceFeatures* enabled_features) {
     // Create device, specifying enabled extensions and features.
     cstr enabled_extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     VkDeviceCreateInfo create_info = {
-        .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .flags = 0,
-        .queueCreateInfoCount = queue_infos.count,
-        .pQueueCreateInfos = queue_infos.data,
-        .enabledLayerCount = 0,
-        .ppEnabledLayerNames = NULL,
-        .enabledExtensionCount = CTK_ARRAY_SIZE(enabled_extensions),
+        .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .flags                   = 0,
+        .queueCreateInfoCount    = queue_infos.count,
+        .pQueueCreateInfos       = queue_infos.data,
+        .enabledLayerCount       = 0,
+        .ppEnabledLayerNames     = NULL,
+        .enabledExtensionCount   = CTK_ARRAY_SIZE(enabled_extensions),
         .ppEnabledExtensionNames = enabled_extensions,
-        .pEnabledFeatures = &enabled_features->as_struct,
+        .pEnabledFeatures        = &enabled_features->as_struct,
     };
     VkResult res = vkCreateDevice(rtk->physical_device->hnd, &create_info, NULL, &rtk->device);
     Validate(res, "failed to create device");
@@ -449,34 +453,36 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
     }
 
     VkSwapchainCreateInfoKHR info = {
-        .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .flags = 0,
-        .surface = surface->hnd,
-        .minImageCount = min_image_count,
-        .imageFormat = selected_format.format,
-        .imageColorSpace = selected_format.colorSpace,
-        .imageExtent = surface->capabilities.currentExtent,
+        .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .flags            = 0,
+        .surface          = surface->hnd,
+        .minImageCount    = min_image_count,
+        .imageFormat      = selected_format.format,
+        .imageColorSpace  = selected_format.colorSpace,
+        .imageExtent      = surface->capabilities.currentExtent,
         .imageArrayLayers = 1, // Always 1 for standard images.
-        .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                      VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .preTransform = surface->capabilities.currentTransform,
-        .compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode = selected_present_mode,
-        .clipped = VK_TRUE,
-        .oldSwapchain = VK_NULL_HANDLE,
+
+        .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                            VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+
+        .preTransform     = surface->capabilities.currentTransform,
+        .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode      = selected_present_mode,
+        .clipped          = VK_TRUE,
+        .oldSwapchain     = VK_NULL_HANDLE,
     };
 
     // Determine image sharing mode based on queue family indexes.
     QueueFamilies* queue_families = &rtk->physical_device->queue_families;
     if (queue_families->graphics != queue_families->present) {
-        info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
         info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(u32);
-        info.pQueueFamilyIndices = (u32*)queue_families;
+        info.pQueueFamilyIndices   = (u32*)queue_families;
     }
     else {
-        info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        info.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
         info.queueFamilyIndexCount = 0;
-        info.pQueueFamilyIndices = NULL;
+        info.pQueueFamilyIndices   = NULL;
     }
 
     res = vkCreateSwapchainKHR(device, &info, NULL, &swapchain->hnd);
@@ -492,11 +498,11 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
 
     for (u32 i = 0; i < swapchain_images->count; ++i) {
         VkImageViewCreateInfo view_info = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .flags = 0,
-            .image = get_copy(swapchain_images, i),
+            .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .flags    = 0,
+            .image    = get_copy(swapchain_images, i),
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = swapchain->image_format,
+            .format   = swapchain->image_format,
             .components = {
                 .r = VK_COMPONENT_SWIZZLE_IDENTITY,
                 .g = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -504,16 +510,70 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
                 .a = VK_COMPONENT_SWIZZLE_IDENTITY,
             },
             .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = 1,
                 .baseArrayLayer = 0,
-                .layerCount = 1,
+                .layerCount     = 1,
             },
         };
         res = vkCreateImageView(device, &view_info, NULL, get(swapchain->image_views, i));
         Validate(res, "failed to create swapchain image view");
     }
+}
+
+static void PushColorAttachment(RenderPassInfo* info, VkAttachmentDescription description) {
+    u32 attachment_index = info->attachment_descriptions.count;
+    if (attachment_index == get_size(&info->attachment_descriptions)) {
+        CTK_FATAL("cannot push color attachment: already at max attachment count of %u",
+                  MAX_RENDER_PASS_ATTACHMENTS);
+    }
+
+    push(&info->color_attachment_references, {
+        .attachment = attachment_index,
+        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    });
+    push(&info->attachment_descriptions, description);
+}
+
+static void PushDepthAttachment(RenderPassInfo* info, VkAttachmentDescription description) {
+    u32 attachment_index = info->attachment_descriptions.count;
+    if (attachment_index == get_size(&info->attachment_descriptions)) {
+        CTK_FATAL("cannot push depth attachment: already at max attachment count of %u", MAX_RENDER_PASS_ATTACHMENTS);
+    }
+
+    if (info->depth_attachment_reference.count == 1) {
+        CTK_FATAL("cannot push depth attachment: one has already been pushed (only one allowed)");
+    }
+
+    push(&info->depth_attachment_reference, {
+        .attachment = attachment_index,
+        .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+    });
+    push(&info->attachment_descriptions, description);
+}
+
+static void InitRenderPass(RTKContext* rtk, RenderPassInfo* info) {
+    VkSubpassDescription subpass_description = {
+        .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
+        .colorAttachmentCount    = info->color_attachment_references.count,
+        .pColorAttachments       = info->color_attachment_references.data,
+        .pDepthStencilAttachment = info->depth_attachment_reference.count == 1
+                                   ? info->depth_attachment_reference.data
+                                   : NULL,
+    };
+
+    VkRenderPassCreateInfo create_info = {
+        .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+        .attachmentCount = info->attachment_descriptions.count,
+        .pAttachments    = info->attachment_descriptions.data,
+        .subpassCount    = 1,
+        .pSubpasses      = &subpass_description,
+        .dependencyCount = 0,
+        .pDependencies   = NULL,
+    };
+    VkResult res = vkCreateRenderPass(rtk->device, &create_info, NULL, &rtk->render_pass);
+    Validate(res, "failed to create render pass");
 }
 
 // static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* physical_device,

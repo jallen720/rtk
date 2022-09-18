@@ -7,6 +7,7 @@
 #include "ctk/memory.h"
 #include "ctk/containers.h"
 #include "ctk/file.h"
+#include "ctk/multithreading.h"
 #include "stk/stk.h"
 
 using namespace ctk;
@@ -29,9 +30,7 @@ static constexpr VkColorComponentFlags COLOR_COMPONENT_RGBA = VK_COLOR_COMPONENT
                                                               VK_COLOR_COMPONENT_B_BIT |
                                                               VK_COLOR_COMPONENT_A_BIT;
 static constexpr u32 MAX_DEVICE_FEATURES = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
-static constexpr u32 MAX_DEVICES = 8;
-static constexpr u32 MAX_FRAMEBUFFER_IMAGES = 8;
-static constexpr u32 MAX_RENDER_PASS_ATTACHMENTS = MAX_FRAMEBUFFER_IMAGES;
+static constexpr u32 UNSET_INDEX = U32_MAX;
 
 struct InstanceInfo {
     cstr                                application_name;
@@ -48,7 +47,6 @@ struct Surface {
 };
 
 struct QueueFamilies {
-    static constexpr u32 NO_INDEX = U32_MAX;
     u32 graphics;
     u32 present;
 };
@@ -99,11 +97,11 @@ struct Shader {
     VkShaderStageFlagBits stage;
 };
 
-struct VertexLayout {
-    FixedArray<VkVertexInputBindingDescription, 4>    bindings;
-    FixedArray<VkVertexInputAttributeDescription, 16> attributes;
-    u32                                               attribute_location;
-};
+// struct VertexLayout {
+//     Array<VkVertexInputBindingDescription>*   bindings;
+//     Array<VkVertexInputAttributeDescription>* attributes;
+//     u32                                       attribute_location;
+// };
 
 struct Swapchain {
     VkSwapchainKHR      hnd;
@@ -113,31 +111,34 @@ struct Swapchain {
     VkExtent2D          extent;
 };
 
-struct RenderPassInfo {
-    FixedArray<VkAttachmentDescription, MAX_RENDER_PASS_ATTACHMENTS> attachment_descriptions;
-    FixedArray<VkAttachmentReference, MAX_RENDER_PASS_ATTACHMENTS>   color_attachment_references;
-    Optional<VkAttachmentReference>                                  depth_attachment_reference;
-};
-
 struct RTKContext {
-    VkInstance                              instance;
-    VkDebugUtilsMessengerEXT                debug_messenger;
-    Surface                                 surface;
-    FixedArray<PhysicalDevice, MAX_DEVICES> physical_devices;
-    PhysicalDevice*                         physical_device;
-    VkDevice                                device;
-    VkQueue                                 graphics_queue;
-    VkQueue                                 present_queue;
-    Swapchain                               swapchain;
-    VkRenderPass                            render_pass;
+    ThreadPool* thread_pool;
+
+    VkInstance               instance;
+    VkDebugUtilsMessengerEXT debug_messenger;
+
+    Surface                surface;
+    Array<PhysicalDevice>* physical_devices;
+    PhysicalDevice*        physical_device;
+    VkDevice               device;
+    VkQueue                graphics_queue;
+    VkQueue                present_queue;
+
+    Swapchain             swapchain;
+    VkRenderPass          render_pass;
+    Array<VkFramebuffer>* framebuffers;
+
+    VkCommandPool         main_command_pool;
+    VkCommandBuffer       temp_command_buffer;
+    Array<VkCommandPool>* render_command_pools;
 };
 
 /// Internal
 ////////////////////////////////////////////////////////////
 static QueueFamilies FindQueueFamilies(Stack temp_mem, VkPhysicalDevice physical_device, Surface* surface) {
     QueueFamilies queue_families = {
-        .graphics = QueueFamilies::NO_INDEX,
-        .present  = QueueFamilies::NO_INDEX,
+        .graphics = UNSET_INDEX,
+        .present  = UNSET_INDEX,
     };
     Array<VkQueueFamilyProperties>* queue_family_properties = GetVkQueueFamilyProperties(&temp_mem, physical_device);
 
@@ -203,6 +204,11 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(u32 queue_family_index) {
 
 /// Interface
 ////////////////////////////////////////////////////////////
+static void InitRTKContext(RTKContext* rtk, Stack* mem, ThreadPool* thread_pool, u32 max_physical_devices) {
+    rtk->thread_pool = thread_pool;
+    rtk->physical_devices = create_array<PhysicalDevice>(mem, max_physical_devices);
+};
+
 static void InitInstance(RTKContext* rtk, InstanceInfo info) {
     VkResult res = VK_SUCCESS;
 
@@ -272,7 +278,6 @@ static void InitSurface(RTKContext* rtk, Window* window) {
         .hinstance = window->instance,
         .hwnd      = window->handle,
     };
-
     VkResult res = vkCreateWin32SurfaceKHR(rtk->instance, &info, NULL, &rtk->surface.hnd);
     Validate(res, "failed to create win32 surface");
 }
@@ -288,23 +293,23 @@ static bool HasRequiredFeatures(PhysicalDevice* physical_device, DeviceFeatures*
 }
 
 static void UsePhysicalDevice(RTKContext* rtk, u32 index) {
-    if (index >= rtk->physical_devices.count) {
-        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, rtk->physical_devices.count - 1);
+    if (index >= rtk->physical_devices->count) {
+        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, rtk->physical_devices->count - 1);
     }
 
-    rtk->physical_device = get(&rtk->physical_devices, index);
+    rtk->physical_device = get(rtk->physical_devices, index);
 }
 
 static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFeatures* required_features) {
     // Get system physical devices and ensure there is enough space in the context's physical devices list.
     Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_mem, rtk->instance);
-    if (vk_physical_devices->count > MAX_DEVICES) {
-        CTK_FATAL("can't load physical devices: max device count is %u, system device count is %u", MAX_DEVICES,
-                  vk_physical_devices->count);
+    if (vk_physical_devices->size > rtk->physical_devices->size) {
+        CTK_FATAL("can't load physical devices: max device count is %u, system device count is %u",
+                  rtk->physical_devices->size, vk_physical_devices->size);
     }
 
     // Reset context's physical device list to store new list.
-    rtk->physical_devices.count = 0;
+    rtk->physical_devices->count = 0;
 
     // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
     for (u32 i = 0; i < vk_physical_devices->count; ++i) {
@@ -321,8 +326,8 @@ static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFe
         vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
 
         // Graphics and present queue families required.
-        if (physical_device.queue_families.graphics == QueueFamilies::NO_INDEX ||
-            physical_device.queue_families.present == QueueFamilies::NO_INDEX)
+        if (physical_device.queue_families.graphics == UNSET_INDEX ||
+            physical_device.queue_families.present == UNSET_INDEX)
         {
             continue;
         }
@@ -337,11 +342,11 @@ static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFe
             continue;
         }
 
-        push(&rtk->physical_devices, physical_device);
+        push(rtk->physical_devices, physical_device);
     }
 
     // Ensure atleast 1 capable physical device was loaded.
-    if (rtk->physical_devices.count == 0) {
+    if (rtk->physical_devices->count == 0) {
         CTK_FATAL("failed to load any capable physical devices");
     }
 }
@@ -524,50 +529,35 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
     }
 }
 
-static void PushColorAttachment(RenderPassInfo* info, VkAttachmentDescription description) {
-    u32 attachment_index = info->attachment_descriptions.count;
-    if (attachment_index == get_size(&info->attachment_descriptions)) {
-        CTK_FATAL("cannot push color attachment: already at max attachment count of %u",
-                  MAX_RENDER_PASS_ATTACHMENTS);
-    }
-
-    push(&info->color_attachment_references, {
-        .attachment = attachment_index,
+static void InitRenderPass(RTKContext* rtk) {
+    VkAttachmentReference swapchain_attachment_reference = {
+        .attachment = 0,
         .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    });
-    push(&info->attachment_descriptions, description);
-}
-
-static void PushDepthAttachment(RenderPassInfo* info, VkAttachmentDescription description) {
-    u32 attachment_index = info->attachment_descriptions.count;
-    if (attachment_index == get_size(&info->attachment_descriptions)) {
-        CTK_FATAL("cannot push depth attachment: already at max attachment count of %u", MAX_RENDER_PASS_ATTACHMENTS);
-    }
-
-    if (info->depth_attachment_reference.exists) {
-        CTK_FATAL("cannot push depth attachment: one has already been pushed (only one allowed)");
-    }
-
-    set(&info->depth_attachment_reference, {
-        .attachment = attachment_index,
-        .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-    });
-    push(&info->attachment_descriptions, description);
-}
-
-static void InitRenderPass(RTKContext* rtk, RenderPassInfo* info) {
+    };
     VkSubpassDescription subpass_description = {
         .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
-        .colorAttachmentCount    = info->color_attachment_references.count,
-        .pColorAttachments       = info->color_attachment_references.data,
-        .pDepthStencilAttachment = info->depth_attachment_reference.exists
-                                   ? &info->depth_attachment_reference.value
-                                   : NULL,
+        .colorAttachmentCount    = 1,
+        .pColorAttachments       = &swapchain_attachment_reference,
+        .pDepthStencilAttachment = NULL,
+    };
+
+    VkAttachmentDescription swapchain_image_attachment = {
+        .flags   = 0,
+        .format  = rtk->swapchain.image_format,
+        .samples = VK_SAMPLE_COUNT_1_BIT,
+
+        .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+
+        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .finalLayout   = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     };
     VkRenderPassCreateInfo create_info = {
         .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = info->attachment_descriptions.count,
-        .pAttachments    = info->attachment_descriptions.data,
+        .attachmentCount = 1,
+        .pAttachments    = &swapchain_image_attachment,
         .subpassCount    = 1,
         .pSubpasses      = &subpass_description,
         .dependencyCount = 0,
@@ -575,6 +565,64 @@ static void InitRenderPass(RTKContext* rtk, RenderPassInfo* info) {
     };
     VkResult res = vkCreateRenderPass(rtk->device, &create_info, NULL, &rtk->render_pass);
     Validate(res, "failed to create render pass");
+}
+
+static void InitFramebuffers(RTKContext* rtk, Stack* mem) {
+    Swapchain* swapchain = &rtk->swapchain;
+    rtk->framebuffers = create_array<VkFramebuffer>(mem, rtk->swapchain.image_count);
+    for (u32 i = 0; i < rtk->swapchain.image_count; ++i) {
+        VkImageView attachments[] = {
+            get_copy(swapchain->image_views, i),
+        };
+        VkFramebufferCreateInfo info = {
+            .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .renderPass      = rtk->render_pass,
+            .attachmentCount = CTK_ARRAY_SIZE(attachments),
+            .pAttachments    = attachments,
+            .width           = swapchain->extent.width,
+            .height          = swapchain->extent.height,
+            .layers          = 1,
+        };
+        VkResult res = vkCreateFramebuffer(rtk->device, &info, NULL, push(rtk->framebuffers));
+        Validate(res, "failed to create framebuffer");
+    }
+}
+
+static void InitCommandState(RTKContext* rtk, Stack* mem) {
+    VkDevice device = rtk->device;
+    PhysicalDevice* physical_device = rtk->physical_device;
+    VkResult res = VK_SUCCESS;
+
+    // Main Command Pool
+    VkCommandPoolCreateInfo main_command_pool_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = physical_device->queue_families.graphics,
+    };
+    res = vkCreateCommandPool(device, &main_command_pool_info, NULL, &rtk->main_command_pool);
+    Validate(res, "failed to create command pool");
+
+    // Render Command Pools
+    rtk->render_command_pools = create_array<VkCommandPool>(mem, rtk->thread_pool->size);
+    VkCommandPoolCreateInfo render_command_pool_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = physical_device->queue_families.graphics,
+    };
+    for (u32 i = 0; i < rtk->render_command_pools->count; ++i) {
+        res = vkCreateCommandPool(device, &render_command_pool_info, NULL, push(rtk->render_command_pools));
+        Validate(res, "failed to create command pool");
+    }
+
+    // Temp Command Buffer
+    VkCommandBufferAllocateInfo allocate_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = rtk->main_command_pool,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+    res = vkAllocateCommandBuffers(device, &allocate_info, &rtk->temp_command_buffer);
+    Validate(res, "failed to allocate command buffer");
 }
 
 // static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* physical_device,

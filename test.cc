@@ -1,6 +1,7 @@
 #include <windows.h>
 #include "ctk/ctk.h"
 #include "ctk/memory.h"
+#include "ctk/multithreading.h"
 #include "stk/stk.h"
 
 #define RTK_ENABLE_VALIDATION
@@ -9,6 +10,9 @@
 using namespace ctk;
 using namespace stk;
 using namespace RTK;
+
+static constexpr u32 MAX_PHYSICAL_DEVICES = 8;
+static constexpr u32 MAX_RENDER_PASS_ATTACHMENTS = 8;
 
 static void Controls(Window* window) {
     if (key_down(window, Key::ESCAPE)) {
@@ -21,8 +25,8 @@ static void SelectPhysicalDevice(RTKContext* rtk) {
     UsePhysicalDevice(rtk, 0);
 
     // Use first discrete device if any are available.
-    for (u32 i = 0; i < rtk->physical_devices.count; ++i) {
-        if (get(&rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+    for (u32 i = 0; i < rtk->physical_devices->count; ++i) {
+        if (get(rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
             UsePhysicalDevice(rtk, i);
             break;
         }
@@ -31,7 +35,9 @@ static void SelectPhysicalDevice(RTKContext* rtk) {
     LogPhysicalDevice(rtk->physical_device, "selected physical device");
 }
 
-static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window) {
+static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window, ThreadPool* thread_pool) {
+    InitRTKContext(rtk, mem, thread_pool, MAX_PHYSICAL_DEVICES);
+
     // Initialize RTK instance.
     InitInstance(rtk, {
         .application_name = "RTK Test",
@@ -65,23 +71,9 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 
     // Initialize rendering state.
     InitSwapchain(rtk, mem, temp_mem);
-
-    RenderPassInfo render_pass_info = {};
-    PushColorAttachment(&render_pass_info, {
-        .flags   = 0,
-        .format  = rtk->swapchain.image_format,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
-
-        .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-        .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .finalLayout   = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    });
-
-    InitRenderPass(rtk, &render_pass_info);
+    InitRenderPass(rtk);
+    InitFramebuffers(rtk, mem);
+    InitCommandState(rtk, mem);
 }
 
 s32 main() {
@@ -100,8 +92,13 @@ s32 main() {
         .callback = default_window_callback,
     });
 
+    // Create threadpool.
+    SYSTEM_INFO system_info = {};
+    GetSystemInfo(&system_info);
+    ThreadPool* thread_pool = create_thread_pool(mem, system_info.dwNumberOfProcessors);
+
     auto rtk = allocate<RTKContext>(mem, 1);
-    InitRTK(rtk, mem, *temp_mem, window);
+    InitRTK(rtk, mem, *temp_mem, window, thread_pool);
 
     // Run test.
     while (1) {

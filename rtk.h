@@ -117,20 +117,22 @@ struct RTKContext {
     VkInstance               instance;
     VkDebugUtilsMessengerEXT debug_messenger;
 
+    // Device State
     Surface                surface;
     Array<PhysicalDevice>* physical_devices;
     PhysicalDevice*        physical_device;
     VkDevice               device;
     VkQueue                graphics_queue;
     VkQueue                present_queue;
+    VkCommandPool          main_command_pool;
+    VkCommandBuffer        temp_command_buffer;
+    Array<VkCommandPool>*  render_command_pools;
 
+    // Render State
     Swapchain             swapchain;
     VkRenderPass          render_pass;
     Array<VkFramebuffer>* framebuffers;
 
-    VkCommandPool         main_command_pool;
-    VkCommandBuffer       temp_command_buffer;
-    Array<VkCommandPool>* render_command_pools;
 };
 
 /// Internal
@@ -418,6 +420,30 @@ static void GetSurfaceInfo(RTKContext* rtk, Stack* mem) {
     surface->present_modes = GetVkPhysicalDeviceSurfacePresentModes(mem, vk_physical_device, surface->hnd);
 }
 
+static void InitMainCommandState(RTKContext* rtk) {
+    VkDevice device = rtk->device;
+    VkResult res = VK_SUCCESS;
+
+    // Main Command Pool
+    VkCommandPoolCreateInfo pool_info = {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
+    };
+    res = vkCreateCommandPool(device, &pool_info, NULL, &rtk->main_command_pool);
+    Validate(res, "failed to create command pool");
+
+    // Temp Command Buffer
+    VkCommandBufferAllocateInfo allocate_info = {
+        .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool        = rtk->main_command_pool,
+        .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
+    res = vkAllocateCommandBuffers(device, &allocate_info, &rtk->temp_command_buffer);
+    Validate(res, "failed to allocate command buffer");
+}
+
 static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
     VkDevice device = rtk->device;
     Surface* surface = &rtk->surface;
@@ -467,10 +493,8 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
         .imageColorSpace  = selected_format.colorSpace,
         .imageExtent      = surface->capabilities.currentExtent,
         .imageArrayLayers = 1, // Always 1 for standard images.
-
         .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                             VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-
         .preTransform     = surface->capabilities.currentTransform,
         .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode      = selected_present_mode,
@@ -588,41 +612,17 @@ static void InitFramebuffers(RTKContext* rtk, Stack* mem) {
     }
 }
 
-static void InitCommandState(RTKContext* rtk, Stack* mem) {
-    VkDevice device = rtk->device;
-    PhysicalDevice* physical_device = rtk->physical_device;
-    VkResult res = VK_SUCCESS;
-
-    // Main Command Pool
-    VkCommandPoolCreateInfo main_command_pool_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = physical_device->queue_families.graphics,
-    };
-    res = vkCreateCommandPool(device, &main_command_pool_info, NULL, &rtk->main_command_pool);
-    Validate(res, "failed to create command pool");
-
-    // Render Command Pools
+static void InitRenderCommandState(RTKContext* rtk, Stack* mem) {
     rtk->render_command_pools = create_array<VkCommandPool>(mem, rtk->thread_pool->size);
-    VkCommandPoolCreateInfo render_command_pool_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = physical_device->queue_families.graphics,
+    VkCommandPoolCreateInfo info = {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
     };
     for (u32 i = 0; i < rtk->render_command_pools->count; ++i) {
-        res = vkCreateCommandPool(device, &render_command_pool_info, NULL, push(rtk->render_command_pools));
+        VkResult res = vkCreateCommandPool(rtk->device, &info, NULL, push(rtk->render_command_pools));
         Validate(res, "failed to create command pool");
     }
-
-    // Temp Command Buffer
-    VkCommandBufferAllocateInfo allocate_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = rtk->main_command_pool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-    res = vkAllocateCommandBuffers(device, &allocate_info, &rtk->temp_command_buffer);
-    Validate(res, "failed to allocate command buffer");
 }
 
 // static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* physical_device,

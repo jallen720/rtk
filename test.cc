@@ -42,21 +42,19 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window,
     InitInstance(rtk, {
         .application_name = "RTK Test",
 #ifdef RTK_ENABLE_VALIDATION
-        .debug_callback = DefaultDebugCallback,
-
+        .debug_callback         = DefaultDebugCallback,
         .debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                   // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
                                   VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-
-        .debug_message_type = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        .debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 #endif
     });
     InitSurface(rtk, window);
 
-    // Initialize devices and queues.
+    // Initialize device state.
     DeviceFeatures required_features = {
         .as_struct = {
             .geometryShader    = VK_TRUE,
@@ -68,12 +66,13 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window,
     InitDevice(rtk, &required_features);
     InitQueues(rtk);
     GetSurfaceInfo(rtk, mem);
+    InitMainCommandState(rtk);
 
     // Initialize rendering state.
     InitSwapchain(rtk, mem, temp_mem);
     InitRenderPass(rtk);
     InitFramebuffers(rtk, mem);
-    InitCommandState(rtk, mem);
+    InitRenderCommandState(rtk, mem);
 }
 
 s32 main() {

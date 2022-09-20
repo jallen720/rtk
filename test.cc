@@ -13,6 +13,14 @@ using namespace RTK;
 
 static constexpr u32 MAX_PHYSICAL_DEVICES = 8;
 static constexpr u32 MAX_RENDER_PASS_ATTACHMENTS = 8;
+static constexpr u32 MAX_HOST_MEMORY = megabyte(128);
+static constexpr u32 MAX_DEVICE_MEMORY = megabyte(256);
+
+struct Test {
+    VertexLayout vertex_layout;
+    Array<Shader>* shaders;
+    Pipeline pipeline;
+};
 
 static void Controls(Window* window) {
     if (key_down(window, Key::ESCAPE)) {
@@ -66,6 +74,7 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window,
     InitDevice(rtk, &required_features);
     InitQueues(rtk);
     GetSurfaceInfo(rtk, mem);
+    InitMemory(rtk, MAX_HOST_MEMORY, MAX_DEVICE_MEMORY);
     InitMainCommandState(rtk);
 
     // Initialize rendering state.
@@ -73,6 +82,19 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window,
     InitRenderPass(rtk);
     InitFramebuffers(rtk, mem);
     InitRenderCommandState(rtk, mem);
+}
+
+static void InitTest(Test* test, Stack* mem, Stack temp_mem, RTKContext* rtk) {
+    InitVertexLayout(&test->vertex_layout, mem, 1, 4);
+    PushBinding(&test->vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
+    PushAttribute(&test->vertex_layout, 3); // Position
+    PushAttribute(&test->vertex_layout, 3); // Color
+
+    test->shaders = create_array<Shader>(mem, 2);
+    LoadShader(push(test->shaders), temp_mem, rtk->device, "shaders/test.vs", VK_SHADER_STAGE_VERTEX_BIT);
+    LoadShader(push(test->shaders), temp_mem, rtk->device, "shaders/test.fs", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    InitPipeline(&test->pipeline, temp_mem, rtk, &test->vertex_layout, test->shaders);
 }
 
 s32 main() {

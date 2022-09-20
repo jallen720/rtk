@@ -140,8 +140,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="debug.h" />
+    <ClInclude Include="device.h" />
     <ClInclude Include="get_vk_array.h" />
+    <ClInclude Include="memory.h" />
+    <ClInclude Include="pipeline.h" />
     <ClInclude Include="rtk.h" />
+    <ClInclude Include="rtk_context.h" />
     <ClInclude Include="vulkan.h" />
   </ItemGroup>
   <ItemGroup>

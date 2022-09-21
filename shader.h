@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rtk/vulkan.h"
+#include "rtk/debug.h"
 #include "ctk/ctk.h"
 #include "ctk/memory.h"
 #include "ctk/containers.h"
@@ -27,11 +28,11 @@ static void LoadShader(Shader* shader, Stack temp_mem, VkDevice device, cstr pat
 
     shader->stage = stage;
     VkShaderModuleCreateInfo info = {
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
+        .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext    = NULL,
+        .flags    = 0,
         .codeSize = byte_size(bytecode),
-        .pCode = bytecode->data,
+        .pCode    = bytecode->data,
     };
     VkResult res = vkCreateShaderModule(device, &info, NULL, &shader->hnd);
     Validate(res, "failed to create shader from SPIR-V file \"%p\"", path);

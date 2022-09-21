@@ -2,6 +2,7 @@
 #include "ctk/ctk.h"
 #include "ctk/memory.h"
 #include "ctk/multithreading.h"
+#include "ctk/math.h"
 #include "stk/stk.h"
 
 #define RTK_ENABLE_VALIDATION
@@ -20,6 +21,11 @@ struct Test {
     VertexLayout vertex_layout;
     Array<Shader>* shaders;
     Pipeline pipeline;
+};
+
+struct Vertex {
+    Vec3<f32> position;
+    Vec3<f32> color;
 };
 
 static void Controls(Window* window) {
@@ -43,8 +49,8 @@ static void SelectPhysicalDevice(RTKContext* rtk) {
     LogPhysicalDevice(rtk->physical_device, "selected physical device");
 }
 
-static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window, ThreadPool* thread_pool) {
-    InitRTKContext(rtk, mem, thread_pool, MAX_PHYSICAL_DEVICES);
+static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window) {
+    InitRTKContext(rtk, mem, MAX_PHYSICAL_DEVICES);
 
     // Initialize RTK instance.
     InitInstance(rtk, {
@@ -81,8 +87,17 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window,
     InitSwapchain(rtk, mem, temp_mem);
     InitRenderPass(rtk);
     InitFramebuffers(rtk, mem);
-    InitRenderCommandState(rtk, mem);
+    static constexpr u32 RENDER_THREAD_COUNT = 1;
+    InitRenderCommandState(rtk, mem, RENDER_THREAD_COUNT);
+    InitSyncState(rtk);
 }
+
+static constexpr Vertex VERTEXES[] = {
+    { { -0.5f, 0.5f, 0.0f }, { 1, 0, 0 } },
+    { {  0.0f,-0.5f, 0.0f }, { 0, 1, 0 } },
+    { {  0.5f, 0.5f, 0.0f }, { 0, 0, 1 } },
+};
+static constexpr u32 INDEXES[] = { 0, 1, 2 };
 
 static void InitTest(Test* test, Stack* mem, Stack temp_mem, RTKContext* rtk) {
     InitVertexLayout(&test->vertex_layout, mem, 1, 4);
@@ -91,10 +106,41 @@ static void InitTest(Test* test, Stack* mem, Stack temp_mem, RTKContext* rtk) {
     PushAttribute(&test->vertex_layout, 3); // Color
 
     test->shaders = create_array<Shader>(mem, 2);
-    LoadShader(push(test->shaders), temp_mem, rtk->device, "shaders/test.vs", VK_SHADER_STAGE_VERTEX_BIT);
-    LoadShader(push(test->shaders), temp_mem, rtk->device, "shaders/test.fs", VK_SHADER_STAGE_FRAGMENT_BIT);
+    LoadShader(push(test->shaders), temp_mem, rtk->device, "shaders/test.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    LoadShader(push(test->shaders), temp_mem, rtk->device, "shaders/test.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
     InitPipeline(&test->pipeline, temp_mem, rtk, &test->vertex_layout, test->shaders);
+
+    memcpy(rtk->host_buffer.mapped_mem, VERTEXES, sizeof(VERTEXES));
+    memcpy(rtk->host_buffer.mapped_mem + sizeof(VERTEXES), INDEXES, sizeof(INDEXES));
+}
+
+static void RecordRenderCommands(Test* test, RTKContext* rtk) {
+    VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, 0);
+        Pipeline* pipeline = &test->pipeline;
+        vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
+
+        // Bind mesh data buffers.
+        VkDeviceSize vertexes_offset = 0;
+        vkCmdBindVertexBuffers(render_command_buffer,
+                               0, // First Binding
+                               1, // Binding Count
+                               &rtk->host_buffer.hnd,
+                               &vertexes_offset);
+
+        VkDeviceSize indexes_offset = sizeof(VERTEXES);
+        vkCmdBindIndexBuffer(render_command_buffer,
+                             rtk->host_buffer.hnd,
+                             indexes_offset,
+                             VK_INDEX_TYPE_UINT32);
+
+        vkCmdDrawIndexed(render_command_buffer,
+                         3, // Index Count
+                         1, // Instance Count
+                         0, // Index Offset
+                         0, // Vertex Offset
+                         0); // First Instance
+    vkEndCommandBuffer(render_command_buffer);
 }
 
 s32 main() {
@@ -113,13 +159,16 @@ s32 main() {
         .callback = default_window_callback,
     });
 
-    // Create threadpool.
-    SYSTEM_INFO system_info = {};
-    GetSystemInfo(&system_info);
-    ThreadPool* thread_pool = create_thread_pool(mem, system_info.dwNumberOfProcessors);
+    // // Create threadpool.
+    // SYSTEM_INFO system_info = {};
+    // GetSystemInfo(&system_info);
+    // ThreadPool* thread_pool = create_thread_pool(mem, system_info.dwNumberOfProcessors);
 
-    auto rtk = allocate<RTKContext>(mem, 1);
-    InitRTK(rtk, mem, *temp_mem, window, thread_pool);
+    RTKContext rtk = {};
+    InitRTK(&rtk, mem, *temp_mem, window);
+
+    Test test = {};
+    InitTest(&test, mem, *temp_mem, &rtk);
 
     // Run test.
     while (1) {
@@ -136,31 +185,9 @@ s32 main() {
         }
 
         if (window_is_active(window)) {
-            // // Update game state.
-            // update(game, window, renderer);
-            // if (!window->open) {
-            //     // Game update closed window.
-            //     break;
-            // }
-
-            // // Start frame for rendering UI.
-            // next_ui_frame();
-
-            // // Render game UI.
-            // render_game_ui(game, renderer);
-            // if (!window->open) {
-            //     // UI interaction closed window.
-            //     break;
-            // }
-
-            // // Render debug UI.
-            // render_debug_ui(&frame_metrics);
-
-            // // Record and submit rendering commands based on updated game and UI state.
-            // Frame* frame = next_frame(renderer);
-            // record_entity_render_commands(renderer, frame, *temp_mem, &game->entities, &game->view);
-            // record_ui_render_commands(renderer, frame);
-            // submit_render_commands(renderer, frame);
+            NextFrame(&rtk);
+            RecordRenderCommands(&test, &rtk);
+            SubmitRenderCommands(&rtk);
         }
         else {
             Sleep(1);

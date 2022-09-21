@@ -65,8 +65,6 @@ struct Swapchain {
 };
 
 struct RTKContext {
-    ThreadPool* thread_pool;
-
     VkInstance               instance;
     VkDebugUtilsMessengerEXT debug_messenger;
 
@@ -83,10 +81,15 @@ struct RTKContext {
     VkCommandBuffer        temp_command_buffer;
 
     // Render State
-    Swapchain             swapchain;
-    VkRenderPass          render_pass;
-    Array<VkFramebuffer>* framebuffers;
-    Array<VkCommandPool>* render_command_pools;
+    Swapchain               swapchain;
+    VkRenderPass            render_pass;
+    Array<VkFramebuffer>*   framebuffers;
+    Array<VkCommandPool>*   render_command_pools;
+    VkCommandBuffer         primary_render_command_buffer;
+    Array<VkCommandBuffer>* render_command_buffers;
+    u32                     swapchain_image_index;
+    VkSemaphore             image_acquired;
+    VkSemaphore             render_finished;
 };
 
 /// Internal
@@ -158,10 +161,35 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(u32 queue_family_index) {
     return info;
 }
 
+static VkFence CreateFence(VkDevice device) {
+    VkFenceCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+    };
+    VkFence fence = VK_NULL_HANDLE;
+    VkResult res = vkCreateFence(device, &info, NULL, &fence);
+    Validate(res, "failed to create fence");
+
+    return fence;
+}
+
+static VkSemaphore CreateSemaphore(VkDevice device) {
+    VkSemaphoreCreateInfo info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+    };
+    VkSemaphore semaphore = VK_NULL_HANDLE;
+    VkResult res = vkCreateSemaphore(device, &info, NULL, &semaphore);
+    Validate(res, "failed to create semaphore");
+
+    return semaphore;
+}
+
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRTKContext(RTKContext* rtk, Stack* mem, ThreadPool* thread_pool, u32 max_physical_devices) {
-    rtk->thread_pool = thread_pool;
+static void InitRTKContext(RTKContext* rtk, Stack* mem, u32 max_physical_devices) {
     rtk->physical_devices = create_array<PhysicalDevice>(mem, max_physical_devices);
 };
 
@@ -343,6 +371,28 @@ static void GetSurfaceInfo(RTKContext* rtk, Stack* mem) {
     surface->present_modes = GetVkPhysicalDeviceSurfacePresentModes(mem, vk_physical_device, surface->hnd);
 }
 
+static void InitMemory(RTKContext* rtk, u32 max_host_memory, u32 max_device_memory) {
+    InitBuffer(&rtk->host_buffer, rtk->device, rtk->physical_device, {
+        .size               = max_host_memory,
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    });
+    InitBuffer(&rtk->device_buffer, rtk->device, rtk->physical_device, {
+        .size               = max_device_memory,
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    });
+}
+
 static void InitMainCommandState(RTKContext* rtk) {
     VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
@@ -354,7 +404,7 @@ static void InitMainCommandState(RTKContext* rtk) {
         .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
     };
     res = vkCreateCommandPool(device, &pool_info, NULL, &rtk->main_command_pool);
-    Validate(res, "failed to create command pool");
+    Validate(res, "failed to create main_command_pool");
 
     // Temp Command Buffer
     VkCommandBufferAllocateInfo allocate_info = {
@@ -364,7 +414,7 @@ static void InitMainCommandState(RTKContext* rtk) {
         .commandBufferCount = 1,
     };
     res = vkAllocateCommandBuffers(device, &allocate_info, &rtk->temp_command_buffer);
-    Validate(res, "failed to allocate command buffer");
+    Validate(res, "failed to allocate temp_command_buffer");
 }
 
 static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
@@ -477,9 +527,26 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem) {
 }
 
 static void InitRenderPass(RTKContext* rtk) {
+    VkAttachmentDescription attachments[] = {
+        // Swapchain Image
+        {
+            .flags          = 0,
+            .format         = rtk->swapchain.image_format,
+            .samples        = VK_SAMPLE_COUNT_1_BIT,
+
+            .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+
+            .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        }
+    };
+
     VkAttachmentReference swapchain_attachment_reference = {
         .attachment = 0,
-        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
     };
     VkSubpassDescription subpass_description = {
         .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -488,23 +555,10 @@ static void InitRenderPass(RTKContext* rtk) {
         .pDepthStencilAttachment = NULL,
     };
 
-    VkAttachmentDescription swapchain_image_attachment = {
-        .flags   = 0,
-        .format  = rtk->swapchain.image_format,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
-
-        .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-        .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .finalLayout   = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    };
     VkRenderPassCreateInfo create_info = {
         .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = 1,
-        .pAttachments    = &swapchain_image_attachment,
+        .attachmentCount = CTK_ARRAY_SIZE(attachments),
+        .pAttachments    = attachments,
         .subpassCount    = 1,
         .pSubpasses      = &subpass_description,
         .dependencyCount = 0,
@@ -535,37 +589,55 @@ static void InitFramebuffers(RTKContext* rtk, Stack* mem) {
     }
 }
 
-static void InitRenderCommandState(RTKContext* rtk, Stack* mem) {
-    rtk->render_command_pools = create_array<VkCommandPool>(mem, rtk->thread_pool->size);
-    VkCommandPoolCreateInfo info = {
-        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
-    };
-    for (u32 i = 0; i < rtk->render_command_pools->count; ++i) {
-        VkResult res = vkCreateCommandPool(rtk->device, &info, NULL, push(rtk->render_command_pools));
-        Validate(res, "failed to create command pool");
+static void InitRenderCommandState(RTKContext* rtk, Stack* mem, u32 render_thread_count) {
+    VkResult res = VK_SUCCESS;
+    VkDevice device = rtk->device;
+
+    // primary_render_command_buffer
+    {
+        VkCommandBufferAllocateInfo allocate_info = {
+            .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+            .commandPool        = rtk->main_command_pool,
+            .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+            .commandBufferCount = 1,
+        };
+        res = vkAllocateCommandBuffers(device, &allocate_info, &rtk->primary_render_command_buffer);
+        Validate(res, "failed to allocate primary_render_command_buffer");
+    }
+
+    // render_command_pools
+    {
+        rtk->render_command_pools = create_array<VkCommandPool>(mem, render_thread_count);
+        VkCommandPoolCreateInfo info = {
+            .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+            .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
+        };
+        for (u32 i = 0; i < render_thread_count; ++i) {
+            res = vkCreateCommandPool(device, &info, NULL, push(rtk->render_command_pools));
+            Validate(res, "failed to create render_command_pools");
+        }
+    }
+
+    // render_command_buffers
+    {
+        rtk->render_command_buffers = create_array<VkCommandBuffer>(mem, render_thread_count);
+        for (u32 i = 0; i < render_thread_count; ++i) {
+            VkCommandBufferAllocateInfo allocate_info = {
+                .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                .commandPool        = get_copy(rtk->render_command_pools, i),
+                .level              = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
+                .commandBufferCount = 1,
+            };
+            res = vkAllocateCommandBuffers(device, &allocate_info, push(rtk->render_command_buffers));
+            Validate(res, "failed to allocate render_command_buffers[%u]", i);
+        }
     }
 }
 
-static void InitMemory(RTKContext* rtk, u32 max_host_memory, u32 max_device_memory) {
-    InitBuffer(&rtk->host_buffer, rtk->device, rtk->physical_device, {
-        .size               = max_host_memory,
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    });
-    InitBuffer(&rtk->device_buffer, rtk->device, rtk->physical_device, {
-        .size               = max_device_memory,
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    });
+static void InitSyncState(RTKContext* rtk) {
+    rtk->image_acquired = CreateSemaphore(rtk->device);
+    rtk->render_finished = CreateSemaphore(rtk->device);
 }
 
 // static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_device, ImageInfo info) {
@@ -587,32 +659,6 @@ static void InitMemory(RTKContext* rtk, u32 max_host_memory, u32 max_device_memo
 //     Validate(res, "failed to create image view");
 
 //     image->extent = info.image.extent;
-// }
-
-// static VkSemaphore CreateSemaphore(VkDevice device) {
-//     VkSemaphoreCreateInfo info = {
-//         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-//         .pNext = NULL,
-//         .flags = 0,
-//     };
-//     VkSemaphore semaphore = VK_NULL_HANDLE;
-//     VkResult res = vkCreateSemaphore(device, &info, NULL, &semaphore);
-//     Validate(res, "failed to create semaphore");
-
-//     return semaphore;
-// }
-
-// static VkFence CreateFence(VkDevice device) {
-//     VkFenceCreateInfo info = {
-//         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-//         .pNext = NULL,
-//         .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-//     };
-//     VkFence fence = VK_NULL_HANDLE;
-//     VkResult res = vkCreateFence(device, &info, NULL, &fence);
-//     Validate(res, "failed to create fence");
-
-//     return fence;
 // }
 
 // static void BeginTempCommandBuffer(VkCommandBuffer command_buffer) {
@@ -644,5 +690,106 @@ static void InitMemory(RTKContext* rtk, u32 max_host_memory, u32 max_device_memo
 
 //     vkQueueWaitIdle(queue);
 // }
+
+static void NextFrame(RTKContext* rtk) {
+    // Get next swapchain image's index.
+    VkResult res = vkAcquireNextImageKHR(rtk->device, rtk->swapchain.hnd, U64_MAX, rtk->image_acquired, VK_NULL_HANDLE,
+                                         &rtk->swapchain_image_index);
+    Validate(res, "failed to aquire next swapchain image");
+}
+
+static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, u32 render_thread_index) {
+    VkCommandBuffer render_command_buffer = get_copy(rtk->render_command_buffers, render_thread_index);
+
+    VkCommandBufferInheritanceInfo inheritance_info = {
+        .sType                = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
+        .pNext                = NULL,
+        .renderPass           = rtk->render_pass,
+        .subpass              = 0,
+        .framebuffer          = get_copy(rtk->framebuffers, rtk->swapchain_image_index),
+        .occlusionQueryEnable = VK_FALSE,
+        .queryFlags           = 0,
+        .pipelineStatistics   = 0,
+    };
+    VkCommandBufferBeginInfo command_buffer_begin_info = {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags            = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
+        .pInheritanceInfo = &inheritance_info,
+    };
+    VkResult res = vkBeginCommandBuffer(render_command_buffer, &command_buffer_begin_info);
+    Validate(res, "failed to begin recording command buffer");
+
+    return render_command_buffer;
+}
+
+static void SubmitRenderCommands(RTKContext* rtk) {
+    VkResult res = VK_SUCCESS;
+
+    // Record current frame's primary command buffer, including render command buffers.
+    VkCommandBuffer command_buffer = rtk->primary_render_command_buffer;
+
+    // Begin command buffer.
+    VkCommandBufferBeginInfo command_buffer_begin_info = {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags            = 0,
+        .pInheritanceInfo = NULL,
+    };
+    res = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
+    Validate(res, "failed to begin recording command buffer");
+
+    // Begin render pass.
+    VkClearValue clear_value = { 0.0, 0.1, 0.2, 1 };
+    VkRenderPassBeginInfo render_pass_begin_info = {
+        .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .pNext       = NULL,
+        .renderPass  = rtk->render_pass,
+        .framebuffer = get_copy(rtk->framebuffers, rtk->swapchain_image_index),
+        .renderArea = {
+            .offset = { 0, 0 },
+            .extent = rtk->swapchain.extent,
+        },
+        .clearValueCount = 1,
+        .pClearValues    = &clear_value,
+    };
+    vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+
+    // Execute entity render commands.
+    vkCmdExecuteCommands(command_buffer, rtk->render_command_buffers->count, rtk->render_command_buffers->data);
+
+    vkCmdEndRenderPass(command_buffer);
+    vkEndCommandBuffer(command_buffer);
+
+    // Submit commands for rendering to graphics queue.
+    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkSubmitInfo submit_info = {
+        .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext                = NULL,
+        .waitSemaphoreCount   = 1,
+        .pWaitSemaphores      = &rtk->image_acquired,
+        .pWaitDstStageMask    = &wait_stage,
+        .commandBufferCount   = 1,
+        .pCommandBuffers      = &command_buffer,
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores    = &rtk->render_finished,
+    };
+    res = vkQueueSubmit(rtk->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+    Validate(res, "vkQueueSubmit() failed");
+
+    // Queue swapchain image for presentation.
+    VkPresentInfoKHR present_info = {
+        .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext              = NULL,
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores    = &rtk->render_finished,
+        .swapchainCount     = 1,
+        .pSwapchains        = &rtk->swapchain.hnd,
+        .pImageIndices      = &rtk->swapchain_image_index,
+        .pResults           = NULL,
+    };
+    res = vkQueuePresentKHR(rtk->present_queue, &present_info);
+    Validate(res, "vkQueuePresentKHR() failed");
+
+    vkDeviceWaitIdle(rtk->device);
+}
 
 }

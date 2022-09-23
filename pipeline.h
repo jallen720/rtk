@@ -163,6 +163,12 @@ struct VertexLayout {
     u32                                       attribute_location;
 };
 
+struct PipelineInfo {
+    VertexLayout               vertex_layout;
+    Array<Shader>              shaders;
+    Array<VkPushConstantRange> push_constant_ranges;
+};
+
 struct Pipeline {
     VkPipeline hnd;
     VkPipelineLayout layout;
@@ -212,18 +218,16 @@ static void PushAttribute(VertexLayout* layout, u32 field_count) {
     layout->attribute_location++;
 }
 
-static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, VertexLayout* vertex_layout,
-                         Array<Shader>* shaders)
-{
+static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, PipelineInfo* info) {
     VkDevice device = rtk->device;
     VkExtent2D surface_extent = rtk->surface.capabilities.currentExtent;
     VkResult res = VK_SUCCESS;
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
-    vertex_input_state.vertexBindingDescriptionCount = vertex_layout->bindings->count;
-    vertex_input_state.pVertexBindingDescriptions = vertex_layout->bindings->data;
-    vertex_input_state.vertexAttributeDescriptionCount = vertex_layout->attributes->count;
-    vertex_input_state.pVertexAttributeDescriptions = vertex_layout->attributes->data;
+    vertex_input_state.vertexBindingDescriptionCount = info->vertex_layout.bindings->count;
+    vertex_input_state.pVertexBindingDescriptions = info->vertex_layout.bindings->data;
+    vertex_input_state.vertexAttributeDescriptionCount = info->vertex_layout.attributes->count;
+    vertex_input_state.pVertexAttributeDescriptions = info->vertex_layout.attributes->data;
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
 
@@ -269,18 +273,19 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Ve
         .size       = 8,
     };
 
+
     VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
     layout_create_info.setLayoutCount = 0;
     layout_create_info.pSetLayouts = NULL;
-    layout_create_info.pushConstantRangeCount = 0;
-    layout_create_info.pPushConstantRanges = NULL;
+    layout_create_info.pushConstantRangeCount = info->push_constant_ranges.count;
+    layout_create_info.pPushConstantRanges = info->push_constant_ranges.data;
     res = vkCreatePipelineLayout(device, &layout_create_info, NULL, &pipeline->layout);
     Validate(res, "failed to create graphics pipeline layout");
 
     // Pipeline
-    auto shader_stages = create_array<VkPipelineShaderStageCreateInfo>(&temp_mem, shaders->count);
-    for (u32 i = 0; i < shaders->count; ++i) {
-        push(shader_stages, DefaultShaderStageCreateInfo(get(shaders, i)));
+    auto shader_stages = create_array<VkPipelineShaderStageCreateInfo>(&temp_mem, info->shaders.count);
+    for (u32 i = 0; i < info->shaders.count; ++i) {
+        push(shader_stages, DefaultShaderStageCreateInfo(get(&info->shaders, i)));
     }
 
     VkGraphicsPipelineCreateInfo create_info = {

@@ -8,6 +8,8 @@
 #define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
 
+#include "rtk/tests/shared.h"
+
 using namespace ctk;
 using namespace stk;
 using namespace RTK;
@@ -35,22 +37,18 @@ struct Entity {
     Matrix    mvp_matrix;
 };
 
-struct Mouse {
-    Vec2<s32> position;
-    Vec2<s32> delta;
-    Vec2<s32> last_position;
-};
-
 struct Game {
     Array<Shader>* shaders;
     Pipeline       pipeline;
     View           view;
     Array<Entity>* entities;
     Mouse          mouse;
+    u32            test_mesh_indexes_offset;
 };
 
 struct Vertex {
     Vec3<f32> position;
+    // Vec3<f32> color;
 };
 
 /// Test Functions
@@ -113,16 +111,14 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     InitSyncState(rtk);
 }
 
-static u32 test_mesh_indexes_offset = 0;
-
 static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk) {
     PipelineInfo pipeline_info = {};
 
     // Load pipeline shaders.
     init_array(&pipeline_info.shaders, mem, 2);
-    LoadShader(push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/3d.vert.spv",
+    LoadShader(push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.vert.spv",
                VK_SHADER_STAGE_VERTEX_BIT);
-    LoadShader(push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/3d.frag.spv",
+    LoadShader(push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.frag.spv",
                VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Init pipeline vertex layout.
@@ -143,8 +139,8 @@ static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* 
 
     // Load test mesh into host memory.
     {
-        #include "rtk/meshes/cube.h"
-        test_mesh_indexes_offset = sizeof(vertexes);
+        #include "rtk/meshes/quad.h"
+        game->test_mesh_indexes_offset = sizeof(vertexes);
         memcpy(rtk->host_buffer.mapped_mem, vertexes, sizeof(vertexes));
         memcpy(rtk->host_buffer.mapped_mem + sizeof(vertexes), indexes, sizeof(indexes));
     }
@@ -179,25 +175,6 @@ static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk) {
     InitGameState(game, mem);
 }
 
-static void UpdateMouse(Game* game, Window* window) {
-    game->mouse.position = get_mouse_position(window);
-    game->mouse.delta = game->mouse.position - game->mouse.last_position;
-    game->mouse.last_position = game->mouse.position;
-}
-
-static void LocalTranslate(View* view, Vec3<f32> translation) {
-    Matrix matrix = ID_MATRIX;
-    matrix = rotate_x(matrix, view->rotation.x);
-    matrix = rotate_y(matrix, view->rotation.y);
-    matrix = rotate_z(matrix, view->rotation.z);
-
-    Vec3<f32> forward = { matrix[0][2], matrix[1][2], matrix[2][2] };
-    Vec3<f32> right = { matrix[0][0], matrix[1][0], matrix[2][0] };
-    view->position += translation.z * forward;
-    view->position += translation.x * right;
-    view->position.y += translation.y;
-}
-
 static void ViewControls(Game* game, Window* window) {
     View* view = &game->view;
 
@@ -207,47 +184,29 @@ static void ViewControls(Game* game, Window* window) {
     f32 translation_speed = BASE_TRANSLATION_SPEED * mod;
     Vec3<f32> translation = {};
 
-    if (key_down(window, Key::W)) { translation.z += translation_speed; }
-    if (key_down(window, Key::S)) { translation.z -= translation_speed; }
     if (key_down(window, Key::D)) { translation.x += translation_speed; }
     if (key_down(window, Key::A)) { translation.x -= translation_speed; }
-    if (key_down(window, Key::E)) { translation.y += translation_speed; }
-    if (key_down(window, Key::Q)) { translation.y -= translation_speed; }
+    if (key_down(window, Key::W)) { translation.y += translation_speed; }
+    if (key_down(window, Key::S)) { translation.y -= translation_speed; }
 
-    LocalTranslate(view, translation);
-
-    // Rotation
-    if (mouse_button_down(window, 1)) {
-        static constexpr f32 ROTATION_SPEED = 0.2f;
-        view->rotation.x -= game->mouse.delta.y * ROTATION_SPEED;
-        view->rotation.y -= game->mouse.delta.x * ROTATION_SPEED;
-        view->rotation.x = clamp(view->rotation.x, -view->max_x_angle, view->max_x_angle);
-    }
+    view->position += translation;
 }
 
 static void Controls(Game* game, Window* window) {
     if (key_down(window, Key::ESCAPE)) {
         window->open = false;
+        return;
     }
 
     ViewControls(game, window);
 }
 
 static Matrix CreateViewProjectionMatrix(View* view) {
-    Matrix view_model_matrix = ID_MATRIX;
-    view_model_matrix = rotate_x(view_model_matrix, view->rotation.x);
-    view_model_matrix = rotate_y(view_model_matrix, view->rotation.y);
-    view_model_matrix = rotate_z(view_model_matrix, view->rotation.z);
-    Vec3<f32> forward = {
-        .x = view_model_matrix[0][2],
-        .y = view_model_matrix[1][2],
-        .z = view_model_matrix[2][2],
-    };
-    Matrix view_matrix = look_at(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
-
-    // Projection Matrix
+    static constexpr Vec3<f32> FORWARD = { 0, 0, 1 };
+    static constexpr Vec3<f32> UP = { 0, -1, 0 };
+    Matrix view_model_matrix = translate(ID_MATRIX, view->position);
+    Matrix view_matrix = look_at(view->position, view->position + FORWARD, UP);
     Matrix projection_matrix = perspective_matrix(view->vertical_fov, view->aspect, view->z_near, view->z_far);
-
     return projection_matrix * view_matrix;
 }
 
@@ -280,7 +239,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk) {
                                &rtk->host_buffer.hnd,
                                &vertexes_offset);
 
-        VkDeviceSize indexes_offset = test_mesh_indexes_offset;
+        VkDeviceSize indexes_offset = game->test_mesh_indexes_offset;
         vkCmdBindIndexBuffer(render_command_buffer,
                              rtk->host_buffer.hnd,
                              indexes_offset,
@@ -313,7 +272,7 @@ void test_main() {
             .width  = 1080,
             .height = 720,
         },
-        .title    = L"3D Test",
+        .title    = L"2D Test",
         .callback = default_window_callback,
     });
 
@@ -331,7 +290,7 @@ void test_main() {
             break;
         }
 
-        UpdateMouse(game, window);
+        UpdateMouse(&game->mouse, window);
         Controls(game, window);
         if (!window->open) {
             // Controls closed window.

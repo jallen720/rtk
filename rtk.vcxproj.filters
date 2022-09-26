@@ -13,11 +13,11 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Source Files\tests">
+      <UniqueIdentifier>{c6961729-08dd-41ae-aee2-f2d2a17fa84c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="debug.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="get_vk_array.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -37,6 +37,18 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="rtk_context.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\2d.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\3d.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\shared.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="debug.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

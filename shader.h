@@ -2,36 +2,39 @@
 
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
-#include "ctk/ctk.h"
-#include "ctk/memory.h"
-#include "ctk/containers.h"
-#include "ctk/file.h"
+#include "ctk2/ctk.h"
+#include "ctk2/memory.h"
+#include "ctk2/containers.h"
+#include "ctk2/file.h"
 
-using namespace ctk;
+using namespace CTK;
 
-namespace RTK {
+namespace RTK
+{
 
 /// Data
 ////////////////////////////////////////////////////////////
-struct Shader {
+struct Shader
+{
     VkShaderModule        hnd;
     VkShaderStageFlagBits stage;
 };
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void LoadShader(Shader* shader, Stack temp_mem, VkDevice device, cstr path, VkShaderStageFlagBits stage) {
-    Array<u32>* bytecode = read_file<u32>(&temp_mem, path);
-    if (bytecode == NULL) {
+static void LoadShader(Shader* shader, Stack temp_mem, VkDevice device, cstring path, VkShaderStageFlagBits stage)
+{
+    Array<uint32>* bytecode = ReadFile<uint32>(&temp_mem, path);
+    if (bytecode == NULL)
         CTK_FATAL("failed to load bytecode from \"%s\"", path);
-    }
 
     shader->stage = stage;
-    VkShaderModuleCreateInfo info = {
+    VkShaderModuleCreateInfo info =
+    {
         .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext    = NULL,
         .flags    = 0,
-        .codeSize = byte_size(bytecode),
+        .codeSize = ByteSize(bytecode),
         .pCode    = bytecode->data,
     };
     VkResult res = vkCreateShaderModule(device, &info, NULL, &shader->hnd);

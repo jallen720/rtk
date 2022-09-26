@@ -3,11 +3,11 @@
 #include "rtk/vulkan.h"
 #include "rtk/rtk_context.h"
 #include "rtk/shader.h"
-#include "ctk/ctk.h"
-#include "ctk/memory.h"
-#include "ctk/containers.h"
+#include "ctk2/ctk.h"
+#include "ctk2/memory.h"
+#include "ctk2/containers.h"
 
-using namespace ctk;
+using namespace CTK;
 
 namespace RTK {
 
@@ -28,7 +28,8 @@ static constexpr VkPipelineVertexInputStateCreateInfo DEFAULT_VERTEX_INPUT_STATE
     .pVertexAttributeDescriptions    = NULL,
 };
 
-static constexpr VkPipelineInputAssemblyStateCreateInfo DEFAULT_INPUT_ASSEMBLY_STATE = {
+static constexpr VkPipelineInputAssemblyStateCreateInfo DEFAULT_INPUT_ASSEMBLY_STATE =
+{
     .sType                  = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
     .pNext                  = NULL,
     .flags                  = 0,
@@ -36,7 +37,8 @@ static constexpr VkPipelineInputAssemblyStateCreateInfo DEFAULT_INPUT_ASSEMBLY_S
     .primitiveRestartEnable = VK_FALSE,
 };
 
-static constexpr VkPipelineViewportStateCreateInfo DEFAULT_VIEWPORT_STATE = {
+static constexpr VkPipelineViewportStateCreateInfo DEFAULT_VIEWPORT_STATE =
+{
     .sType         = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
     .pNext         = NULL,
     .flags         = 0,
@@ -46,7 +48,8 @@ static constexpr VkPipelineViewportStateCreateInfo DEFAULT_VIEWPORT_STATE = {
     .pScissors     = NULL,
 };
 
-static constexpr VkPipelineRasterizationStateCreateInfo DEFAULT_RASTERIZATION_STATE = {
+static constexpr VkPipelineRasterizationStateCreateInfo DEFAULT_RASTERIZATION_STATE =
+{
     .sType                   = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
     .pNext                   = NULL,
     .flags                   = 0,
@@ -62,7 +65,8 @@ static constexpr VkPipelineRasterizationStateCreateInfo DEFAULT_RASTERIZATION_ST
     .lineWidth               = 1.0f,
 };
 
-static constexpr VkPipelineMultisampleStateCreateInfo DEFAULT_MULTISAMPLE_STATE = {
+static constexpr VkPipelineMultisampleStateCreateInfo DEFAULT_MULTISAMPLE_STATE =
+{
     .sType                 = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
     .pNext                 = NULL,
     .flags                 = 0,
@@ -74,7 +78,8 @@ static constexpr VkPipelineMultisampleStateCreateInfo DEFAULT_MULTISAMPLE_STATE 
     .alphaToOneEnable      = VK_FALSE,
 };
 
-static constexpr VkPipelineDepthStencilStateCreateInfo DEFAULT_DEPTH_STENCIL_STATE = {
+static constexpr VkPipelineDepthStencilStateCreateInfo DEFAULT_DEPTH_STENCIL_STATE =
+{
     .sType                 = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
     .pNext                 = NULL,
     .flags                 = 0,
@@ -83,7 +88,8 @@ static constexpr VkPipelineDepthStencilStateCreateInfo DEFAULT_DEPTH_STENCIL_STA
     .depthCompareOp        = VK_COMPARE_OP_LESS,
     .depthBoundsTestEnable = VK_FALSE,
     .stencilTestEnable     = VK_FALSE,
-    .front = {
+    .front =
+    {
         .failOp      = VK_STENCIL_OP_KEEP,
         .passOp      = VK_STENCIL_OP_KEEP,
         .depthFailOp = VK_STENCIL_OP_KEEP,
@@ -92,7 +98,8 @@ static constexpr VkPipelineDepthStencilStateCreateInfo DEFAULT_DEPTH_STENCIL_STA
         .writeMask   = 0xFF,
         .reference   = 1,
     },
-    .back = {
+    .back =
+    {
         .failOp      = VK_STENCIL_OP_KEEP,
         .passOp      = VK_STENCIL_OP_KEEP,
         .depthFailOp = VK_STENCIL_OP_KEEP,
@@ -105,7 +112,8 @@ static constexpr VkPipelineDepthStencilStateCreateInfo DEFAULT_DEPTH_STENCIL_STA
     .maxDepthBounds = 1.0f,
 };
 
-static constexpr VkPipelineColorBlendAttachmentState DEFAULT_COLOR_BLEND_ATTACHMENT_STATE = {
+static constexpr VkPipelineColorBlendAttachmentState DEFAULT_COLOR_BLEND_ATTACHMENT_STATE =
+{
     .blendEnable         = VK_FALSE,
     .srcColorBlendFactor = VK_BLEND_FACTOR_ZERO,
     .dstColorBlendFactor = VK_BLEND_FACTOR_ZERO,
@@ -116,7 +124,8 @@ static constexpr VkPipelineColorBlendAttachmentState DEFAULT_COLOR_BLEND_ATTACHM
     .colorWriteMask      = COLOR_COMPONENT_RGBA,
 };
 
-static constexpr VkPipelineColorBlendStateCreateInfo DEFAULT_COLOR_BLEND_STATE = {
+static constexpr VkPipelineColorBlendStateCreateInfo DEFAULT_COLOR_BLEND_STATE =
+{
     .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
     .pNext           = NULL,
     .flags           = 0,
@@ -127,7 +136,8 @@ static constexpr VkPipelineColorBlendStateCreateInfo DEFAULT_COLOR_BLEND_STATE =
     .blendConstants  = { 1.0f, 1.0f, 1.0f, 1.0f },
 };
 
-static constexpr VkPipelineDynamicStateCreateInfo DEFAULT_DYNAMIC_STATE = {
+static constexpr VkPipelineDynamicStateCreateInfo DEFAULT_DYNAMIC_STATE =
+{
     .sType             = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
     .pNext             = NULL,
     .flags             = 0,
@@ -135,7 +145,8 @@ static constexpr VkPipelineDynamicStateCreateInfo DEFAULT_DYNAMIC_STATE = {
     .pDynamicStates    = NULL,
 };
 
-static constexpr VkPipelineLayoutCreateInfo DEFAULT_LAYOUT_CREATE_INFO = {
+static constexpr VkPipelineLayoutCreateInfo DEFAULT_LAYOUT_CREATE_INFO =
+{
     .sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
     .pNext                  = NULL,
     .flags                  = 0,
@@ -145,8 +156,10 @@ static constexpr VkPipelineLayoutCreateInfo DEFAULT_LAYOUT_CREATE_INFO = {
     .pPushConstantRanges    = NULL,
 };
 
-static VkPipelineShaderStageCreateInfo DefaultShaderStageCreateInfo(Shader* shader) {
-    return {
+static VkPipelineShaderStageCreateInfo DefaultShaderStageCreateInfo(Shader* shader)
+{
+    return
+    {
         .sType               = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
         .pNext               = NULL,
         .flags               = 0,
@@ -157,32 +170,38 @@ static VkPipelineShaderStageCreateInfo DefaultShaderStageCreateInfo(Shader* shad
     };
 }
 
-struct VertexLayout {
+struct VertexLayout
+{
     Array<VkVertexInputBindingDescription>*   bindings;
     Array<VkVertexInputAttributeDescription>* attributes;
-    u32                                       attribute_location;
+    uint32                                    attribute_location;
 };
 
-struct PipelineInfo {
+struct PipelineInfo
+{
     VertexLayout               vertex_layout;
     Array<Shader>              shaders;
     Array<VkPushConstantRange> push_constant_ranges;
 };
 
-struct Pipeline {
+struct Pipeline
+{
     VkPipeline hnd;
     VkPipelineLayout layout;
 };
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitVertexLayout(VertexLayout* layout, Stack* mem, u32 max_bindings, u32 max_attributes) {
-    layout->bindings = create_array<VkVertexInputBindingDescription>(mem, max_bindings);
-    layout->attributes = create_array<VkVertexInputAttributeDescription>(mem, max_attributes);
+static void InitVertexLayout(VertexLayout* layout, Stack* mem, uint32 max_bindings, uint32 max_attributes)
+{
+    layout->bindings = CreateArray<VkVertexInputBindingDescription>(mem, max_bindings);
+    layout->attributes = CreateArray<VkVertexInputAttributeDescription>(mem, max_attributes);
 }
 
-static void PushBinding(VertexLayout* layout, VkVertexInputRate input_rate) {
-    push(layout->bindings, {
+static void PushBinding(VertexLayout* layout, VkVertexInputRate input_rate)
+{
+    Push(layout->bindings,
+    {
         .binding   = layout->bindings->count,
         .stride    = 0,
         .inputRate = input_rate,
@@ -191,8 +210,10 @@ static void PushBinding(VertexLayout* layout, VkVertexInputRate input_rate) {
     layout->attribute_location = 0; // Reset attribute location for new binding.
 }
 
-static void PushAttribute(VertexLayout* layout, u32 field_count) {
-    static constexpr VkFormat FORMATS[] = {
+static void PushAttribute(VertexLayout* layout, uint32 field_count)
+{
+    static constexpr VkFormat FORMATS[] =
+    {
         VK_FORMAT_R32_SFLOAT,
         VK_FORMAT_R32G32_SFLOAT,
         VK_FORMAT_R32G32B32_SFLOAT,
@@ -203,10 +224,11 @@ static void PushAttribute(VertexLayout* layout, u32 field_count) {
     CTK_ASSERT(field_count > 0);
     CTK_ASSERT(field_count <= 4);
 
-    u32 current_binding_index = layout->bindings->count - 1;
-    VkVertexInputBindingDescription* current_binding = get(layout->bindings, current_binding_index);
+    uint32 current_binding_index = layout->bindings->count - 1;
+    VkVertexInputBindingDescription* current_binding = Get(layout->bindings, current_binding_index);
 
-    push(layout->attributes, {
+    Push(layout->attributes,
+    {
         .location = layout->attribute_location,
         .binding  = current_binding_index,
         .format   = FORMATS[field_count - 1],
@@ -218,7 +240,8 @@ static void PushAttribute(VertexLayout* layout, u32 field_count) {
     layout->attribute_location++;
 }
 
-static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, PipelineInfo* info) {
+static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, PipelineInfo* info)
+{
     VkDevice device = rtk->device;
     VkExtent2D surface_extent = rtk->surface.capabilities.currentExtent;
     VkResult res = VK_SUCCESS;
@@ -232,15 +255,17 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
 
     // Viewport
-    VkViewport viewport = {
+    VkViewport viewport =
+    {
         .x        = 0,
         .y        = 0,
-        .width    = (f32)surface_extent.width,
-        .height   = (f32)surface_extent.height,
+        .width    = (float32)surface_extent.width,
+        .height   = (float32)surface_extent.height,
         .minDepth = 0,
         .maxDepth = 1
     };
-    VkRect2D scissor = {
+    VkRect2D scissor =
+    {
         .offset = { 0, 0 },
         .extent = surface_extent,
     };
@@ -267,7 +292,8 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
 
     // Pipeline Layout
-    VkPushConstantRange push_constant_range = {
+    VkPushConstantRange push_constant_range =
+    {
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .offset     = 0,
         .size       = 8,
@@ -283,12 +309,12 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     Validate(res, "failed to create graphics pipeline layout");
 
     // Pipeline
-    auto shader_stages = create_array<VkPipelineShaderStageCreateInfo>(&temp_mem, info->shaders.count);
-    for (u32 i = 0; i < info->shaders.count; ++i) {
-        push(shader_stages, DefaultShaderStageCreateInfo(get(&info->shaders, i)));
-    }
+    auto shader_stages = CreateArray<VkPipelineShaderStageCreateInfo>(&temp_mem, info->shaders.count);
+    for (uint32 i = 0; i < info->shaders.count; ++i)
+        Push(shader_stages, DefaultShaderStageCreateInfo(Get(&info->shaders, i)));
 
-    VkGraphicsPipelineCreateInfo create_info = {
+    VkGraphicsPipelineCreateInfo create_info =
+    {
         .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext               = NULL,
         .flags               = 0,

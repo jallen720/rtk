@@ -1,24 +1,26 @@
 #pragma once
 
-#include "ctk/ctk.h"
-#include "ctk/math.h"
-#include "stk/stk.h"
+#include "ctk2/ctk.h"
+#include "ctk2/math.h"
+#include "stk2/stk.h"
 
-using namespace ctk;
-using namespace stk;
+using namespace CTK;
+using namespace STK;
 
 /// Data
 ////////////////////////////////////////////////////////////
-struct Mouse {
-    Vec2<s32> position;
-    Vec2<s32> delta;
-    Vec2<s32> last_position;
+struct Mouse
+{
+    Vec2<sint32> position;
+    Vec2<sint32> delta;
+    Vec2<sint32> last_position;
 };
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void UpdateMouse(Mouse* mouse, Window* window) {
-    mouse->position = get_mouse_position(window);
+static void UpdateMouse(Mouse* mouse, Window* window)
+{
+    mouse->position = GetMousePosition(window);
     mouse->delta = mouse->position - mouse->last_position;
     mouse->last_position = mouse->position;
 }

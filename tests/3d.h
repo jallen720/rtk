@@ -1,47 +1,46 @@
 #include <windows.h>
-#include "ctk/ctk.h"
-#include "ctk/memory.h"
-#include "ctk/multithreading.h"
-#include "ctk/math.h"
-#include "stk/stk.h"
+#include "ctk2/ctk.h"
+#include "ctk2/memory.h"
+#include "ctk2/multithreading.h"
+#include "ctk2/math.h"
+#include "stk2/stk.h"
 
 #define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
 
-using namespace ctk;
-using namespace stk;
+#include "rtk/tests/shared.h"
+
+using namespace CTK;
+using namespace STK;
 using namespace RTK;
 
 /// Data
 ////////////////////////////////////////////////////////////
-static constexpr u32 MAX_PHYSICAL_DEVICES        = 8;
-static constexpr u32 MAX_RENDER_PASS_ATTACHMENTS = 8;
-static constexpr u32 MAX_HOST_MEMORY             = megabyte(128);
-static constexpr u32 MAX_DEVICE_MEMORY           = megabyte(256);
+static constexpr uint32 MAX_PHYSICAL_DEVICES        = 8;
+static constexpr uint32 MAX_RENDER_PASS_ATTACHMENTS = 8;
+static constexpr uint32 MAX_HOST_MEMORY             = Megabyte(128);
+static constexpr uint32 MAX_DEVICE_MEMORY           = Megabyte(256);
 
-struct View {
-    Vec3<f32> position;
-    Vec3<f32> rotation;
-    f32       vertical_fov;
-    f32       aspect;
-    f32       z_near;
-    f32       z_far;
-    f32       max_x_angle;
+struct View
+{
+    Vec3<float32> position;
+    Vec3<float32> rotation;
+    float32       vertical_fov;
+    float32       aspect;
+    float32       z_near;
+    float32       z_far;
+    float32       max_x_angle;
 };
 
-struct Entity {
-    Vec3<f32> position;
-    Vec3<f32> rotation;
-    Matrix    mvp_matrix;
+struct Entity
+{
+    Vec3<float32> position;
+    Vec3<float32> rotation;
+    Matrix        mvp_matrix;
 };
 
-struct Mouse {
-    Vec2<s32> position;
-    Vec2<s32> delta;
-    Vec2<s32> last_position;
-};
-
-struct Game {
+struct Game
+{
     Array<Shader>* shaders;
     Pipeline       pipeline;
     View           view;
@@ -49,19 +48,23 @@ struct Game {
     Mouse          mouse;
 };
 
-struct Vertex {
-    Vec3<f32> position;
+struct Vertex
+{
+    Vec3<float32> position;
 };
 
 /// Test Functions
 ////////////////////////////////////////////////////////////
-static void SelectPhysicalDevice(RTKContext* rtk) {
+static void SelectPhysicalDevice(RTKContext* rtk)
+{
     // Default to first physical device.
     UsePhysicalDevice(rtk, 0);
 
     // Use first discrete device if any are available.
-    for (u32 i = 0; i < rtk->physical_devices->count; ++i) {
-        if (get(rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
+    for (uint32 i = 0; i < rtk->physical_devices->count; ++i)
+    {
+        if (Get(rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        {
             UsePhysicalDevice(rtk, i);
             break;
         }
@@ -70,11 +73,13 @@ static void SelectPhysicalDevice(RTKContext* rtk) {
     LogPhysicalDevice(rtk->physical_device, "selected physical device");
 }
 
-static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window) {
+static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
+{
     InitRTKContext(rtk, mem, MAX_PHYSICAL_DEVICES);
 
     // Initialize RTK instance.
-    InitInstance(rtk, {
+    InitInstance(rtk,
+    {
         .application_name = "RTK Test",
 #ifdef RTK_ENABLE_VALIDATION
         .debug_callback         = DefaultDebugCallback,
@@ -90,8 +95,10 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     InitSurface(rtk, window);
 
     // Initialize device state.
-    DeviceFeatures required_features = {
-        .as_struct = {
+    DeviceFeatures required_features =
+    {
+        .as_struct =
+        {
             .geometryShader    = VK_TRUE,
             .samplerAnisotropy = VK_TRUE,
         },
@@ -108,21 +115,22 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     InitSwapchain(rtk, mem, temp_mem);
     InitRenderPass(rtk);
     InitFramebuffers(rtk, mem);
-    static constexpr u32 RENDER_THREAD_COUNT = 1;
+    static constexpr uint32 RENDER_THREAD_COUNT = 1;
     InitRenderCommandState(rtk, mem, RENDER_THREAD_COUNT);
     InitSyncState(rtk);
 }
 
-static u32 test_mesh_indexes_offset = 0;
+static uint32 test_mesh_indexes_offset = 0;
 
-static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk) {
+static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+{
     PipelineInfo pipeline_info = {};
 
     // Load pipeline shaders.
-    init_array(&pipeline_info.shaders, mem, 2);
-    LoadShader(push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/3d.vert.spv",
+    InitArray(&pipeline_info.shaders, mem, 2);
+    LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.vert.spv",
                VK_SHADER_STAGE_VERTEX_BIT);
-    LoadShader(push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/3d.frag.spv",
+    LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.frag.spv",
                VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Init pipeline vertex layout.
@@ -132,8 +140,9 @@ static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* 
     // PushAttribute(&pipeline_info.vertex_layout, 3); // Color
 
     // Init push constant ranges.
-    init_array(&pipeline_info.push_constant_ranges, mem, 1);
-    push(&pipeline_info.push_constant_ranges, {
+    InitArray(&pipeline_info.push_constant_ranges, mem, 1);
+    Push(&pipeline_info.push_constant_ranges,
+    {
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
         .offset     = 0,
         .size       = sizeof(Matrix),
@@ -150,8 +159,10 @@ static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* 
     }
 }
 
-static void InitGameState(Game* game, Stack* mem) {
-    game->view = {
+static void InitGameState(Game* game, Stack* mem)
+{
+    game->view =
+    {
         .position     = { 0, 0, -1 },
         .rotation     = { 0, 0, 0 },
         .vertical_fov = 90.0f,
@@ -161,113 +172,126 @@ static void InitGameState(Game* game, Stack* mem) {
         .max_x_angle  = 85.0f,
     };
 
-    static constexpr u32 CUBE_SIZE = 4;
-    static constexpr u32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
-    game->entities = create_array<Entity>(mem, CUBE_ENTITY_COUNT);
-    for (u32 x = 0; x < CUBE_SIZE; ++x)
-    for (u32 y = 0; y < CUBE_SIZE; ++y)
-    for (u32 z = 0; z < CUBE_SIZE; ++z) {
-        push(game->entities, {
+    static constexpr uint32 CUBE_SIZE = 4;
+    static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
+    game->entities = CreateArray<Entity>(mem, CUBE_ENTITY_COUNT);
+    for (uint32 x = 0; x < CUBE_SIZE; ++x)
+    for (uint32 y = 0; y < CUBE_SIZE; ++y)
+    for (uint32 z = 0; z < CUBE_SIZE; ++z)
+    {
+        Push(game->entities,
+        {
             .position = { x * 1.5f, y * 1.5f, z * 1.5f },
             .rotation = { 0, 0, 0 },
         });
     }
 }
 
-static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk) {
+static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+{
     InitRenderState(game, mem, temp_mem, rtk);
     InitGameState(game, mem);
 }
 
-static void UpdateMouse(Game* game, Window* window) {
-    game->mouse.position = get_mouse_position(window);
-    game->mouse.delta = game->mouse.position - game->mouse.last_position;
-    game->mouse.last_position = game->mouse.position;
-}
-
-static void LocalTranslate(View* view, Vec3<f32> translation) {
+static void LocalTranslate(View* view, Vec3<float32> translation)
+{
     Matrix matrix = ID_MATRIX;
-    matrix = rotate_x(matrix, view->rotation.x);
-    matrix = rotate_y(matrix, view->rotation.y);
-    matrix = rotate_z(matrix, view->rotation.z);
+    matrix = RotateX(matrix, view->rotation.x);
+    matrix = RotateY(matrix, view->rotation.y);
+    matrix = RotateZ(matrix, view->rotation.z);
 
-    Vec3<f32> forward = { matrix[0][2], matrix[1][2], matrix[2][2] };
-    Vec3<f32> right = { matrix[0][0], matrix[1][0], matrix[2][0] };
-    view->position += translation.z * forward;
-    view->position += translation.x * right;
+    Vec3<float32> forward = {};
+    forward.x = GetVal(&matrix, 0, 2);
+    forward.y = GetVal(&matrix, 1, 2);
+    forward.z = GetVal(&matrix, 2, 2);
+
+    Vec3<float32> right = {};
+    right.x = GetVal(&matrix, 0, 0);
+    right.y = GetVal(&matrix, 1, 0);
+    right.z = GetVal(&matrix, 2, 0);
+
+    view->position = view->position + (translation.z * forward);
+    view->position = view->position + (translation.x * right);
     view->position.y += translation.y;
 }
 
-static void ViewControls(Game* game, Window* window) {
+static void ViewControls(Game* game, Window* window)
+{
     View* view = &game->view;
 
     // Translation
-    static constexpr f32 BASE_TRANSLATION_SPEED = 0.01f;
-    f32 mod = key_down(window, Key::SHIFT) ? 8 : 1;
-    f32 translation_speed = BASE_TRANSLATION_SPEED * mod;
-    Vec3<f32> translation = {};
+    static constexpr float32 BASE_TRANSLATION_SPEED = 0.01f;
+    float32 mod = KeyDown(window, Key::SHIFT) ? 8 : 1;
+    float32 translation_speed = BASE_TRANSLATION_SPEED * mod;
+    Vec3<float32> translation = {};
 
-    if (key_down(window, Key::W)) { translation.z += translation_speed; }
-    if (key_down(window, Key::S)) { translation.z -= translation_speed; }
-    if (key_down(window, Key::D)) { translation.x += translation_speed; }
-    if (key_down(window, Key::A)) { translation.x -= translation_speed; }
-    if (key_down(window, Key::E)) { translation.y += translation_speed; }
-    if (key_down(window, Key::Q)) { translation.y -= translation_speed; }
+    if (KeyDown(window, Key::W)) translation.z += translation_speed;
+    if (KeyDown(window, Key::S)) translation.z -= translation_speed;
+    if (KeyDown(window, Key::D)) translation.x += translation_speed;
+    if (KeyDown(window, Key::A)) translation.x -= translation_speed;
+    if (KeyDown(window, Key::E)) translation.y += translation_speed;
+    if (KeyDown(window, Key::Q)) translation.y -= translation_speed;
 
     LocalTranslate(view, translation);
 
     // Rotation
-    if (mouse_button_down(window, 1)) {
-        static constexpr f32 ROTATION_SPEED = 0.2f;
+    if (MouseButtonDown(window, 1))
+    {
+        static constexpr float32 ROTATION_SPEED = 0.2f;
         view->rotation.x -= game->mouse.delta.y * ROTATION_SPEED;
         view->rotation.y -= game->mouse.delta.x * ROTATION_SPEED;
-        view->rotation.x = clamp(view->rotation.x, -view->max_x_angle, view->max_x_angle);
+        view->rotation.x = Clamp(view->rotation.x, -view->max_x_angle, view->max_x_angle);
     }
 }
 
-static void Controls(Game* game, Window* window) {
-    if (key_down(window, Key::ESCAPE)) {
+static void Controls(Game* game, Window* window)
+{
+    if (KeyDown(window, Key::ESCAPE))
         window->open = false;
-    }
 
     ViewControls(game, window);
 }
 
-static Matrix CreateViewProjectionMatrix(View* view) {
+static Matrix CreateViewProjectionMatrix(View* view)
+{
     Matrix view_model_matrix = ID_MATRIX;
-    view_model_matrix = rotate_x(view_model_matrix, view->rotation.x);
-    view_model_matrix = rotate_y(view_model_matrix, view->rotation.y);
-    view_model_matrix = rotate_z(view_model_matrix, view->rotation.z);
-    Vec3<f32> forward = {
-        .x = view_model_matrix[0][2],
-        .y = view_model_matrix[1][2],
-        .z = view_model_matrix[2][2],
-    };
-    Matrix view_matrix = look_at(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
+    view_model_matrix = RotateX(view_model_matrix, view->rotation.x);
+    view_model_matrix = RotateY(view_model_matrix, view->rotation.y);
+    view_model_matrix = RotateZ(view_model_matrix, view->rotation.z);
+
+    Vec3<float32> forward = {};
+    forward.x = GetVal(&view_model_matrix, 0, 2);
+    forward.y = GetVal(&view_model_matrix, 1, 2);
+    forward.z = GetVal(&view_model_matrix, 2, 2);
+
+    Matrix view_matrix = LookAt(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
 
     // Projection Matrix
-    Matrix projection_matrix = perspective_matrix(view->vertical_fov, view->aspect, view->z_near, view->z_far);
+    Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, view->aspect, view->z_near, view->z_far);
 
     return projection_matrix * view_matrix;
 }
 
-static void UpdateGame(Game* game) {
+static void UpdateGame(Game* game)
+{
     // Update entity MVP matrixes.
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    for (u32 i = 0; i < game->entities->count; ++i) {
-        Entity* entity = get(game->entities, i);
+    for (uint32 i = 0; i < game->entities->count; ++i)
+    {
+        Entity* entity = Get(game->entities, i);
         Matrix model_matrix = ID_MATRIX;
-        model_matrix = translate(ID_MATRIX, entity->position);
-        model_matrix = rotate_x(model_matrix, entity->rotation.x);
-        model_matrix = rotate_y(model_matrix, entity->rotation.y);
-        model_matrix = rotate_z(model_matrix, entity->rotation.z);
+        model_matrix = Translate(ID_MATRIX, entity->position);
+        model_matrix = RotateX(model_matrix, entity->rotation.x);
+        model_matrix = RotateY(model_matrix, entity->rotation.y);
+        model_matrix = RotateZ(model_matrix, entity->rotation.z);
         // model_matrix = scale(model_matrix, entity->scale);
 
         entity->mvp_matrix = view_projection_matrix * model_matrix;
     }
 }
 
-static void RecordRenderCommands(Game* game, RTKContext* rtk) {
+static void RecordRenderCommands(Game* game, RTKContext* rtk)
+{
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, 0);
         Pipeline* pipeline = &game->pipeline;
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
@@ -286,8 +310,9 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk) {
                              indexes_offset,
                              VK_INDEX_TYPE_UINT32);
 
-        for (u32 i = 0; i < game->entities->count; ++i) {
-            Entity* entity = get(game->entities, i);
+        for (uint32 i = 0; i < game->entities->count; ++i)
+        {
+            Entity* entity = Get(game->entities, i);
             vkCmdPushConstants(render_command_buffer, pipeline->layout,
                                VK_SHADER_STAGE_VERTEX_BIT,
                                0, sizeof(entity->mvp_matrix), &entity->mvp_matrix);
@@ -301,44 +326,48 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk) {
     vkEndCommandBuffer(render_command_buffer);
 }
 
-void test_main() {
-    Stack* mem = create_stack(megabyte(4));
-    Stack* temp_mem = create_stack(mem, megabyte(1));
+void test_main()
+{
+    Stack* mem = CreateStack(Megabyte(4));
+    Stack* temp_mem = CreateStack(mem, Megabyte(1));
 
-    win32_init();
-    Window* window = create_window(mem, {
-        .surface = {
+    auto window = Allocate<Window>(mem, 1);
+    InitWin32();
+    InitWindow(window,
+    {
+        .surface =
+        {
             .x      = 0,
             .y      = 60, // Taskbar height.
             .width  = 1080,
             .height = 720,
         },
         .title    = L"3D Test",
-        .callback = default_window_callback,
+        .callback = DefaultWindowCallback,
     });
 
-    auto rtk = allocate<RTKContext>(mem, 1);
+    auto rtk = Allocate<RTKContext>(mem, 1);
     InitRTK(rtk, mem, *temp_mem, window);
 
-    auto game = allocate<Game>(mem, 1);
+    auto game = Allocate<Game>(mem, 1);
     InitTest(game, mem, *temp_mem, rtk);
 
     // Run game.
     while (1) {
-        process_events(window);
+        ProcessEvents(window);
         if (!window->open) {
             // Quit event closed window.
             break;
         }
 
-        UpdateMouse(game, window);
+        UpdateMouse(&game->mouse, window);
         Controls(game, window);
         if (!window->open) {
             // Controls closed window.
             break;
         }
 
-        if (window_is_active(window)) {
+        if (WindowIsActive(window)) {
             UpdateGame(game);
             NextFrame(rtk);
             RecordRenderCommands(game, rtk);

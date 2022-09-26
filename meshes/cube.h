@@ -1,4 +1,5 @@
-Vertex vertexes[] = {
+Vertex vertexes[] =
+{
     // -Z
     { .position = { 0.0f, 0.0f, 0.0f } },
     { .position = { 0.0f, 1.0f, 0.0f } },
@@ -36,7 +37,8 @@ Vertex vertexes[] = {
     { .position = { 1.0f, 1.0f, 0.0f } },
 };
 
-u32 indexes[] = {
+uint32 indexes[] =
+{
     // -Z
     0, 1, 2,
     0, 2, 3,

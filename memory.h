@@ -3,27 +3,30 @@
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/device.h"
-#include "ctk/ctk.h"
+#include "ctk2/ctk.h"
 
-using namespace ctk;
+using namespace CTK;
 
-namespace RTK {
+namespace RTK
+{
 
 /// Data
 ////////////////////////////////////////////////////////////
-struct BufferInfo {
+struct BufferInfo
+{
     VkDeviceSize          size;
     VkSharingMode         sharing_mode;
     VkBufferUsageFlags    usage_flags;
     VkMemoryPropertyFlags mem_property_flags;
 };
 
-struct Buffer {
+struct Buffer
+{
     VkBuffer       hnd;
     VkDeviceMemory mem;
     VkDeviceSize   size;
     VkDeviceSize   offset;
-    u8*            mapped_mem;
+    uint8*         mapped_mem;
 };
 
 /// Utils
@@ -34,26 +37,27 @@ static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* phys
 {
     // Find memory type index in memory properties based on memory property flags.
     VkPhysicalDeviceMemoryProperties mem_properties = physical_device->mem_properties;
-    u32 mem_type_index = U32_MAX;
-    for (u32 i = 0; i < mem_properties.memoryTypeCount; ++i) {
+    uint32 mem_type_index = U32_MAX;
+    for (uint32 i = 0; i < mem_properties.memoryTypeCount; ++i)
+    {
         // Ensure memory type at mem_properties.memoryTypes[i] is supported by mem_requirements.
-        if ((mem_requirements.memoryTypeBits & (1 << i)) == 0) {
+        if ((mem_requirements.memoryTypeBits & (1 << i)) == 0)
             continue;
-        }
 
         // Check if memory at index has all property flags.
-        if ((mem_properties.memoryTypes[i].propertyFlags & mem_property_flags) == mem_property_flags) {
+        if ((mem_properties.memoryTypes[i].propertyFlags & mem_property_flags) == mem_property_flags)
+        {
             mem_type_index = i;
             break;
         }
     }
 
-    if (mem_type_index == U32_MAX) {
+    if (mem_type_index == U32_MAX)
         CTK_FATAL("failed to find memory type that satisfies memory requirements");
-    }
 
     // Allocate memory using selected memory type index.
-    VkMemoryAllocateInfo info = {
+    VkMemoryAllocateInfo info =
+    {
         .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize  = mem_requirements.size,
         .memoryTypeIndex = mem_type_index,
@@ -67,10 +71,12 @@ static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* phys
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical_device, BufferInfo info) {
+static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical_device, BufferInfo info)
+{
     VkResult res = VK_SUCCESS;
 
-    VkBufferCreateInfo create_info = {
+    VkBufferCreateInfo create_info =
+    {
         .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .size                  = info.size,
         .usage                 = info.usage_flags,
@@ -92,9 +98,8 @@ static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical
     buffer->size = mem_requirements.size;
 
     // Map host visible buffer memory.
-    if (info.mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+    if (info.mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         vkMapMemory(device, buffer->mem, 0, buffer->size, 0, (void**)&buffer->mapped_mem);
-    }
 }
 
 }

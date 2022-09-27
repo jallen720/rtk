@@ -159,7 +159,8 @@ static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* 
     }
 }
 
-static void InitGameState(Game* game, Stack* mem) {
+static void InitGameState(Game* game, Stack* mem)
+{
     game->view =
     {
         .position     = { 0, 0, -1 },
@@ -186,12 +187,14 @@ static void InitGameState(Game* game, Stack* mem) {
     }
 }
 
-static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk) {
+static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+{
     InitRenderState(game, mem, temp_mem, rtk);
     InitGameState(game, mem);
 }
 
-static void ViewControls(Game* game, Window* window) {
+static void ViewControls(Game* game, Window* window)
+{
     View* view = &game->view;
 
     // Translation
@@ -208,7 +211,8 @@ static void ViewControls(Game* game, Window* window) {
     view->position = view->position + translation;
 }
 
-static void Controls(Game* game, Window* window) {
+static void Controls(Game* game, Window* window)
+{
     if (KeyDown(window, Key::ESCAPE))
     {
         window->open = false;
@@ -246,7 +250,8 @@ static void UpdateGame(Game* game)
     }
 }
 
-static void RecordRenderCommands(Game* game, RTKContext* rtk) {
+static void RecordRenderCommands(Game* game, RTKContext* rtk)
+{
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, 0);
         Pipeline* pipeline = &game->pipeline;
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
@@ -281,7 +286,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk) {
     vkEndCommandBuffer(render_command_buffer);
 }
 
-void test_main()
+void TestMain()
 {
     Stack* mem = CreateStack(Megabyte(4));
     Stack* temp_mem = CreateStack(mem, Megabyte(1));

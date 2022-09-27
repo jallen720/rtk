@@ -4,6 +4,6 @@
 
 sint32 main()
 {
-    test_main();
+    TestMain();
     return 0;
 }

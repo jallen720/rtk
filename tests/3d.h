@@ -329,7 +329,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
     vkEndCommandBuffer(render_command_buffer);
 }
 
-void test_main()
+void TestMain()
 {
     Stack* mem = CreateStack(Megabyte(4));
     Stack* temp_mem = CreateStack(mem, Megabyte(1));

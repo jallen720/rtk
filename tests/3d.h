@@ -200,18 +200,20 @@ static void LocalTranslate(View* view, Vec3<float32> translation)
     matrix = RotateY(matrix, view->rotation.y);
     matrix = RotateZ(matrix, view->rotation.z);
 
-    Vec3<float32> forward = {};
-    forward.x = GetVal(&matrix, 0, 2);
-    forward.y = GetVal(&matrix, 1, 2);
-    forward.z = GetVal(&matrix, 2, 2);
-
-    Vec3<float32> right = {};
-    right.x = GetVal(&matrix, 0, 0);
-    right.y = GetVal(&matrix, 1, 0);
-    right.z = GetVal(&matrix, 2, 0);
-
-    view->position = view->position + (translation.z * forward);
-    view->position = view->position + (translation.x * right);
+    Vec3<float32> forward =
+    {
+        .x = GetVal(&matrix, 0, 2),
+        .y = GetVal(&matrix, 1, 2),
+        .z = GetVal(&matrix, 2, 2),
+    };
+    Vec3<float32> right =
+    {
+        .x = GetVal(&matrix, 0, 0),
+        .y = GetVal(&matrix, 1, 0),
+        .z = GetVal(&matrix, 2, 0),
+    };
+    view->position = view->position + (forward * translation.z);
+    view->position = view->position + (right * translation.x);
     view->position.y += translation.y;
 }
 
@@ -259,11 +261,12 @@ static Matrix CreateViewProjectionMatrix(View* view)
     view_model_matrix = RotateY(view_model_matrix, view->rotation.y);
     view_model_matrix = RotateZ(view_model_matrix, view->rotation.z);
 
-    Vec3<float32> forward = {};
-    forward.x = GetVal(&view_model_matrix, 0, 2);
-    forward.y = GetVal(&view_model_matrix, 1, 2);
-    forward.z = GetVal(&view_model_matrix, 2, 2);
-
+    Vec3<float32> forward =
+    {
+        .x = GetVal(&view_model_matrix, 0, 2),
+        .y = GetVal(&view_model_matrix, 1, 2),
+        .z = GetVal(&view_model_matrix, 2, 2),
+    };
     Matrix view_matrix = LookAt(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
 
     // Projection Matrix
@@ -353,27 +356,26 @@ void test_main()
     InitTest(game, mem, *temp_mem, rtk);
 
     // Run game.
-    while (1) {
+    while (1)
+    {
         ProcessEvents(window);
-        if (!window->open) {
-            // Quit event closed window.
-            break;
-        }
+        if (!window->open)
+            break; // Quit event closed window.
 
         UpdateMouse(&game->mouse, window);
         Controls(game, window);
-        if (!window->open) {
-            // Controls closed window.
-            break;
-        }
+        if (!window->open)
+            break; // Controls closed window.
 
-        if (WindowIsActive(window)) {
+        if (WindowIsActive(window))
+        {
             UpdateGame(game);
             NextFrame(rtk);
             RecordRenderCommands(game, rtk);
             SubmitRenderCommands(rtk);
         }
-        else {
+        else
+        {
             Sleep(1);
         }
     }

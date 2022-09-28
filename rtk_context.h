@@ -21,7 +21,7 @@ using namespace STK;
     auto FUNC_NAME = (PFN_ ## FUNC_NAME)vkGetInstanceProcAddr(INSTANCE, #FUNC_NAME); \
     if (FUNC_NAME == NULL) \
     { \
-        CTK_FATAL("failed to load instance extension function \"%s\"", #FUNC_NAME) \
+        CTK_FATAL("failed to load instance extension function \"%s\"", #FUNC_NAME); \
     }
 
 namespace RTK
@@ -95,7 +95,7 @@ struct RTKContext
     Array<VkCommandPool>*   render_command_pools;
     VkCommandBuffer         primary_render_command_buffer;
     Array<VkCommandBuffer>* render_command_buffers;
-    uint32                     swapchain_image_index;
+    uint32                  swapchain_image_index;
     VkSemaphore             image_acquired;
     VkSemaphore             render_finished;
 };
@@ -406,7 +406,8 @@ static void GetSurfaceInfo(RTKContext* rtk, Stack* mem)
 
 static void InitMemory(RTKContext* rtk, uint32 max_host_memory, uint32 max_device_memory)
 {
-    InitBuffer(&rtk->host_buffer, rtk->device, rtk->physical_device, {
+    InitBuffer(&rtk->host_buffer, rtk->device, rtk->physical_device,
+    {
         .size               = max_host_memory,
         .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -416,7 +417,8 @@ static void InitMemory(RTKContext* rtk, uint32 max_host_memory, uint32 max_devic
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     });
-    InitBuffer(&rtk->device_buffer, rtk->device, rtk->physical_device, {
+    InitBuffer(&rtk->device_buffer, rtk->device, rtk->physical_device,
+    {
         .size               = max_device_memory,
         .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -527,7 +529,8 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
         info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
         info.pQueueFamilyIndices   = (uint32*)queue_families;
     }
-    else {
+    else
+    {
         info.imageSharingMode      = VK_SHARING_MODE_EXCLUSIVE;
         info.queueFamilyIndexCount = 0;
         info.pQueueFamilyIndices   = NULL;

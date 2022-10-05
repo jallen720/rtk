@@ -400,8 +400,8 @@ static void GetSurfaceInfo(RTKContext* rtk, Stack* mem)
     VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, surface->hnd, &surface->capabilities);
     Validate(res, "failed to get physical device surface capabilities");
 
-    surface->formats = GetVkPhysicalDeviceSurfaceFormats(mem, vk_physical_device, surface->hnd);
-    surface->present_modes = GetVkPhysicalDeviceSurfacePresentModes(mem, vk_physical_device, surface->hnd);
+    surface->formats = GetVkSurfaceFormats(mem, vk_physical_device, surface->hnd);
+    surface->present_modes = GetVkSurfacePresentModes(mem, vk_physical_device, surface->hnd);
 }
 
 static void InitMemory(RTKContext* rtk, uint32 max_host_memory, uint32 max_device_memory)

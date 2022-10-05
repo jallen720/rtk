@@ -60,13 +60,13 @@ GetVkPhysicalDevices(Stack* mem, VkInstance instance)
 }
 
 static Array<VkSurfaceFormatKHR>*
-GetVkPhysicalDeviceSurfaceFormats(Stack* mem, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
+GetVkSurfaceFormats(Stack* mem, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
     return GetVkArray<VkSurfaceFormatKHR>(mem, vkGetPhysicalDeviceSurfaceFormatsKHR, physical_device, surface);
 }
 
 static Array<VkPresentModeKHR>*
-GetVkPhysicalDeviceSurfacePresentModes(Stack* mem, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
+GetVkSurfacePresentModes(Stack* mem, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
     return GetVkArray<VkPresentModeKHR>(mem, vkGetPhysicalDeviceSurfacePresentModesKHR, physical_device, surface);
 }

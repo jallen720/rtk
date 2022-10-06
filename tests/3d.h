@@ -202,15 +202,15 @@ static void LocalTranslate(View* view, Vec3<float32> translation)
 
     Vec3<float32> forward =
     {
-        .x = GetVal(&matrix, 0, 2),
-        .y = GetVal(&matrix, 1, 2),
-        .z = GetVal(&matrix, 2, 2),
+        .x = Get(&matrix, 0, 2),
+        .y = Get(&matrix, 1, 2),
+        .z = Get(&matrix, 2, 2),
     };
     Vec3<float32> right =
     {
-        .x = GetVal(&matrix, 0, 0),
-        .y = GetVal(&matrix, 1, 0),
-        .z = GetVal(&matrix, 2, 0),
+        .x = Get(&matrix, 0, 0),
+        .y = Get(&matrix, 1, 0),
+        .z = Get(&matrix, 2, 0),
     };
     view->position = view->position + (forward * translation.z);
     view->position = view->position + (right * translation.x);
@@ -263,9 +263,9 @@ static Matrix CreateViewProjectionMatrix(View* view)
 
     Vec3<float32> forward =
     {
-        .x = GetVal(&view_model_matrix, 0, 2),
-        .y = GetVal(&view_model_matrix, 1, 2),
-        .z = GetVal(&view_model_matrix, 2, 2),
+        .x = Get(&view_model_matrix, 0, 2),
+        .y = Get(&view_model_matrix, 1, 2),
+        .z = Get(&view_model_matrix, 2, 2),
     };
     Matrix view_matrix = LookAt(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
 
@@ -283,11 +283,11 @@ static void UpdateGame(Game* game)
     {
         Entity* entity = Get(game->entities, i);
         Matrix model_matrix = ID_MATRIX;
-        model_matrix = Translate(ID_MATRIX, entity->position);
+        model_matrix = Translate(model_matrix, entity->position);
         model_matrix = RotateX(model_matrix, entity->rotation.x);
         model_matrix = RotateY(model_matrix, entity->rotation.y);
         model_matrix = RotateZ(model_matrix, entity->rotation.z);
-        // model_matrix = scale(model_matrix, entity->scale);
+        // model_matrix = Scale(model_matrix, entity->scale);
 
         entity->mvp_matrix = view_projection_matrix * model_matrix;
     }
@@ -341,7 +341,7 @@ void TestMain()
         .surface =
         {
             .x      = 0,
-            .y      = 60, // Taskbar height.
+            .y      = 90, // Taskbar height.
             .width  = 1080,
             .height = 720,
         },

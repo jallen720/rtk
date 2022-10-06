@@ -225,7 +225,7 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
     CTK_ASSERT(field_count <= 4);
 
     uint32 current_binding_index = layout->bindings->count - 1;
-    VkVertexInputBindingDescription* current_binding = Get(layout->bindings, current_binding_index);
+    VkVertexInputBindingDescription* current_binding = GetPtr(layout->bindings, current_binding_index);
 
     Push(layout->attributes,
     {
@@ -311,7 +311,7 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     // Pipeline
     auto shader_stages = CreateArray<VkPipelineShaderStageCreateInfo>(&temp_mem, info->shaders.count);
     for (uint32 i = 0; i < info->shaders.count; ++i)
-        Push(shader_stages, DefaultShaderStageCreateInfo(Get(&info->shaders, i)));
+        Push(shader_stages, DefaultShaderStageCreateInfo(GetPtr(&info->shaders, i)));
 
     VkGraphicsPipelineCreateInfo create_info =
     {

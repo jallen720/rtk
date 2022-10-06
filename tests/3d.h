@@ -63,7 +63,7 @@ static void SelectPhysicalDevice(RTKContext* rtk)
     // Use first discrete device if any are available.
     for (uint32 i = 0; i < rtk->physical_devices->count; ++i)
     {
-        if (Get(rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        if (GetPtr(rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
         {
             UsePhysicalDevice(rtk, i);
             break;
@@ -281,7 +281,7 @@ static void UpdateGame(Game* game)
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
     for (uint32 i = 0; i < game->entities->count; ++i)
     {
-        Entity* entity = Get(game->entities, i);
+        Entity* entity = GetPtr(game->entities, i);
         Matrix model_matrix = ID_MATRIX;
         model_matrix = Translate(model_matrix, entity->position);
         model_matrix = RotateX(model_matrix, entity->rotation.x);
@@ -315,7 +315,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
 
         for (uint32 i = 0; i < game->entities->count; ++i)
         {
-            Entity* entity = Get(game->entities, i);
+            Entity* entity = GetPtr(game->entities, i);
             vkCmdPushConstants(render_command_buffer, pipeline->layout,
                                VK_SHADER_STAGE_VERTEX_BIT,
                                0, sizeof(entity->mvp_matrix), &entity->mvp_matrix);

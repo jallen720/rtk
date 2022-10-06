@@ -115,7 +115,7 @@ static QueueFamilies FindQueueFamilies(Stack temp_mem, VkPhysicalDevice physical
     for (uint32 queue_family_index = 0; queue_family_index < queue_family_properties->count; ++queue_family_index)
     {
         // Check if queue supports graphics operations.
-        if (Get(queue_family_properties, queue_family_index)->queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        if (GetPtr(queue_family_properties, queue_family_index)->queueFlags & VK_QUEUE_GRAPHICS_BIT)
         {
             queue_families.graphics = queue_family_index;
             break;
@@ -298,7 +298,7 @@ static void UsePhysicalDevice(RTKContext* rtk, uint32 index)
     if (index >= rtk->physical_devices->count)
         CTK_FATAL("physical device index %u is out of bounds: max is %u", index, rtk->physical_devices->count - 1);
 
-    rtk->physical_device = Get(rtk->physical_devices, index);
+    rtk->physical_device = GetPtr(rtk->physical_devices, index);
 }
 
 static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFeatures* required_features)
@@ -317,7 +317,7 @@ static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFe
     // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
     for (uint32 i = 0; i < vk_physical_devices->count; ++i)
     {
-        VkPhysicalDevice vk_physical_device = GetCopy(vk_physical_devices, i);
+        VkPhysicalDevice vk_physical_device = Get(vk_physical_devices, i);
 
         // Collect all info about physical device.
         PhysicalDevice physical_device =
@@ -465,10 +465,10 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
 
     // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
     // color space.
-    VkSurfaceFormatKHR selected_format = GetCopy(surface->formats, 0);
+    VkSurfaceFormatKHR selected_format = Get(surface->formats, 0);
     for (uint32 i = 0; i < surface->formats->count; ++i)
     {
-        VkSurfaceFormatKHR surface_format = GetCopy(surface->formats, i);
+        VkSurfaceFormatKHR surface_format = Get(surface->formats, i);
         if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM &&
             surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
         {
@@ -481,7 +481,7 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
     VkPresentModeKHR selected_present_mode = VK_PRESENT_MODE_FIFO_KHR;
     for (uint32 i = 0; i < surface->present_modes->count; ++i)
     {
-        VkPresentModeKHR surface_present_mode = GetCopy(surface->present_modes, i);
+        VkPresentModeKHR surface_present_mode = Get(surface->present_modes, i);
         if (surface_present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
         {
             selected_present_mode = surface_present_mode;
@@ -554,7 +554,7 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
         {
             .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .flags    = 0,
-            .image    = GetCopy(swapchain_images, i),
+            .image    = Get(swapchain_images, i),
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
             .format   = swapchain->image_format,
             .components =
@@ -573,7 +573,7 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
                 .layerCount     = 1,
             },
         };
-        res = vkCreateImageView(device, &view_info, NULL, Get(swapchain->image_views, i));
+        res = vkCreateImageView(device, &view_info, NULL, GetPtr(swapchain->image_views, i));
         Validate(res, "failed to create swapchain image view");
     }
 }
@@ -633,7 +633,7 @@ static void InitFramebuffers(RTKContext* rtk, Stack* mem)
     {
         VkImageView attachments[] =
         {
-            GetCopy(swapchain->image_views, i),
+            Get(swapchain->image_views, i),
         };
         VkFramebufferCreateInfo info =
         {
@@ -692,7 +692,7 @@ static void InitRenderCommandState(RTKContext* rtk, Stack* mem, uint32 render_th
             VkCommandBufferAllocateInfo allocate_info =
             {
                 .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .commandPool        = GetCopy(rtk->render_command_pools, i),
+                .commandPool        = Get(rtk->render_command_pools, i),
                 .level              = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
                 .commandBufferCount = 1,
             };
@@ -774,7 +774,7 @@ static void NextFrame(RTKContext* rtk)
 
 static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, uint32 render_thread_index)
 {
-    VkCommandBuffer render_command_buffer = GetCopy(rtk->render_command_buffers, render_thread_index);
+    VkCommandBuffer render_command_buffer = Get(rtk->render_command_buffers, render_thread_index);
 
     VkCommandBufferInheritanceInfo inheritance_info =
     {
@@ -782,7 +782,7 @@ static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, uint32 rend
         .pNext                = NULL,
         .renderPass           = rtk->render_pass,
         .subpass              = 0,
-        .framebuffer          = GetCopy(rtk->framebuffers, rtk->swapchain_image_index),
+        .framebuffer          = Get(rtk->framebuffers, rtk->swapchain_image_index),
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags           = 0,
         .pipelineStatistics   = 0,
@@ -823,7 +823,7 @@ static void SubmitRenderCommands(RTKContext* rtk)
         .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext       = NULL,
         .renderPass  = rtk->render_pass,
-        .framebuffer = GetCopy(rtk->framebuffers, rtk->swapchain_image_index),
+        .framebuffer = Get(rtk->framebuffers, rtk->swapchain_image_index),
         .renderArea =
         {
             .offset = { 0, 0 },

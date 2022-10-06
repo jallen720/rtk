@@ -25,9 +25,6 @@ struct Shader
 static void LoadShader(Shader* shader, Stack temp_mem, VkDevice device, cstring path, VkShaderStageFlagBits stage)
 {
     Array<uint32>* bytecode = ReadFile<uint32>(&temp_mem, path);
-    if (bytecode == NULL)
-        CTK_FATAL("failed to load bytecode from \"%s\"", path);
-
     shader->stage = stage;
     VkShaderModuleCreateInfo info =
     {

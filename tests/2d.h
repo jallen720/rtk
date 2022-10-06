@@ -41,12 +41,11 @@ struct Entity
 
 struct Game
 {
-    Array<Shader>* shaders;
-    Pipeline       pipeline;
-    View           view;
-    Array<Entity>* entities;
-    Mouse          mouse;
-    uint32         test_mesh_indexes_offset;
+    Pipeline      pipeline;
+    View          view;
+    Array<Entity> entities;
+    Mouse         mouse;
+    uint32        test_mesh_indexes_offset;
 };
 
 struct Vertex
@@ -127,20 +126,20 @@ static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* 
     PipelineInfo pipeline_info = {};
 
     // Load pipeline shaders.
-    InitArray(&pipeline_info.shaders, mem, 2);
+    InitArray(&pipeline_info.shaders, &temp_mem, 2);
     LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.vert.spv",
                VK_SHADER_STAGE_VERTEX_BIT);
     LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.frag.spv",
                VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Init pipeline vertex layout.
-    InitVertexLayout(&pipeline_info.vertex_layout, mem, 1, 4);
+    InitVertexLayout(&pipeline_info.vertex_layout, &temp_mem, 1, 4);
     PushBinding(&pipeline_info.vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
     PushAttribute(&pipeline_info.vertex_layout, 3); // Position
     // PushAttribute(&pipeline_info.vertex_layout, 3); // Color
 
     // Init push constant ranges.
-    InitArray(&pipeline_info.push_constant_ranges, mem, 1);
+    InitArray(&pipeline_info.push_constant_ranges, &temp_mem, 1);
     Push(&pipeline_info.push_constant_ranges,
     {
         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
@@ -174,12 +173,12 @@ static void InitGameState(Game* game, Stack* mem)
 
     static constexpr uint32 CUBE_SIZE = 4;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
-    game->entities = CreateArray<Entity>(mem, CUBE_ENTITY_COUNT);
+    InitArray(&game->entities, mem, CUBE_ENTITY_COUNT);
     for (uint32 x = 0; x < CUBE_SIZE; ++x)
     for (uint32 y = 0; y < CUBE_SIZE; ++y)
     for (uint32 z = 0; z < CUBE_SIZE; ++z)
     {
-        Push(game->entities,
+        Push(&game->entities,
         {
             .position = { x * 1.5f, y * 1.5f, z * 1.5f },
             .rotation = { 0, 0, 0 },
@@ -236,9 +235,9 @@ static void UpdateGame(Game* game)
 {
     // Update entity MVP matrixes.
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    for (uint32 i = 0; i < game->entities->count; ++i)
+    for (uint32 i = 0; i < game->entities.count; ++i)
     {
-        Entity* entity = GetPtr(game->entities, i);
+        Entity* entity = GetPtr(&game->entities, i);
         Matrix model_matrix = ID_MATRIX;
         model_matrix = Translate(ID_MATRIX, entity->position);
         model_matrix = RotateX(model_matrix, entity->rotation.x);
@@ -270,9 +269,9 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
                              indexes_offset,
                              VK_INDEX_TYPE_UINT32);
 
-        for (uint32 i = 0; i < game->entities->count; ++i)
+        for (uint32 i = 0; i < game->entities.count; ++i)
         {
-            Entity* entity = GetPtr(game->entities, i);
+            Entity* entity = GetPtr(&game->entities, i);
             vkCmdPushConstants(render_command_buffer, pipeline->layout,
                                VK_SHADER_STAGE_VERTEX_BIT,
                                0, sizeof(entity->mvp_matrix), &entity->mvp_matrix);

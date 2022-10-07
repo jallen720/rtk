@@ -62,9 +62,9 @@ static void SelectPhysicalDevice(RTKContext* rtk)
     UsePhysicalDevice(rtk, 0);
 
     // Use first discrete device if any are available.
-    for (uint32 i = 0; i < rtk->physical_devices->count; ++i)
+    for (uint32 i = 0; i < rtk->physical_devices.count; ++i)
     {
-        if (GetPtr(rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        if (GetPtr(&rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
         {
             UsePhysicalDevice(rtk, i);
             break;
@@ -133,8 +133,10 @@ static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* 
                VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Init pipeline vertex layout.
-    InitVertexLayout(&pipeline_info.vertex_layout, &temp_mem, 1, 4);
+    InitArray(&pipeline_info.vertex_layout.bindings, &temp_mem, 1);
     PushBinding(&pipeline_info.vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
+
+    InitArray(&pipeline_info.vertex_layout.attributes, &temp_mem, 4);
     PushAttribute(&pipeline_info.vertex_layout, 3); // Position
     // PushAttribute(&pipeline_info.vertex_layout, 3); // Color
 

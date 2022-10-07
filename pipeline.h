@@ -172,9 +172,9 @@ static VkPipelineShaderStageCreateInfo DefaultShaderStageCreateInfo(Shader* shad
 
 struct VertexLayout
 {
-    Array<VkVertexInputBindingDescription>*   bindings;
-    Array<VkVertexInputAttributeDescription>* attributes;
-    uint32                                    attribute_location;
+    Array<VkVertexInputBindingDescription>   bindings;
+    Array<VkVertexInputAttributeDescription> attributes;
+    uint32                                   attribute_location;
 };
 
 struct PipelineInfo
@@ -192,17 +192,11 @@ struct Pipeline
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitVertexLayout(VertexLayout* layout, Stack* mem, uint32 max_bindings, uint32 max_attributes)
-{
-    layout->bindings = CreateArray<VkVertexInputBindingDescription>(mem, max_bindings);
-    layout->attributes = CreateArray<VkVertexInputAttributeDescription>(mem, max_attributes);
-}
-
 static void PushBinding(VertexLayout* layout, VkVertexInputRate input_rate)
 {
-    Push(layout->bindings,
+    Push(&layout->bindings,
     {
-        .binding   = layout->bindings->count,
+        .binding   = layout->bindings.count,
         .stride    = 0,
         .inputRate = input_rate,
     });
@@ -220,14 +214,14 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
         VK_FORMAT_R32G32B32A32_SFLOAT,
     };
 
-    CTK_ASSERT(layout->bindings->count > 0);
+    CTK_ASSERT(layout->bindings.count > 0);
     CTK_ASSERT(field_count > 0);
     CTK_ASSERT(field_count <= 4);
 
-    uint32 current_binding_index = layout->bindings->count - 1;
-    VkVertexInputBindingDescription* current_binding = GetPtr(layout->bindings, current_binding_index);
+    uint32 current_binding_index = layout->bindings.count - 1;
+    VkVertexInputBindingDescription* current_binding = GetPtr(&layout->bindings, current_binding_index);
 
-    Push(layout->attributes,
+    Push(&layout->attributes,
     {
         .location = layout->attribute_location,
         .binding  = current_binding_index,
@@ -247,10 +241,10 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     VkResult res = VK_SUCCESS;
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
-    vertex_input_state.vertexBindingDescriptionCount = info->vertex_layout.bindings->count;
-    vertex_input_state.pVertexBindingDescriptions = info->vertex_layout.bindings->data;
-    vertex_input_state.vertexAttributeDescriptionCount = info->vertex_layout.attributes->count;
-    vertex_input_state.pVertexAttributeDescriptions = info->vertex_layout.attributes->data;
+    vertex_input_state.vertexBindingDescriptionCount   = info->vertex_layout.bindings.count;
+    vertex_input_state.pVertexBindingDescriptions      = info->vertex_layout.bindings.data;
+    vertex_input_state.vertexAttributeDescriptionCount = info->vertex_layout.attributes.count;
+    vertex_input_state.pVertexAttributeDescriptions    = info->vertex_layout.attributes.data;
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
 
@@ -271,9 +265,9 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     };
     VkPipelineViewportStateCreateInfo viewport_state = DEFAULT_VIEWPORT_STATE;
     viewport_state.viewportCount = 1;
-    viewport_state.pViewports = &viewport;
-    viewport_state.scissorCount = 1;
-    viewport_state.pScissors = &scissor;
+    viewport_state.pViewports    = &viewport;
+    viewport_state.scissorCount  = 1;
+    viewport_state.pScissors     = &scissor;
 
     VkPipelineRasterizationStateCreateInfo rasterization_state = DEFAULT_RASTERIZATION_STATE;
     VkPipelineMultisampleStateCreateInfo multisample_state = DEFAULT_MULTISAMPLE_STATE;
@@ -287,7 +281,7 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     VkPipelineColorBlendAttachmentState swapchain_image_color_blend = DEFAULT_COLOR_BLEND_ATTACHMENT_STATE;
     VkPipelineColorBlendStateCreateInfo color_blend_state = DEFAULT_COLOR_BLEND_STATE;
     color_blend_state.attachmentCount = 1;
-    color_blend_state.pAttachments = &swapchain_image_color_blend;
+    color_blend_state.pAttachments    = &swapchain_image_color_blend;
 
     VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
 
@@ -301,10 +295,10 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
 
 
     VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
-    layout_create_info.setLayoutCount = 0;
-    layout_create_info.pSetLayouts = NULL;
+    layout_create_info.setLayoutCount         = 0;
+    layout_create_info.pSetLayouts            = NULL;
     layout_create_info.pushConstantRangeCount = info->push_constant_ranges.count;
-    layout_create_info.pPushConstantRanges = info->push_constant_ranges.data;
+    layout_create_info.pPushConstantRanges    = info->push_constant_ranges.data;
     res = vkCreatePipelineLayout(device, &layout_create_info, NULL, &pipeline->layout);
     Validate(res, "failed to create graphics pipeline layout");
 

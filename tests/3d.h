@@ -115,7 +115,7 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     // Initialize rendering state.
     InitSwapchain(rtk, mem, temp_mem);
     InitDepthImages(rtk, mem);
-    InitRenderPass(rtk);
+    InitRenderPass(rtk, temp_mem);
     InitFramebuffers(rtk, mem);
 
     static constexpr uint32 RENDER_THREAD_COUNT = 1;

@@ -56,6 +56,13 @@ struct Swapchain
     VkExtent2D         extent;
 };
 
+struct RenderPassAttachments
+{
+    Array<VkAttachmentDescription>  descriptions;
+    Array<VkAttachmentReference>    color;
+    Optional<VkAttachmentReference> depth;
+};
+
 struct Frame
 {
     // Sync State
@@ -174,6 +181,40 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(uint32 queue_family_index)
     };
 
     return info;
+}
+
+static void InitRenderPassAttachments(RenderPassAttachments* attachments, Stack* mem, uint32 max_color_attachments,
+                                      bool depth_attachment)
+{
+    InitArray(&attachments->descriptions, mem, max_color_attachments + (depth_attachment ? 1 : 0));
+    InitArray(&attachments->color, mem, max_color_attachments);
+}
+
+static void PushColorAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
+{
+    uint32 attachment_index = attachments->descriptions.count;
+    Push(&attachments->descriptions, description);
+    Push(&attachments->color,
+    {
+        .attachment = attachment_index,
+        .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    });
+}
+
+static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
+{
+    uint32 attachment_index = attachments->descriptions.count;
+    Push(&attachments->descriptions, description);
+    Set(&attachments->depth,
+    {
+        .attachment = attachment_index,
+        .layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    });
+}
+
+static VkAttachmentReference* GetDepthAttachment(RenderPassAttachments* attachments)
+{
+    return attachments->depth.exists ? &attachments->depth.value : NULL;
 }
 
 static VkFence CreateFence(VkDevice device)
@@ -497,7 +538,7 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
     // Verify current extent has been set for surface.
     if (surface->capabilities.currentExtent.width == UINT32_MAX)
     {
-        CTK_FATAL("current extent not set for surface")
+        CTK_FATAL("current extent not set for surface");
     }
 
     VkSwapchainCreateInfoKHR info =
@@ -637,68 +678,53 @@ static void InitDepthImages(RTKContext* rtk, Stack* mem)
     }
 }
 
-static void InitRenderPass(RTKContext* rtk)
+static void InitRenderPass(RTKContext* rtk, Stack temp_mem)
 {
-    VkAttachmentDescription attachments[] =
+    RenderPassAttachments attachments = {};
+    InitRenderPassAttachments(&attachments, &temp_mem, 1, true);
+    PushColorAttachment(&attachments,
     {
-        // Swapchain Image
-        {
-            .flags          = 0,
-            .format         = rtk->swapchain.image_format,
-            .samples        = VK_SAMPLE_COUNT_1_BIT,
+        .flags          = 0,
+        .format         = rtk->swapchain.image_format,
+        .samples        = VK_SAMPLE_COUNT_1_BIT,
 
-            .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 
-            .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        },
-        // Depth Image
-        {
-            .flags          = 0,
-            .format         = rtk->physical_device->depth_image_format,
-            .samples        = VK_SAMPLE_COUNT_1_BIT,
-
-            .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-
-            .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        },
-    };
-
-    VkAttachmentReference color_attachment_references[] =
+        .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+        .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+    });
+    SetDepthAttachment(&attachments,
     {
-        // Swapchain Image
-        {
-            .attachment = 0,
-            .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        },
-    };
-    VkAttachmentReference depth_attachment_reference =
-    {
-        .attachment = 1,
-        .layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-    };
+        .flags          = 0,
+        .format         = rtk->physical_device->depth_image_format,
+        .samples        = VK_SAMPLE_COUNT_1_BIT,
+
+        .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+        .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+
+        .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+        .finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    });
+
     VkSubpassDescription subpass_descriptions[] =
     {
         {
             .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
-            .colorAttachmentCount    = CTK_ARRAY_SIZE(color_attachment_references),
-            .pColorAttachments       = color_attachment_references,
-            .pDepthStencilAttachment = &depth_attachment_reference,
+            .colorAttachmentCount    = attachments.color.count,
+            .pColorAttachments       = attachments.color.data,
+            .pDepthStencilAttachment = GetDepthAttachment(&attachments),
         }
     };
-
     VkRenderPassCreateInfo create_info =
     {
         .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = CTK_ARRAY_SIZE(attachments),
-        .pAttachments    = attachments,
+        .attachmentCount = attachments.descriptions.count,
+        .pAttachments    = attachments.descriptions.data,
         .subpassCount    = CTK_ARRAY_SIZE(subpass_descriptions),
         .pSubpasses      = subpass_descriptions,
         .dependencyCount = 0,

@@ -87,6 +87,7 @@ struct Frame
 
 struct RTKContext
 {
+    // Instance State
     VkInstance               instance;
     VkDebugUtilsMessengerEXT debug_messenger;
 

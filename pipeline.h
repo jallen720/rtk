@@ -179,9 +179,10 @@ struct VertexLayout
 
 struct PipelineInfo
 {
-    VertexLayout               vertex_layout;
-    Array<Shader>              shaders;
-    Array<VkPushConstantRange> push_constant_ranges;
+    VertexLayout*                vertex_layout;
+    Array<Shader>                shaders;
+    Array<VkDescriptorSetLayout> descriptor_set_layouts;
+    Array<VkPushConstantRange>   push_constant_ranges;
 };
 
 struct Pipeline
@@ -215,8 +216,7 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
     };
 
     CTK_ASSERT(layout->bindings.count > 0);
-    CTK_ASSERT(field_count > 0);
-    CTK_ASSERT(field_count <= 4);
+    CTK_ASSERT(field_count >= 1 && field_count <= 4);
 
     uint32 current_binding_index = layout->bindings.count - 1;
     VkVertexInputBindingDescription* current_binding = GetPtr(&layout->bindings, current_binding_index);
@@ -241,10 +241,10 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     VkResult res = VK_SUCCESS;
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
-    vertex_input_state.vertexBindingDescriptionCount   = info->vertex_layout.bindings.count;
-    vertex_input_state.pVertexBindingDescriptions      = info->vertex_layout.bindings.data;
-    vertex_input_state.vertexAttributeDescriptionCount = info->vertex_layout.attributes.count;
-    vertex_input_state.pVertexAttributeDescriptions    = info->vertex_layout.attributes.data;
+    vertex_input_state.vertexBindingDescriptionCount   = info->vertex_layout->bindings.count;
+    vertex_input_state.pVertexBindingDescriptions      = info->vertex_layout->bindings.data;
+    vertex_input_state.vertexAttributeDescriptionCount = info->vertex_layout->attributes.count;
+    vertex_input_state.pVertexAttributeDescriptions    = info->vertex_layout->attributes.data;
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
 
@@ -286,17 +286,9 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
 
     // Pipeline Layout
-    VkPushConstantRange push_constant_range =
-    {
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        .offset     = 0,
-        .size       = 8,
-    };
-
-
     VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
-    layout_create_info.setLayoutCount         = 0;
-    layout_create_info.pSetLayouts            = NULL;
+    layout_create_info.setLayoutCount         = info->descriptor_set_layouts.count;
+    layout_create_info.pSetLayouts            = info->descriptor_set_layouts.data;
     layout_create_info.pushConstantRangeCount = info->push_constant_ranges.count;
     layout_create_info.pPushConstantRanges    = info->push_constant_ranges.data;
     res = vkCreatePipelineLayout(device, &layout_create_info, NULL, &pipeline->layout);

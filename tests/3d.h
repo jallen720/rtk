@@ -41,10 +41,12 @@ struct Entity
 
 struct Game
 {
+    VertexLayout  vertex_layout;
     Pipeline      pipeline;
     View          view;
     Array<Entity> entities;
     Mouse         mouse;
+    uint32        test_mesh_indexes_offset;
 };
 
 struct Vertex
@@ -122,11 +124,23 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     InitFrames(rtk, mem, FRAME_COUNT);
 }
 
-static uint32 test_mesh_indexes_offset = 0;
+static void InitVertexLayout(Game* game, Stack* mem)
+{
+    VertexLayout* vertex_layout = &game->vertex_layout;
 
-static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+    // Init pipeline vertex layout.
+    InitArray(&vertex_layout->bindings, mem, 1);
+    PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
+
+    InitArray(&vertex_layout->attributes, mem, 4);
+    PushAttribute(vertex_layout, 3); // Position
+    // PushAttribute(&pipeline_info.vertex_layout, 3); // Color
+}
+
+static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
 {
     PipelineInfo pipeline_info = {};
+    pipeline_info.vertex_layout = &game->vertex_layout;
 
     // Load pipeline shaders.
     InitArray(&pipeline_info.shaders, &temp_mem, 2);
@@ -134,14 +148,6 @@ static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* 
                VK_SHADER_STAGE_VERTEX_BIT);
     LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.frag.spv",
                VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    // Init pipeline vertex layout.
-    InitArray(&pipeline_info.vertex_layout.bindings, &temp_mem, 1);
-    PushBinding(&pipeline_info.vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
-
-    InitArray(&pipeline_info.vertex_layout.attributes, &temp_mem, 4);
-    PushAttribute(&pipeline_info.vertex_layout, 3); // Position
-    // PushAttribute(&pipeline_info.vertex_layout, 3); // Color
 
     // Init push constant ranges.
     InitArray(&pipeline_info.push_constant_ranges, &temp_mem, 1);
@@ -153,11 +159,14 @@ static void InitRenderState(Game* game, Stack* mem, Stack temp_mem, RTKContext* 
     });
 
     InitPipeline(&game->pipeline, temp_mem, rtk, &pipeline_info);
+}
 
+static void LoadMeshData(Game* game, RTKContext* rtk)
+{
     // Load test mesh into host memory.
     {
         #include "rtk/meshes/cube.h"
-        test_mesh_indexes_offset = sizeof(vertexes);
+        game->test_mesh_indexes_offset = sizeof(vertexes);
         memcpy(rtk->host_buffer.mapped_mem, vertexes, sizeof(vertexes));
         memcpy(rtk->host_buffer.mapped_mem + sizeof(vertexes), indexes, sizeof(indexes));
     }
@@ -193,7 +202,9 @@ static void InitGameState(Game* game, Stack* mem)
 
 static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    InitRenderState(game, mem, temp_mem, rtk);
+    InitVertexLayout(game, mem);
+    InitPipelines(game, temp_mem, rtk);
+    LoadMeshData(game, rtk);
     InitGameState(game, mem);
 }
 
@@ -253,7 +264,10 @@ static void ViewControls(Game* game, Window* window)
 static void Controls(Game* game, Window* window)
 {
     if (KeyDown(window, Key::ESCAPE))
+    {
         window->open = false;
+        return;
+    }
 
     ViewControls(game, window);
 }
@@ -279,7 +293,7 @@ static Matrix CreateViewProjectionMatrix(View* view)
     return projection_matrix * view_matrix;
 }
 
-static void UpdateGame(Game* game)
+static void UpdateMVPMatrixes(Game* game)
 {
     // Update entity MVP matrixes.
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
@@ -297,6 +311,17 @@ static void UpdateGame(Game* game)
     }
 }
 
+static void UpdateGame(Game* game, Window* window)
+{
+    UpdateMouse(&game->mouse, window);
+
+    Controls(game, window);
+    if (!window->open)
+        return; // Controls closed window.
+
+    UpdateMVPMatrixes(game);
+}
+
 static void RecordRenderCommands(Game* game, RTKContext* rtk)
 {
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, 0);
@@ -311,7 +336,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
                                &rtk->host_buffer.hnd,
                                &vertexes_offset);
 
-        VkDeviceSize indexes_offset = test_mesh_indexes_offset;
+        VkDeviceSize indexes_offset = game->test_mesh_indexes_offset;
         vkCmdBindIndexBuffer(render_command_buffer,
                              rtk->host_buffer.hnd,
                              indexes_offset,
@@ -366,14 +391,9 @@ void TestMain()
         if (!window->open)
             break; // Quit event closed window.
 
-        UpdateMouse(&game->mouse, window);
-        Controls(game, window);
-        if (!window->open)
-            break; // Controls closed window.
-
         if (WindowIsActive(window))
         {
-            UpdateGame(game);
+            UpdateGame(game, window);
             NextFrame(rtk);
             RecordRenderCommands(game, rtk);
             SubmitRenderCommands(rtk);

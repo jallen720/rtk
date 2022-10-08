@@ -779,7 +779,7 @@ static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
         }
 
         // render_command_buffers
-        InitArray(&frame->render_command_buffers, mem, rtk->render_command_pools.count);
+        InitArrayFull(&frame->render_command_buffers, mem, rtk->render_command_pools.count);
         for (uint32 i = 0; i < rtk->render_command_pools.count; ++i)
         {
             VkCommandBufferAllocateInfo allocate_info =
@@ -789,7 +789,7 @@ static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
                 .level              = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
                 .commandBufferCount = 1,
             };
-            res = vkAllocateCommandBuffers(device, &allocate_info, Push(&frame->render_command_buffers));
+            res = vkAllocateCommandBuffers(device, &allocate_info, GetPtr(&frame->render_command_buffers, i));
             Validate(res, "failed to allocate render_command_buffers[%u]", i);
         }
     }

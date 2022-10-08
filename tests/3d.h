@@ -121,8 +121,8 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     static constexpr uint32 RENDER_THREAD_COUNT = 1;
     InitRenderCommandPools(rtk, mem, RENDER_THREAD_COUNT);
 
-    static constexpr uint32 FRAME_COUNT = 3;
-    InitFrames(rtk, mem, FRAME_COUNT);
+    uint32 frame_count = rtk->swapchain.image_count + 1;
+    InitFrames(rtk, mem, frame_count);
 }
 
 static void InitVertexLayout(Game* game, Stack* mem)

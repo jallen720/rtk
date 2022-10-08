@@ -18,7 +18,8 @@ static constexpr VkColorComponentFlags COLOR_COMPONENT_RGBA = VK_COLOR_COMPONENT
                                                               VK_COLOR_COMPONENT_B_BIT |
                                                               VK_COLOR_COMPONENT_A_BIT;
 
-static constexpr VkPipelineVertexInputStateCreateInfo DEFAULT_VERTEX_INPUT_STATE = {
+static constexpr VkPipelineVertexInputStateCreateInfo DEFAULT_VERTEX_INPUT_STATE =
+{
     .sType                           = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
     .pNext                           = NULL,
     .flags                           = 0,
@@ -273,9 +274,9 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
     VkPipelineMultisampleStateCreateInfo multisample_state = DEFAULT_MULTISAMPLE_STATE;
 
     VkPipelineDepthStencilStateCreateInfo depth_stencil_state = DEFAULT_DEPTH_STENCIL_STATE;
-    // depth_stencil_state.depthTestEnable = VK_TRUE;
-    // depth_stencil_state.depthWriteEnable = VK_TRUE;
-    // depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    depth_stencil_state.depthTestEnable = VK_TRUE;
+    depth_stencil_state.depthWriteEnable = VK_TRUE;
+    depth_stencil_state.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 
     // Color Blend
     VkPipelineColorBlendAttachmentState swapchain_image_color_blend = DEFAULT_COLOR_BLEND_ATTACHMENT_STATE;

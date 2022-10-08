@@ -47,21 +47,6 @@ struct Surface
     Array<VkPresentModeKHR>   present_modes;
 };
 
-struct ImageInfo
-{
-    VkImageCreateInfo        image;
-    VkImageViewCreateInfo    view;
-    VkMemoryPropertyFlagBits mem_property_flags;
-};
-
-struct Image
-{
-    VkImage        hnd;
-    VkImageView    view;
-    VkDeviceMemory mem;
-    VkExtent3D     extent;
-};
-
 struct Swapchain
 {
     VkSwapchainKHR     hnd;
@@ -106,6 +91,7 @@ struct RTKContext
     // Render State
     Swapchain            swapchain;
     VkRenderPass         render_pass;
+    Array<Image>         depth_images;
     Array<VkFramebuffer> framebuffers;
     Array<VkCommandPool> render_command_pools;
     RingBuffer<Frame>    frames;
@@ -590,6 +576,67 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
     }
 }
 
+static void InitDepthImages(RTKContext* rtk, Stack* mem)
+{
+    Swapchain* swapchain = &rtk->swapchain;
+    VkFormat depth_image_format = rtk->physical_device->depth_image_format;
+    InitArrayFull(&rtk->depth_images, mem, swapchain->image_count);
+    for (uint32 i = 0; i < swapchain->image_count; ++i)
+    {
+        InitImage(GetPtr(&rtk->depth_images, i), rtk->device, rtk->physical_device,
+        {
+            .image =
+            {
+                .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .pNext     = NULL,
+                .flags     = 0,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format    = depth_image_format,
+                .extent =
+                {
+                    .width  = swapchain->extent.width,
+                    .height = swapchain->extent.height,
+                    .depth  = 1
+                },
+                .mipLevels             = 1,
+                .arrayLayers           = 1,
+                .samples               = VK_SAMPLE_COUNT_1_BIT,
+                .tiling                = VK_IMAGE_TILING_OPTIMAL,
+                .usage                 = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+                .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 0,
+                .pQueueFamilyIndices   = NULL,
+                .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+            },
+            .view =
+            {
+                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .pNext    = NULL,
+                .flags    = 0,
+                .image    = VK_NULL_HANDLE,
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format   = depth_image_format,
+                .components =
+                {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+            },
+            .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        });
+    }
+}
+
 static void InitRenderPass(RTKContext* rtk)
 {
     VkAttachmentDescription attachments[] =
@@ -607,20 +654,44 @@ static void InitRenderPass(RTKContext* rtk)
 
             .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
             .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        }
+        },
+        // Depth Image
+        {
+            .flags          = 0,
+            .format         = rtk->physical_device->depth_image_format,
+            .samples        = VK_SAMPLE_COUNT_1_BIT,
+
+            .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+            .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+
+            .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        },
     };
 
-    VkAttachmentReference swapchain_attachment_reference =
+    VkAttachmentReference color_attachment_references[] =
     {
-        .attachment = 0,
-        .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        // Swapchain Image
+        {
+            .attachment = 0,
+            .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        },
     };
-    VkSubpassDescription subpass_description =
+    VkAttachmentReference depth_attachment_reference =
     {
-        .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
-        .colorAttachmentCount    = 1,
-        .pColorAttachments       = &swapchain_attachment_reference,
-        .pDepthStencilAttachment = NULL,
+        .attachment = 1,
+        .layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    };
+    VkSubpassDescription subpass_descriptions[] =
+    {
+        {
+            .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .colorAttachmentCount    = CTK_ARRAY_SIZE(color_attachment_references),
+            .pColorAttachments       = color_attachment_references,
+            .pDepthStencilAttachment = &depth_attachment_reference,
+        }
     };
 
     VkRenderPassCreateInfo create_info =
@@ -628,8 +699,8 @@ static void InitRenderPass(RTKContext* rtk)
         .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
         .attachmentCount = CTK_ARRAY_SIZE(attachments),
         .pAttachments    = attachments,
-        .subpassCount    = 1,
-        .pSubpasses      = &subpass_description,
+        .subpassCount    = CTK_ARRAY_SIZE(subpass_descriptions),
+        .pSubpasses      = subpass_descriptions,
         .dependencyCount = 0,
         .pDependencies   = NULL,
     };
@@ -646,6 +717,7 @@ static void InitFramebuffers(RTKContext* rtk, Stack* mem)
         VkImageView attachments[] =
         {
             Get(&swapchain->image_views, i),
+            GetPtr(&rtk->depth_images, i)->view,
         };
         VkFramebufferCreateInfo info =
         {
@@ -722,28 +794,6 @@ static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
         }
     }
 }
-
-// static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_device, ImageInfo info)
-// {
-//     VkResult res = VK_SUCCESS;
-
-//     res = vkCreateImage(device, &info.image, NULL, &image->hnd);
-//     Validate(res, "failed to create image");
-
-//     // Allocate/bind image memory.
-//     VkMemoryRequirements mem_requirements = {};
-//     vkGetImageMemoryRequirements(device, image->hnd, &mem_requirements);
-
-//     image->mem = AllocateDeviceMemory(device, physical_device, mem_requirements, info.mem_property_flags);
-//     res = vkBindImageMemory(device, image->hnd, image->mem, 0);
-//     Validate(res, "failed to bind image memory");
-
-//     info.view.image = image->hnd;
-//     res = vkCreateImageView(device, &info.view, NULL, &image->view);
-//     Validate(res, "failed to create image view");
-
-//     image->extent = info.image.extent;
-// }
 
 // static void BeginTempCommandBuffer(VkCommandBuffer command_buffer)
 // {
@@ -856,7 +906,11 @@ static void SubmitRenderCommands(RTKContext* rtk)
     Validate(res, "vkBeginCommandBuffer() failed");
 
     // Begin render pass.
-    VkClearValue clear_value = { 0.0, 0.1, 0.2, 1 };
+    VkClearValue clear_values[] =
+    {
+        { 0.0f, 0.1f, 0.2f, 1.0f },
+        { 1.0f },
+    };
     VkRenderPassBeginInfo render_pass_begin_info =
     {
         .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -868,8 +922,8 @@ static void SubmitRenderCommands(RTKContext* rtk)
             .offset = { 0, 0 },
             .extent = rtk->swapchain.extent,
         },
-        .clearValueCount = 1,
-        .pClearValues    = &clear_value,
+        .clearValueCount = CTK_ARRAY_SIZE(clear_values),
+        .pClearValues    = clear_values,
     };
     vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 

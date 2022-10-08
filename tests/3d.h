@@ -114,6 +114,7 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 
     // Initialize rendering state.
     InitSwapchain(rtk, mem, temp_mem);
+    InitDepthImages(rtk, mem);
     InitRenderPass(rtk);
     InitFramebuffers(rtk, mem);
 

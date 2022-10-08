@@ -71,6 +71,20 @@ struct Swapchain
     VkExtent2D         extent;
 };
 
+struct Frame
+{
+    // Sync State
+    VkSemaphore image_acquired;
+    VkSemaphore render_finished;
+    VkFence     in_progress;
+
+    // Render State
+    VkCommandBuffer        primary_render_command_buffer;
+    Array<VkCommandBuffer> render_command_buffers;
+    uint32                 swapchain_image_index;
+    VkFramebuffer          framebuffer;
+};
+
 struct RTKContext
 {
     VkInstance               instance;
@@ -89,15 +103,12 @@ struct RTKContext
     VkCommandBuffer       temp_command_buffer;
 
     // Render State
-    Swapchain              swapchain;
-    VkRenderPass           render_pass;
-    Array<VkFramebuffer>   framebuffers;
-    Array<VkCommandPool>   render_command_pools;
-    VkCommandBuffer        primary_render_command_buffer;
-    Array<VkCommandBuffer> render_command_buffers;
-    uint32                 swapchain_image_index;
-    VkSemaphore            image_acquired;
-    VkSemaphore            render_finished;
+    Swapchain            swapchain;
+    VkRenderPass         render_pass;
+    Array<VkFramebuffer> framebuffers;
+    Array<VkCommandPool> render_command_pools;
+    RingBuffer<Frame>    frames;
+    Frame*               frame;
 };
 
 /// Internal
@@ -650,44 +661,53 @@ static void InitFramebuffers(RTKContext* rtk, Stack* mem)
     }
 }
 
-static void InitRenderCommandState(RTKContext* rtk, Stack* mem, uint32 render_thread_count)
+static void InitRenderCommandPools(RTKContext* rtk, Stack* mem, uint32 render_thread_count)
+{
+    InitArray(&rtk->render_command_pools, mem, render_thread_count);
+    VkCommandPoolCreateInfo info =
+    {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+        .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+        .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
+    };
+    for (uint32 i = 0; i < render_thread_count; ++i)
+    {
+        VkResult res = vkCreateCommandPool(rtk->device, &info, NULL, Push(&rtk->render_command_pools));
+        Validate(res, "failed to create render_command_pools");
+    }
+}
+
+static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = rtk->device;
 
-    // primary_render_command_buffer
+    InitRingBuffer(&rtk->frames, mem, frame_count);
+    for (uint32 i = 0; i < frame_count; ++i)
     {
-        VkCommandBufferAllocateInfo allocate_info =
-        {
-            .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-            .commandPool        = rtk->main_command_pool,
-            .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-            .commandBufferCount = 1,
-        };
-        res = vkAllocateCommandBuffers(device, &allocate_info, &rtk->primary_render_command_buffer);
-        Validate(res, "failed to allocate primary_render_command_buffer");
-    }
+        Frame* frame = GetPtr(&rtk->frames, i);
 
-    // render_command_pools
-    {
-        InitArray(&rtk->render_command_pools, mem, render_thread_count);
-        VkCommandPoolCreateInfo info =
+        // Sync State
+        frame->image_acquired = CreateSemaphore(device);
+        frame->render_finished = CreateSemaphore(device);
+        frame->in_progress = CreateFence(device);
+
+        // primary_render_command_buffer
         {
-            .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-            .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
-        };
-        for (uint32 i = 0; i < render_thread_count; ++i)
-        {
-            res = vkCreateCommandPool(device, &info, NULL, Push(&rtk->render_command_pools));
-            Validate(res, "failed to create render_command_pools");
+            VkCommandBufferAllocateInfo allocate_info =
+            {
+                .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+                .commandPool        = rtk->main_command_pool,
+                .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                .commandBufferCount = 1,
+            };
+            res = vkAllocateCommandBuffers(device, &allocate_info, &frame->primary_render_command_buffer);
+            Validate(res, "failed to allocate primary_render_command_buffer");
         }
-    }
 
-    // render_command_buffers
-    {
-        InitArray(&rtk->render_command_buffers, mem, render_thread_count);
-        for (uint32 i = 0; i < render_thread_count; ++i)
+        // render_command_buffers
+        InitArray(&frame->render_command_buffers, mem, rtk->render_command_pools.count);
+        for (uint32 i = 0; i < rtk->render_command_pools.count; ++i)
         {
             VkCommandBufferAllocateInfo allocate_info =
             {
@@ -696,16 +716,10 @@ static void InitRenderCommandState(RTKContext* rtk, Stack* mem, uint32 render_th
                 .level              = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
                 .commandBufferCount = 1,
             };
-            res = vkAllocateCommandBuffers(device, &allocate_info, Push(&rtk->render_command_buffers));
+            res = vkAllocateCommandBuffers(device, &allocate_info, Push(&frame->render_command_buffers));
             Validate(res, "failed to allocate render_command_buffers[%u]", i);
         }
     }
-}
-
-static void InitSyncState(RTKContext* rtk)
-{
-    rtk->image_acquired = CreateSemaphore(rtk->device);
-    rtk->render_finished = CreateSemaphore(rtk->device);
 }
 
 // static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_device, ImageInfo info)
@@ -766,15 +780,32 @@ static void InitSyncState(RTKContext* rtk)
 
 static void NextFrame(RTKContext* rtk)
 {
-    // Get next swapchain image's index.
-    VkResult res = vkAcquireNextImageKHR(rtk->device, rtk->swapchain.hnd, U64_MAX, rtk->image_acquired, VK_NULL_HANDLE,
-                                         &rtk->swapchain_image_index);
+    VkDevice device = rtk->device;
+    VkResult res = VK_SUCCESS;
+
+    // Get next frame and wait for it to be finished (if still in-progress) before proceeding.
+    Frame* frame = Next(&rtk->frames);
+
+    res = vkWaitForFences(device, 1, &frame->in_progress, VK_TRUE, U64_MAX);
+    Validate(res, "vkWaitForFences() failed");
+
+    res = vkResetFences(device, 1, &frame->in_progress);
+    Validate(res, "vkResetFences() failed");
+
+    // Once frame is ready, aquire next swapchain image and get its framebuffer.
+    res = vkAcquireNextImageKHR(rtk->device, rtk->swapchain.hnd, U64_MAX, frame->image_acquired, VK_NULL_HANDLE,
+                                &frame->swapchain_image_index);
     Validate(res, "failed to aquire next swapchain image");
+
+    frame->framebuffer = Get(&rtk->framebuffers, frame->swapchain_image_index);
+
+    rtk->frame = frame;
 }
 
 static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, uint32 render_thread_index)
 {
-    VkCommandBuffer render_command_buffer = Get(&rtk->render_command_buffers, render_thread_index);
+    Frame* frame = rtk->frame;
+    VkCommandBuffer render_command_buffer = Get(&frame->render_command_buffers, render_thread_index);
 
     VkCommandBufferInheritanceInfo inheritance_info =
     {
@@ -782,7 +813,7 @@ static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, uint32 rend
         .pNext                = NULL,
         .renderPass           = rtk->render_pass,
         .subpass              = 0,
-        .framebuffer          = Get(&rtk->framebuffers, rtk->swapchain_image_index),
+        .framebuffer          = frame->framebuffer,
         .occlusionQueryEnable = VK_FALSE,
         .queryFlags           = 0,
         .pipelineStatistics   = 0,
@@ -794,17 +825,24 @@ static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, uint32 rend
         .pInheritanceInfo = &inheritance_info,
     };
     VkResult res = vkBeginCommandBuffer(render_command_buffer, &command_buffer_begin_info);
-    Validate(res, "failed to begin recording command buffer");
+    Validate(res, "vkBeginCommandBuffer() failed");
 
     return render_command_buffer;
 }
 
+static void EndRecordingRenderCommands(VkCommandBuffer render_command_buffer)
+{
+    VkResult res = vkEndCommandBuffer(render_command_buffer);
+    Validate(res, "vkEndCommandBuffer() failed");
+}
+
 static void SubmitRenderCommands(RTKContext* rtk)
 {
+    Frame* frame = rtk->frame;
     VkResult res = VK_SUCCESS;
 
     // Record current frame's primary command buffer, including render command buffers.
-    VkCommandBuffer command_buffer = rtk->primary_render_command_buffer;
+    VkCommandBuffer command_buffer = frame->primary_render_command_buffer;
 
     // Begin command buffer.
     VkCommandBufferBeginInfo command_buffer_begin_info =
@@ -814,7 +852,7 @@ static void SubmitRenderCommands(RTKContext* rtk)
         .pInheritanceInfo = NULL,
     };
     res = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
-    Validate(res, "failed to begin recording command buffer");
+    Validate(res, "vkBeginCommandBuffer() failed");
 
     // Begin render pass.
     VkClearValue clear_value = { 0.0, 0.1, 0.2, 1 };
@@ -823,7 +861,7 @@ static void SubmitRenderCommands(RTKContext* rtk)
         .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .pNext       = NULL,
         .renderPass  = rtk->render_pass,
-        .framebuffer = Get(&rtk->framebuffers, rtk->swapchain_image_index),
+        .framebuffer = frame->framebuffer,
         .renderArea =
         {
             .offset = { 0, 0 },
@@ -835,10 +873,12 @@ static void SubmitRenderCommands(RTKContext* rtk)
     vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 
     // Execute entity render commands.
-    vkCmdExecuteCommands(command_buffer, rtk->render_command_buffers.count, rtk->render_command_buffers.data);
+    vkCmdExecuteCommands(command_buffer, frame->render_command_buffers.count, frame->render_command_buffers.data);
 
     vkCmdEndRenderPass(command_buffer);
-    vkEndCommandBuffer(command_buffer);
+
+    res = vkEndCommandBuffer(command_buffer);
+    Validate(res, "vkEndCommandBuffer() failed");
 
     // Submit commands for rendering to graphics queue.
     VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -847,14 +887,14 @@ static void SubmitRenderCommands(RTKContext* rtk)
         .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .pNext                = NULL,
         .waitSemaphoreCount   = 1,
-        .pWaitSemaphores      = &rtk->image_acquired,
+        .pWaitSemaphores      = &frame->image_acquired,
         .pWaitDstStageMask    = &wait_stage,
         .commandBufferCount   = 1,
         .pCommandBuffers      = &command_buffer,
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores    = &rtk->render_finished,
+        .pSignalSemaphores    = &frame->render_finished,
     };
-    res = vkQueueSubmit(rtk->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+    res = vkQueueSubmit(rtk->graphics_queue, 1, &submit_info, frame->in_progress);
     Validate(res, "vkQueueSubmit() failed");
 
     // Queue swapchain image for presentation.
@@ -863,10 +903,10 @@ static void SubmitRenderCommands(RTKContext* rtk)
         .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext              = NULL,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores    = &rtk->render_finished,
+        .pWaitSemaphores    = &frame->render_finished,
         .swapchainCount     = 1,
         .pSwapchains        = &rtk->swapchain.hnd,
-        .pImageIndices      = &rtk->swapchain_image_index,
+        .pImageIndices      = &frame->swapchain_image_index,
         .pResults           = NULL,
     };
     res = vkQueuePresentKHR(rtk->present_queue, &present_info);

@@ -114,9 +114,12 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     InitSwapchain(rtk, mem, temp_mem);
     InitRenderPass(rtk);
     InitFramebuffers(rtk, mem);
+
     static constexpr uint32 RENDER_THREAD_COUNT = 1;
-    InitRenderCommandState(rtk, mem, RENDER_THREAD_COUNT);
-    InitSyncState(rtk);
+    InitRenderCommandPools(rtk, mem, RENDER_THREAD_COUNT);
+
+    static constexpr uint32 FRAME_COUNT = 3;
+    InitFrames(rtk, mem, FRAME_COUNT);
 }
 
 static uint32 test_mesh_indexes_offset = 0;
@@ -327,7 +330,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
                              0, // Vertex Offset
                              0); // First Instance
         }
-    vkEndCommandBuffer(render_command_buffer);
+    EndRecordingRenderCommands(render_command_buffer);
 }
 
 void TestMain()

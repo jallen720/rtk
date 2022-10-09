@@ -397,7 +397,7 @@ void TestMain()
         if (!window->open)
             break; // Quit event closed window.
 
-        if (WindowIsActive(window))
+        if (IsActive(window))
         {
             UpdateGame(game, window);
             NextFrame(rtk);

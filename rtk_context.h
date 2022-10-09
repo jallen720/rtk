@@ -91,6 +91,14 @@ struct RenderTarget
     Array<VkFramebuffer> framebuffers;
 };
 
+struct RTKLimits
+{
+    const uint32 MAX_PHYSICAL_DEVICES;
+    const uint32 MAX_HOST_MEMORY;
+    const uint32 MAX_DEVICE_MEMORY;
+    const uint32 RENDER_THREAD_COUNT;
+};
+
 struct RTKContext
 {
     // Instance State
@@ -193,79 +201,7 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(uint32 queue_family_index)
 
     return info;
 }
-
-static void InitRenderPassAttachments(RenderPassAttachments* attachments, Stack* mem, uint32 max_color_attachments,
-                                      bool depth_attachment)
-{
-    InitArray(&attachments->descriptions, mem, max_color_attachments + (depth_attachment ? 1 : 0));
-    InitArray(&attachments->color, mem, max_color_attachments);
-}
-
-static void PushColorAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
-{
-    uint32 attachment_index = attachments->descriptions.count;
-    Push(&attachments->descriptions, description);
-    Push(&attachments->color,
-    {
-        .attachment = attachment_index,
-        .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    });
-}
-
-static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
-{
-    uint32 attachment_index = attachments->descriptions.count;
-    Push(&attachments->descriptions, description);
-    Set(&attachments->depth,
-    {
-        .attachment = attachment_index,
-        .layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-    });
-}
-
-static VkAttachmentReference* GetDepthAttachment(RenderPassAttachments* attachments)
-{
-    return attachments->depth.exists ? &attachments->depth.value : NULL;
-}
-
-static VkFence CreateFence(VkDevice device)
-{
-    VkFenceCreateInfo info =
-    {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-    };
-    VkFence fence = VK_NULL_HANDLE;
-    VkResult res = vkCreateFence(device, &info, NULL, &fence);
-    Validate(res, "failed to create fence");
-
-    return fence;
-}
-
-static VkSemaphore CreateSemaphore(VkDevice device)
-{
-    VkSemaphoreCreateInfo info =
-    {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-    };
-    VkSemaphore semaphore = VK_NULL_HANDLE;
-    VkResult res = vkCreateSemaphore(device, &info, NULL, &semaphore);
-    Validate(res, "failed to create semaphore");
-
-    return semaphore;
-}
-
-/// Interface
-////////////////////////////////////////////////////////////
-static void InitRTKContext(RTKContext* rtk, Stack* mem, uint32 max_physical_devices)
-{
-    InitArray(&rtk->physical_devices, mem, max_physical_devices);
-};
-
-static void InitInstance(RTKContext* rtk, InstanceInfo info)
+static void InitInstance(RTKContext* rtk, InstanceInfo* info)
 {
     VkResult res = VK_SUCCESS;
 
@@ -275,9 +211,9 @@ static void InitInstance(RTKContext* rtk, InstanceInfo info)
         .sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .pNext           = NULL,
         .flags           = 0,
-        .messageSeverity = info.debug_message_severity,
-        .messageType     = info.debug_message_type,
-        .pfnUserCallback = info.debug_callback,
+        .messageSeverity = info->debug_message_severity,
+        .messageType     = info->debug_message_type,
+        .pfnUserCallback = info->debug_callback,
         .pUserData       = NULL,
     };
 #endif
@@ -286,9 +222,9 @@ static void InitInstance(RTKContext* rtk, InstanceInfo info)
     {
         .sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pNext              = NULL,
-        .pApplicationName   = info.application_name,
+        .pApplicationName   = info->application_name,
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-        .pEngineName        = info.application_name,
+        .pEngineName        = info->application_name,
         .engineVersion      = VK_MAKE_VERSION(1, 0, 0),
         .apiVersion         = VK_API_VERSION_1_0,
     };
@@ -642,6 +578,36 @@ static void InitRenderCommandPools(RTKContext* rtk, Stack* mem, uint32 render_th
     }
 }
 
+static VkFence CreateFence(VkDevice device)
+{
+    VkFenceCreateInfo info =
+    {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+    };
+    VkFence fence = VK_NULL_HANDLE;
+    VkResult res = vkCreateFence(device, &info, NULL, &fence);
+    Validate(res, "failed to create fence");
+
+    return fence;
+}
+
+static VkSemaphore CreateSemaphore(VkDevice device)
+{
+    VkSemaphoreCreateInfo info =
+    {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+    };
+    VkSemaphore semaphore = VK_NULL_HANDLE;
+    VkResult res = vkCreateSemaphore(device, &info, NULL, &semaphore);
+    Validate(res, "failed to create semaphore");
+
+    return semaphore;
+}
+
 static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
 {
     VkResult res = VK_SUCCESS;
@@ -653,9 +619,9 @@ static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
         Frame* frame = GetPtr(&rtk->frames, i);
 
         // Sync State
-        frame->image_acquired = CreateSemaphore(device);
+        frame->image_acquired  = CreateSemaphore(device);
         frame->render_finished = CreateSemaphore(device);
-        frame->in_progress = CreateFence(device);
+        frame->in_progress     = CreateFence(device);
 
         // primary_render_command_buffer
         {
@@ -685,6 +651,40 @@ static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
             Validate(res, "failed to allocate render_command_buffers[%u]", i);
         }
     }
+}
+
+static void InitRenderPassAttachments(RenderPassAttachments* attachments, Stack* mem, uint32 max_color_attachments,
+                                      bool depth_attachment)
+{
+    InitArray(&attachments->descriptions, mem, max_color_attachments + (depth_attachment ? 1 : 0));
+    InitArray(&attachments->color, mem, max_color_attachments);
+}
+
+static void PushColorAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
+{
+    uint32 attachment_index = attachments->descriptions.count;
+    Push(&attachments->descriptions, description);
+    Push(&attachments->color,
+    {
+        .attachment = attachment_index,
+        .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    });
+}
+
+static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
+{
+    uint32 attachment_index = attachments->descriptions.count;
+    Push(&attachments->descriptions, description);
+    Set(&attachments->depth,
+    {
+        .attachment = attachment_index,
+        .layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+    });
+}
+
+static VkAttachmentReference* GetDepthAttachment(RenderPassAttachments* attachments)
+{
+    return attachments->depth.exists ? &attachments->depth.value : NULL;
 }
 
 static void InitRenderPass(RenderTarget* render_target, Stack temp_mem, RTKContext* rtk, bool depth_testing)
@@ -839,6 +839,33 @@ static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp
         Clear(attachments);
     }
 }
+
+/// Interface
+////////////////////////////////////////////////////////////
+static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window, RTKLimits* limits,
+                           InstanceInfo* instance_info, DeviceFeatures* required_features)
+{
+    InitInstance(rtk, instance_info);
+    InitSurface(rtk, window);
+
+    // Initialize device state.
+    InitArray(&rtk->physical_devices, mem, limits->MAX_PHYSICAL_DEVICES);
+    LoadCapablePhysicalDevices(rtk, temp_mem, required_features);
+    UsePhysicalDevice(rtk, 0);
+    InitDevice(rtk, required_features);
+    InitQueues(rtk);
+    GetSurfaceInfo(rtk, mem);
+    InitMemory(rtk, limits->MAX_HOST_MEMORY, limits->MAX_DEVICE_MEMORY);
+    InitMainCommandState(rtk);
+
+    // Initialize rendering state.
+    InitSwapchain(rtk, mem, temp_mem);
+
+    InitRenderCommandPools(rtk, mem, limits->RENDER_THREAD_COUNT);
+
+    uint32 frame_count = rtk->swapchain.image_count + 1;
+    InitFrames(rtk, mem, frame_count);
+};
 
 static void InitRenderTarget(RenderTarget* render_target, Stack* mem, Stack temp_mem, RTKContext* rtk,
                              bool depth_testing)

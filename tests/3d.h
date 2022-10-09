@@ -16,12 +16,7 @@ using namespace RTK;
 
 /// Data
 ////////////////////////////////////////////////////////////
-static constexpr uint32 MAX_PHYSICAL_DEVICES        = 8;
-static constexpr uint32 MAX_RENDER_PASS_ATTACHMENTS = 8;
-static constexpr uint32 MAX_HOST_MEMORY             = Megabyte(128);
-static constexpr uint32 MAX_DEVICE_MEMORY           = Megabyte(256);
-static constexpr uint32 RENDER_THREAD_COUNT         = 1;
-static constexpr bool   DEPTH_TESTING               = true;
+static constexpr bool DEPTH_TESTING = true;
 
 struct View
 {
@@ -64,9 +59,6 @@ struct Vertex
 ////////////////////////////////////////////////////////////
 static void SelectPhysicalDevice(RTKContext* rtk)
 {
-    // Default to first physical device.
-    UsePhysicalDevice(rtk, 0);
-
     // Use first discrete device if any are available.
     for (uint32 i = 0; i < rtk->physical_devices.count; ++i)
     {
@@ -82,10 +74,14 @@ static void SelectPhysicalDevice(RTKContext* rtk)
 
 static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 {
-    InitRTKContext(rtk, mem, MAX_PHYSICAL_DEVICES);
-
-    // Initialize RTK instance.
-    InitInstance(rtk,
+    RTKLimits limits =
+    {
+        .MAX_PHYSICAL_DEVICES = 8,
+        .MAX_HOST_MEMORY      = Megabyte(128),
+        .MAX_DEVICE_MEMORY    = Megabyte(256),
+        .RENDER_THREAD_COUNT  = 1,
+    };
+    InstanceInfo instance_info =
     {
         .application_name = "RTK Test",
 #ifdef RTK_ENABLE_VALIDATION
@@ -98,10 +94,7 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
                                   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                                   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 #endif
-    });
-    InitSurface(rtk, window);
-
-    // Initialize device state.
+    };
     DeviceFeatures required_features =
     {
         .as_struct =
@@ -110,21 +103,7 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
             .samplerAnisotropy = VK_TRUE,
         },
     };
-    LoadCapablePhysicalDevices(rtk, temp_mem, &required_features);
-    SelectPhysicalDevice(rtk);
-    InitDevice(rtk, &required_features);
-    InitQueues(rtk);
-    GetSurfaceInfo(rtk, mem);
-    InitMemory(rtk, MAX_HOST_MEMORY, MAX_DEVICE_MEMORY);
-    InitMainCommandState(rtk);
-
-    // Initialize rendering state.
-    InitSwapchain(rtk, mem, temp_mem);
-
-    InitRenderCommandPools(rtk, mem, RENDER_THREAD_COUNT);
-
-    uint32 frame_count = rtk->swapchain.image_count + 1;
-    InitFrames(rtk, mem, frame_count);
+    InitRTKContext(rtk, mem, temp_mem, window, &limits, &instance_info, &required_features);
 }
 
 static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -196,9 +175,9 @@ static void InitGameState(Game* game, Stack* mem)
     static constexpr uint32 CUBE_SIZE = 4;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
     InitArray(&game->entities, mem, CUBE_ENTITY_COUNT);
-    for (uint32 x = 0; x < CUBE_SIZE; ++x)
-    for (uint32 y = 0; y < CUBE_SIZE; ++y)
     for (uint32 z = 0; z < CUBE_SIZE; ++z)
+    for (uint32 y = 0; y < CUBE_SIZE; ++y)
+    for (uint32 x = 0; x < CUBE_SIZE; ++x)
     {
         Push(&game->entities,
         {
@@ -333,19 +312,20 @@ static void UpdateGame(Game* game, Window* window)
 
 static void RecordRenderCommands(Game* game, RTKContext* rtk)
 {
+    Pipeline* pipeline = &game->pipeline;
+    VkDeviceSize vertexes_offset = 0;
+    VkDeviceSize indexes_offset = game->test_mesh_indexes_offset;
+
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &game->render_target, 0);
-        Pipeline* pipeline = &game->pipeline;
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 
         // Bind mesh data buffers.
-        VkDeviceSize vertexes_offset = 0;
         vkCmdBindVertexBuffers(render_command_buffer,
                                0, // First Binding
                                1, // Binding Count
                                &rtk->host_buffer.hnd,
                                &vertexes_offset);
 
-        VkDeviceSize indexes_offset = game->test_mesh_indexes_offset;
         vkCmdBindIndexBuffer(render_command_buffer,
                              rtk->host_buffer.hnd,
                              indexes_offset,

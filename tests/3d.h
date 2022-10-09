@@ -43,13 +43,16 @@ struct Entity
 
 struct Game
 {
-    RenderTarget  render_target;
-    VertexLayout  vertex_layout;
-    Pipeline      pipeline;
+    // Graphics
+    RenderTarget render_target;
+    VertexLayout vertex_layout;
+    Pipeline     pipeline;
+    uint32       test_mesh_indexes_offset;
+
+    // Sim State
     View          view;
     Array<Entity> entities;
     Mouse         mouse;
-    uint32        test_mesh_indexes_offset;
 };
 
 struct Vertex
@@ -205,7 +208,7 @@ static void InitGameState(Game* game, Stack* mem)
     }
 }
 
-static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+static void InitGame(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
     InitRenderTargets(game, mem, temp_mem, rtk);
     InitVertexLayout(game, mem);
@@ -388,7 +391,7 @@ void TestMain()
     InitRTK(rtk, mem, *temp_mem, window);
 
     auto game = Allocate<Game>(mem, 1);
-    InitTest(game, mem, *temp_mem, rtk);
+    InitGame(game, mem, *temp_mem, rtk);
 
     // Run game.
     while (1)

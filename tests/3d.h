@@ -20,6 +20,8 @@ static constexpr uint32 MAX_PHYSICAL_DEVICES        = 8;
 static constexpr uint32 MAX_RENDER_PASS_ATTACHMENTS = 8;
 static constexpr uint32 MAX_HOST_MEMORY             = Megabyte(128);
 static constexpr uint32 MAX_DEVICE_MEMORY           = Megabyte(256);
+static constexpr uint32 RENDER_THREAD_COUNT         = 1;
+static constexpr bool   DEPTH_TESTING               = true;
 
 struct View
 {
@@ -43,6 +45,7 @@ struct Game
 {
     VertexLayout  vertex_layout;
     Pipeline      pipeline;
+    RenderTarget  render_target;
     View          view;
     Array<Entity> entities;
     Mouse         mouse;
@@ -114,11 +117,7 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 
     // Initialize rendering state.
     InitSwapchain(rtk, mem, temp_mem);
-    InitDepthImages(rtk, mem);
-    InitRenderPass(rtk, temp_mem);
-    InitFramebuffers(rtk, mem);
 
-    static constexpr uint32 RENDER_THREAD_COUNT = 1;
     InitRenderCommandPools(rtk, mem, RENDER_THREAD_COUNT);
 
     uint32 frame_count = rtk->swapchain.image_count + 1;
@@ -159,7 +158,7 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
         .size       = sizeof(Matrix),
     });
 
-    InitPipeline(&game->pipeline, temp_mem, rtk, &pipeline_info);
+    InitPipeline(&game->pipeline, temp_mem, &game->render_target, rtk, &pipeline_info);
 }
 
 static void LoadMeshData(Game* game, RTKContext* rtk)
@@ -203,6 +202,7 @@ static void InitGameState(Game* game, Stack* mem)
 
 static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
+    InitRenderTarget(&game->render_target, mem, temp_mem, rtk, DEPTH_TESTING);
     InitVertexLayout(game, mem);
     InitPipelines(game, temp_mem, rtk);
     LoadMeshData(game, rtk);
@@ -325,7 +325,7 @@ static void UpdateGame(Game* game, Window* window)
 
 static void RecordRenderCommands(Game* game, RTKContext* rtk)
 {
-    VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, 0);
+    VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &game->render_target, 0);
         Pipeline* pipeline = &game->pipeline;
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 
@@ -397,7 +397,7 @@ void TestMain()
             UpdateGame(game, window);
             NextFrame(rtk);
             RecordRenderCommands(game, rtk);
-            SubmitRenderCommands(rtk);
+            SubmitRenderCommands(rtk, &game->render_target);
         }
         else
         {

@@ -235,7 +235,7 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
     layout->attribute_location++;
 }
 
-static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, PipelineInfo* info)
+static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTarget* render_target, RTKContext* rtk, PipelineInfo* info)
 {
     VkDevice device = rtk->device;
     VkExtent2D surface_extent = rtk->surface.capabilities.currentExtent;
@@ -317,7 +317,7 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RTKContext* rtk, Pi
         .pColorBlendState    = &color_blend_state,
         .pDynamicState       = &dynamic_state,
         .layout              = pipeline->layout,
-        .renderPass          = rtk->render_pass,
+        .renderPass          = render_target->render_pass,
         .subpass             = 0,
         .basePipelineHandle  = VK_NULL_HANDLE,
         .basePipelineIndex   = -1,

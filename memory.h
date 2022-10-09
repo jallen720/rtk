@@ -86,16 +86,16 @@ static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* phys
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical_device, BufferInfo info)
+static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical_device, BufferInfo* info)
 {
     VkResult res = VK_SUCCESS;
 
     VkBufferCreateInfo create_info =
     {
         .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size                  = info.size,
-        .usage                 = info.usage_flags,
-        .sharingMode           = info.sharing_mode,
+        .size                  = info->size,
+        .usage                 = info->usage_flags,
+        .sharingMode           = info->sharing_mode,
         .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices   = NULL, // Ignored if sharingMode is not VK_SHARING_MODE_CONCURRENT.
     };
@@ -106,37 +106,47 @@ static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical
     VkMemoryRequirements mem_requirements = {};
     vkGetBufferMemoryRequirements(device, buffer->hnd, &mem_requirements);
 
-    buffer->mem = AllocateDeviceMemory(device, physical_device, mem_requirements, info.mem_property_flags);
+    buffer->mem = AllocateDeviceMemory(device, physical_device, mem_requirements, info->mem_property_flags);
     res = vkBindBufferMemory(device, buffer->hnd, buffer->mem, 0);
     Validate(res, "failed to bind buffer memory");
 
     buffer->size = mem_requirements.size;
 
     // Map host visible buffer memory.
-    if (info.mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+    if (info->mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         vkMapMemory(device, buffer->mem, 0, buffer->size, 0, (void**)&buffer->mapped_mem);
 }
 
-static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_device, ImageInfo info)
+static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical_device, BufferInfo info)
+{
+    InitBuffer(buffer, device, physical_device, &info);
+}
+
+static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_device, ImageInfo* info)
 {
     VkResult res = VK_SUCCESS;
 
-    res = vkCreateImage(device, &info.image, NULL, &image->hnd);
+    res = vkCreateImage(device, &info->image, NULL, &image->hnd);
     Validate(res, "failed to create image");
 
     // Allocate/bind image memory.
     VkMemoryRequirements mem_requirements = {};
     vkGetImageMemoryRequirements(device, image->hnd, &mem_requirements);
 
-    image->mem = AllocateDeviceMemory(device, physical_device, mem_requirements, info.mem_property_flags);
+    image->mem = AllocateDeviceMemory(device, physical_device, mem_requirements, info->mem_property_flags);
     res = vkBindImageMemory(device, image->hnd, image->mem, 0);
     Validate(res, "failed to bind image memory");
 
-    info.view.image = image->hnd;
-    res = vkCreateImageView(device, &info.view, NULL, &image->view);
+    info->view.image = image->hnd;
+    res = vkCreateImageView(device, &info->view, NULL, &image->view);
     Validate(res, "failed to create image view");
 
-    image->extent = info.image.extent;
+    image->extent = info->image.extent;
+}
+
+static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_device, ImageInfo info)
+{
+    InitImage(image, device, physical_device, &info);
 }
 
 }

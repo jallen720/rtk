@@ -109,6 +109,8 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
     InitRenderTarget(&game->render_target, mem, temp_mem, rtk, DEPTH_TESTING);
+    Set(&game->render_target.attachment_clear_values, 0, { 0.0f, 0.1f, 0.2f, 1.0f });
+    Set(&game->render_target.attachment_clear_values, 1, { 1.0f });
 }
 
 static void InitVertexLayout(Game* game, Stack* mem)

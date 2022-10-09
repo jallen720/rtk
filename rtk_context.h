@@ -76,19 +76,12 @@ struct RenderPassAttachments
     Optional<VkAttachmentReference> depth;
 };
 
-struct RenderTargetInfo
-{
-    bool                depth_testing;
-    Array<ImageInfo>    attachment_image_infos;
-    Array<VkClearValue> attachment_clear_values;
-};
-
 struct RenderTarget
 {
     VkRenderPass         render_pass;
     Array<Image>         depth_images;
-    Array<Image>         attachment_images;
     Array<VkFramebuffer> framebuffers;
+    Array<VkClearValue>  attachment_clear_values;
 };
 
 struct RTKLimits
@@ -809,11 +802,10 @@ static void InitDepthImages(RenderTarget* render_target, Stack* mem, RTKContext*
 }
 
 static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp_mem, RTKContext* rtk,
-                             bool depth_testing)
+                             uint32 attachment_count, bool depth_testing)
 {
     Swapchain* swapchain = &rtk->swapchain;
     InitArray(&render_target->framebuffers, mem, rtk->swapchain.image_count);
-    uint32 attachment_count = 1 + (depth_testing ? 1 : 0);
     auto attachments = CreateArray<VkImageView>(&temp_mem, attachment_count);
     for (uint32 i = 0; i < rtk->swapchain.image_count; ++i)
     {
@@ -875,7 +867,9 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* mem, Stack temp
     if (depth_testing)
         InitDepthImages(render_target, mem, rtk);
 
-    InitFramebuffers(render_target, mem, temp_mem, rtk, depth_testing);
+    uint32 attachment_count = 1 + (depth_testing ? 1 : 0);
+    InitFramebuffers(render_target, mem, temp_mem, rtk, attachment_count, depth_testing);
+    InitArrayFull(&render_target->attachment_clear_values, mem, attachment_count);
 }
 
 // static void BeginTempCommandBuffer(VkCommandBuffer command_buffer)
@@ -988,11 +982,6 @@ static void SubmitRenderCommands(RTKContext* rtk, RenderTarget* render_target)
     Validate(res, "vkBeginCommandBuffer() failed");
 
     // Begin render pass.
-    VkClearValue clear_values[] =
-    {
-        { 0.0f, 0.1f, 0.2f, 1.0f },
-        { 1.0f },
-    };
     VkRenderPassBeginInfo render_pass_begin_info =
     {
         .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -1004,8 +993,8 @@ static void SubmitRenderCommands(RTKContext* rtk, RenderTarget* render_target)
             .offset = { 0, 0 },
             .extent = rtk->swapchain.extent,
         },
-        .clearValueCount = CTK_ARRAY_SIZE(clear_values),
-        .pClearValues    = clear_values,
+        .clearValueCount = render_target->attachment_clear_values.count,
+        .pClearValues    = render_target->attachment_clear_values.data,
     };
     vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
 

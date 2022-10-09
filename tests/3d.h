@@ -43,9 +43,9 @@ struct Entity
 
 struct Game
 {
+    RenderTarget  render_target;
     VertexLayout  vertex_layout;
     Pipeline      pipeline;
-    RenderTarget  render_target;
     View          view;
     Array<Entity> entities;
     Mouse         mouse;
@@ -122,6 +122,11 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 
     uint32 frame_count = rtk->swapchain.image_count + 1;
     InitFrames(rtk, mem, frame_count);
+}
+
+static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+{
+    InitRenderTarget(&game->render_target, mem, temp_mem, rtk, DEPTH_TESTING);
 }
 
 static void InitVertexLayout(Game* game, Stack* mem)
@@ -202,7 +207,7 @@ static void InitGameState(Game* game, Stack* mem)
 
 static void InitTest(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    InitRenderTarget(&game->render_target, mem, temp_mem, rtk, DEPTH_TESTING);
+    InitRenderTargets(game, mem, temp_mem, rtk);
     InitVertexLayout(game, mem);
     InitPipelines(game, temp_mem, rtk);
     LoadMeshData(game, rtk);

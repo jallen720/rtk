@@ -3,6 +3,7 @@
 #include "rtk/vulkan.h"
 #include "rtk/rtk_context.h"
 #include "rtk/shader.h"
+#include "rtk/render_target.h"
 #include "ctk2/ctk.h"
 #include "ctk2/memory.h"
 #include "ctk2/containers.h"

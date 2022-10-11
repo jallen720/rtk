@@ -16,8 +16,6 @@ using namespace RTK;
 
 /// Data
 ////////////////////////////////////////////////////////////
-static constexpr bool DEPTH_TESTING = true;
-
 struct View
 {
     Vec3<float32> position;
@@ -76,10 +74,10 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 {
     RTKLimits limits =
     {
-        .MAX_PHYSICAL_DEVICES = 8,
-        .MAX_HOST_MEMORY      = Megabyte(128),
-        .MAX_DEVICE_MEMORY    = Megabyte(256),
-        .RENDER_THREAD_COUNT  = 1,
+        .max_physical_devices = 8,
+        .max_host_memory      = Megabyte(128),
+        .max_device_memory    = Megabyte(256),
+        .render_thread_count  = 1,
     };
     InstanceInfo instance_info =
     {
@@ -108,9 +106,11 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 
 static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    InitRenderTarget(&game->render_target, mem, temp_mem, rtk, DEPTH_TESTING);
-    Set(&game->render_target.attachment_clear_values, 0, { 0.0f, 0.1f, 0.2f, 1.0f });
-    Set(&game->render_target.attachment_clear_values, 1, { 1.0f });
+    RenderTarget* rt = &game->render_target;
+    static constexpr bool DEPTH_TESTING = true;
+    InitRenderTarget(rt, mem, temp_mem, rtk, DEPTH_TESTING);
+    Set(&rt->attachment_clear_values, 0, { 0.0f, 0.1f, 0.2f, 1.0f });
+    Set(&rt->attachment_clear_values, 1, { 1.0f });
 }
 
 static void InitVertexLayout(Game* game, Stack* mem)

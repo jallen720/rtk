@@ -144,6 +144,8 @@
     <ClInclude Include="get_vk_array.h" />
     <ClInclude Include="memory.h" />
     <ClInclude Include="pipeline.h" />
+    <ClInclude Include="rendering.h" />
+    <ClInclude Include="render_target.h" />
     <ClInclude Include="rtk.h" />
     <ClInclude Include="rtk_context.h" />
     <ClInclude Include="tests\2d.h" />

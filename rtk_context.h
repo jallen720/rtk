@@ -69,27 +69,12 @@ struct Frame
     uint32                 swapchain_image_index;
 };
 
-struct RenderPassAttachments
-{
-    Array<VkAttachmentDescription>  descriptions;
-    Array<VkAttachmentReference>    color;
-    Optional<VkAttachmentReference> depth;
-};
-
-struct RenderTarget
-{
-    VkRenderPass         render_pass;
-    Array<Image>         depth_images;
-    Array<VkFramebuffer> framebuffers;
-    Array<VkClearValue>  attachment_clear_values;
-};
-
 struct RTKLimits
 {
-    const uint32 MAX_PHYSICAL_DEVICES;
-    const uint32 MAX_HOST_MEMORY;
-    const uint32 MAX_DEVICE_MEMORY;
-    const uint32 RENDER_THREAD_COUNT;
+    uint32 max_physical_devices;
+    uint32 max_host_memory;
+    uint32 max_device_memory;
+    uint32 render_thread_count;
 };
 
 struct RTKContext
@@ -646,192 +631,6 @@ static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
     }
 }
 
-static void InitRenderPassAttachments(RenderPassAttachments* attachments, Stack* mem, uint32 max_color_attachments,
-                                      bool depth_attachment)
-{
-    InitArray(&attachments->descriptions, mem, max_color_attachments + (depth_attachment ? 1 : 0));
-    InitArray(&attachments->color, mem, max_color_attachments);
-}
-
-static void PushColorAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
-{
-    uint32 attachment_index = attachments->descriptions.count;
-    Push(&attachments->descriptions, description);
-    Push(&attachments->color,
-    {
-        .attachment = attachment_index,
-        .layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-    });
-}
-
-static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
-{
-    uint32 attachment_index = attachments->descriptions.count;
-    Push(&attachments->descriptions, description);
-    Set(&attachments->depth,
-    {
-        .attachment = attachment_index,
-        .layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-    });
-}
-
-static VkAttachmentReference* GetDepthAttachment(RenderPassAttachments* attachments)
-{
-    return attachments->depth.exists ? &attachments->depth.value : NULL;
-}
-
-static void InitRenderPass(RenderTarget* render_target, Stack temp_mem, RTKContext* rtk, bool depth_testing)
-{
-    RenderPassAttachments attachments = {};
-    InitRenderPassAttachments(&attachments, &temp_mem, 1, depth_testing);
-    PushColorAttachment(&attachments,
-    {
-        .flags          = 0,
-        .format         = rtk->swapchain.image_format,
-        .samples        = VK_SAMPLE_COUNT_1_BIT,
-
-        .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-        .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-
-        .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-        .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    });
-
-    if (depth_testing)
-    {
-        SetDepthAttachment(&attachments,
-        {
-            .flags          = 0,
-            .format         = rtk->physical_device->depth_image_format,
-            .samples        = VK_SAMPLE_COUNT_1_BIT,
-
-            .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-
-            .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        });
-    }
-
-    VkSubpassDescription subpass_descriptions[] =
-    {
-        {
-            .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
-            .colorAttachmentCount    = attachments.color.count,
-            .pColorAttachments       = attachments.color.data,
-            .pDepthStencilAttachment = GetDepthAttachment(&attachments),
-        }
-    };
-    VkRenderPassCreateInfo create_info =
-    {
-        .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .attachmentCount = attachments.descriptions.count,
-        .pAttachments    = attachments.descriptions.data,
-        .subpassCount    = CTK_ARRAY_SIZE(subpass_descriptions),
-        .pSubpasses      = subpass_descriptions,
-        .dependencyCount = 0,
-        .pDependencies   = NULL,
-    };
-    VkResult res = vkCreateRenderPass(rtk->device, &create_info, NULL, &render_target->render_pass);
-    Validate(res, "failed to create render pass");
-}
-
-static void InitDepthImages(RenderTarget* render_target, Stack* mem, RTKContext* rtk)
-{
-    Swapchain* swapchain = &rtk->swapchain;
-    VkFormat depth_image_format = rtk->physical_device->depth_image_format;
-    InitArray(&render_target->depth_images, mem, swapchain->image_count);
-    ImageInfo depth_image_info =
-    {
-        .image =
-        {
-            .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-            .pNext     = NULL,
-            .flags     = 0,
-            .imageType = VK_IMAGE_TYPE_2D,
-            .format    = depth_image_format,
-            .extent =
-            {
-                .width  = swapchain->extent.width,
-                .height = swapchain->extent.height,
-                .depth  = 1
-            },
-            .mipLevels             = 1,
-            .arrayLayers           = 1,
-            .samples               = VK_SAMPLE_COUNT_1_BIT,
-            .tiling                = VK_IMAGE_TILING_OPTIMAL,
-            .usage                 = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-            .queueFamilyIndexCount = 0,
-            .pQueueFamilyIndices   = NULL,
-            .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-        },
-        .view =
-        {
-            .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .pNext    = NULL,
-            .flags    = 0,
-            .image    = VK_NULL_HANDLE,
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format   = depth_image_format,
-            .components =
-            {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-            },
-            .subresourceRange =
-            {
-                .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT,
-                .baseMipLevel   = 0,
-                .levelCount     = 1,
-                .baseArrayLayer = 0,
-                .layerCount     = 1,
-            },
-        },
-        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    };
-
-    for (uint32 i = 0; i < swapchain->image_count; ++i)
-        InitImage(Push(&render_target->depth_images), rtk->device, rtk->physical_device, &depth_image_info);
-}
-
-static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp_mem, RTKContext* rtk,
-                             uint32 attachment_count, bool depth_testing)
-{
-    Swapchain* swapchain = &rtk->swapchain;
-    InitArray(&render_target->framebuffers, mem, rtk->swapchain.image_count);
-    auto attachments = CreateArray<VkImageView>(&temp_mem, attachment_count);
-    for (uint32 i = 0; i < rtk->swapchain.image_count; ++i)
-    {
-        Push(attachments, Get(&swapchain->image_views, i));
-
-        if (depth_testing)
-            Push(attachments, GetPtr(&render_target->depth_images, i)->view);
-
-        VkFramebufferCreateInfo info =
-        {
-            .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .renderPass      = render_target->render_pass,
-            .attachmentCount = attachments->count,
-            .pAttachments    = attachments->data,
-            .width           = swapchain->extent.width,
-            .height          = swapchain->extent.height,
-            .layers          = 1,
-        };
-        VkResult res = vkCreateFramebuffer(rtk->device, &info, NULL, Push(&render_target->framebuffers));
-        Validate(res, "failed to create framebuffer");
-
-        // Clear attachments for next iteration.
-        Clear(attachments);
-    }
-}
-
 /// Interface
 ////////////////////////////////////////////////////////////
 static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window, RTKLimits* limits,
@@ -841,35 +640,42 @@ static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* 
     InitSurface(rtk, window);
 
     // Initialize device state.
-    InitArray(&rtk->physical_devices, mem, limits->MAX_PHYSICAL_DEVICES);
+    InitArray(&rtk->physical_devices, mem, limits->max_physical_devices);
     LoadCapablePhysicalDevices(rtk, temp_mem, required_features);
     UsePhysicalDevice(rtk, 0);
     InitDevice(rtk, required_features);
     InitQueues(rtk);
     GetSurfaceInfo(rtk, mem);
-    InitMemory(rtk, limits->MAX_HOST_MEMORY, limits->MAX_DEVICE_MEMORY);
+    InitMemory(rtk, limits->max_host_memory, limits->max_device_memory);
     InitMainCommandState(rtk);
 
     // Initialize rendering state.
     InitSwapchain(rtk, mem, temp_mem);
-
-    InitRenderCommandPools(rtk, mem, limits->RENDER_THREAD_COUNT);
-
+    InitRenderCommandPools(rtk, mem, limits->render_thread_count);
     uint32 frame_count = rtk->swapchain.image_count + 1;
     InitFrames(rtk, mem, frame_count);
 };
 
-static void InitRenderTarget(RenderTarget* render_target, Stack* mem, Stack temp_mem, RTKContext* rtk,
-                             bool depth_testing)
+static void NextFrame(RTKContext* rtk)
 {
-    InitRenderPass(render_target, temp_mem, rtk, depth_testing);
+    VkDevice device = rtk->device;
+    VkResult res = VK_SUCCESS;
 
-    if (depth_testing)
-        InitDepthImages(render_target, mem, rtk);
+    // Get next frame and wait for it to be finished (if still in-progress) before proceeding.
+    Frame* frame = Next(&rtk->frames);
 
-    uint32 attachment_count = 1 + (depth_testing ? 1 : 0);
-    InitFramebuffers(render_target, mem, temp_mem, rtk, attachment_count, depth_testing);
-    InitArrayFull(&render_target->attachment_clear_values, mem, attachment_count);
+    res = vkWaitForFences(device, 1, &frame->in_progress, VK_TRUE, U64_MAX);
+    Validate(res, "vkWaitForFences() failed");
+
+    res = vkResetFences(device, 1, &frame->in_progress);
+    Validate(res, "vkResetFences() failed");
+
+    // Once frame is ready, aquire next swapchain image's index.
+    res = vkAcquireNextImageKHR(rtk->device, rtk->swapchain.hnd, U64_MAX, frame->image_acquired, VK_NULL_HANDLE,
+                                &frame->swapchain_image_index);
+    Validate(res, "vkAcquireNextImageKHR() failed");
+
+    rtk->frame = frame;
 }
 
 // static void BeginTempCommandBuffer(VkCommandBuffer command_buffer)
@@ -905,140 +711,5 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* mem, Stack temp
 
 //     vkQueueWaitIdle(queue);
 // }
-
-static void NextFrame(RTKContext* rtk)
-{
-    VkDevice device = rtk->device;
-    VkResult res = VK_SUCCESS;
-
-    // Get next frame and wait for it to be finished (if still in-progress) before proceeding.
-    Frame* frame = Next(&rtk->frames);
-
-    res = vkWaitForFences(device, 1, &frame->in_progress, VK_TRUE, U64_MAX);
-    Validate(res, "vkWaitForFences() failed");
-
-    res = vkResetFences(device, 1, &frame->in_progress);
-    Validate(res, "vkResetFences() failed");
-
-    // Once frame is ready, aquire next swapchain image's index.
-    res = vkAcquireNextImageKHR(rtk->device, rtk->swapchain.hnd, U64_MAX, frame->image_acquired, VK_NULL_HANDLE,
-                                &frame->swapchain_image_index);
-    Validate(res, "vkAcquireNextImageKHR() failed");
-
-    rtk->frame = frame;
-}
-
-static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, RenderTarget* render_target,
-                                                    uint32 render_thread_index)
-{
-    Frame* frame = rtk->frame;
-    VkCommandBuffer render_command_buffer = Get(&frame->render_command_buffers, render_thread_index);
-
-    VkCommandBufferInheritanceInfo inheritance_info =
-    {
-        .sType                = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO,
-        .pNext                = NULL,
-        .renderPass           = render_target->render_pass,
-        .subpass              = 0,
-        .framebuffer          = Get(&render_target->framebuffers, frame->swapchain_image_index),
-        .occlusionQueryEnable = VK_FALSE,
-        .queryFlags           = 0,
-        .pipelineStatistics   = 0,
-    };
-    VkCommandBufferBeginInfo command_buffer_begin_info =
-    {
-        .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags            = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
-        .pInheritanceInfo = &inheritance_info,
-    };
-    VkResult res = vkBeginCommandBuffer(render_command_buffer, &command_buffer_begin_info);
-    Validate(res, "vkBeginCommandBuffer() failed");
-
-    return render_command_buffer;
-}
-
-static void EndRecordingRenderCommands(VkCommandBuffer render_command_buffer)
-{
-    VkResult res = vkEndCommandBuffer(render_command_buffer);
-    Validate(res, "vkEndCommandBuffer() failed");
-}
-
-static void SubmitRenderCommands(RTKContext* rtk, RenderTarget* render_target)
-{
-    Frame* frame = rtk->frame;
-    VkResult res = VK_SUCCESS;
-
-    // Record current frame's primary command buffer, including render command buffers.
-    VkCommandBuffer command_buffer = frame->primary_render_command_buffer;
-
-    // Begin command buffer.
-    VkCommandBufferBeginInfo command_buffer_begin_info =
-    {
-        .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags            = 0,
-        .pInheritanceInfo = NULL,
-    };
-    res = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
-    Validate(res, "vkBeginCommandBuffer() failed");
-
-    // Begin render pass.
-    VkRenderPassBeginInfo render_pass_begin_info =
-    {
-        .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext       = NULL,
-        .renderPass  = render_target->render_pass,
-        .framebuffer = Get(&render_target->framebuffers, frame->swapchain_image_index),
-        .renderArea =
-        {
-            .offset = { 0, 0 },
-            .extent = rtk->swapchain.extent,
-        },
-        .clearValueCount = render_target->attachment_clear_values.count,
-        .pClearValues    = render_target->attachment_clear_values.data,
-    };
-    vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
-
-    // Execute entity render commands.
-    vkCmdExecuteCommands(command_buffer, frame->render_command_buffers.count, frame->render_command_buffers.data);
-
-    vkCmdEndRenderPass(command_buffer);
-
-    res = vkEndCommandBuffer(command_buffer);
-    Validate(res, "vkEndCommandBuffer() failed");
-
-    // Submit commands for rendering to graphics queue.
-    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    VkSubmitInfo submit_info =
-    {
-        .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .pNext                = NULL,
-        .waitSemaphoreCount   = 1,
-        .pWaitSemaphores      = &frame->image_acquired,
-        .pWaitDstStageMask    = &wait_stage,
-        .commandBufferCount   = 1,
-        .pCommandBuffers      = &command_buffer,
-        .signalSemaphoreCount = 1,
-        .pSignalSemaphores    = &frame->render_finished,
-    };
-    res = vkQueueSubmit(rtk->graphics_queue, 1, &submit_info, frame->in_progress);
-    Validate(res, "vkQueueSubmit() failed");
-
-    // Queue swapchain image for presentation.
-    VkPresentInfoKHR present_info =
-    {
-        .sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-        .pNext              = NULL,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores    = &frame->render_finished,
-        .swapchainCount     = 1,
-        .pSwapchains        = &rtk->swapchain.hnd,
-        .pImageIndices      = &frame->swapchain_image_index,
-        .pResults           = NULL,
-    };
-    res = vkQueuePresentKHR(rtk->present_queue, &present_info);
-    Validate(res, "vkQueuePresentKHR() failed");
-
-    vkDeviceWaitIdle(rtk->device);
-}
 
 }

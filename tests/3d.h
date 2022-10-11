@@ -74,12 +74,7 @@ static void SelectPhysicalDevice(RTKContext* rtk)
 
 static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 {
-    RTKLimits limits =
-    {
-        .max_physical_devices = 8,
-        .render_thread_count  = 1,
-    };
-    InstanceInfo instance_info =
+    RTKInfo rtk_info =
     {
         .application_name = "RTK Test",
 #ifdef RTK_ENABLE_VALIDATION
@@ -92,16 +87,18 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
                                   VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                                   VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 #endif
-    };
-    DeviceFeatures required_features =
-    {
-        .as_struct =
+        .required_features =
         {
-            .geometryShader    = VK_TRUE,
-            .samplerAnisotropy = VK_TRUE,
+            .as_struct =
+            {
+                .geometryShader    = VK_TRUE,
+                .samplerAnisotropy = VK_TRUE,
+            },
         },
+        .max_physical_devices = 8,
+        .render_thread_count  = 1,
     };
-    InitRTKContext(rtk, mem, temp_mem, window, &limits, &instance_info, &required_features);
+    InitRTKContext(rtk, mem, temp_mem, window, &rtk_info);
 }
 
 static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -163,16 +160,16 @@ static void InitGraphicMem(Game* game, RTKContext* rtk)
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     });
-    InitBuffer(&game->device_buffer, rtk,
-    {
-        .size               = Megabyte(256),
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    });
+    // InitBuffer(&game->device_buffer, rtk,
+    // {
+    //     .size               = Megabyte(256),
+    //     .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+    //     .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+    //                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+    //                           VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+    //                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+    //     .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    // });
 }
 
 static void LoadMeshData(Game* game)

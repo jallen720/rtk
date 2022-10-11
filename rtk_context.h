@@ -30,12 +30,15 @@ namespace RTK
 ////////////////////////////////////////////////////////////
 static constexpr uint32 UNSET_INDEX = U32_MAX;
 
-struct InstanceInfo
+struct RTKInfo
 {
     cstring                             application_name;
     DebugCallback                       debug_callback;
     VkDebugUtilsMessageSeverityFlagsEXT debug_message_severity;
     VkDebugUtilsMessageTypeFlagsEXT     debug_message_type;
+    DeviceFeatures                      required_features;
+    uint32                              max_physical_devices;
+    uint32                              render_thread_count;
 };
 
 struct Surface
@@ -66,12 +69,6 @@ struct Frame
     VkCommandBuffer        primary_render_command_buffer;
     Array<VkCommandBuffer> render_command_buffers;
     uint32                 swapchain_image_index;
-};
-
-struct RTKLimits
-{
-    uint32 max_physical_devices;
-    uint32 render_thread_count;
 };
 
 struct RTKContext
@@ -174,7 +171,7 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(uint32 queue_family_index)
 
     return info;
 }
-static void InitInstance(RTKContext* rtk, InstanceInfo* info)
+static void InitInstance(RTKContext* rtk, RTKInfo* info)
 {
     VkResult res = VK_SUCCESS;
 
@@ -603,24 +600,23 @@ static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window, RTKLimits* limits,
-                           InstanceInfo* instance_info, DeviceFeatures* required_features)
+static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window, RTKInfo* info)
 {
-    InitInstance(rtk, instance_info);
+    InitInstance(rtk, info);
     InitSurface(rtk, window);
 
     // Initialize device state.
-    InitArray(&rtk->physical_devices, mem, limits->max_physical_devices);
-    LoadCapablePhysicalDevices(rtk, temp_mem, required_features);
+    InitArray(&rtk->physical_devices, mem, info->max_physical_devices);
+    LoadCapablePhysicalDevices(rtk, temp_mem, &info->required_features);
     UsePhysicalDevice(rtk, 0); // Default to first capable device found. Required by InitDevice().
-    InitDevice(rtk, required_features);
+    InitDevice(rtk, &info->required_features);
     InitQueues(rtk);
     GetSurfaceInfo(rtk, mem);
     InitMainCommandState(rtk);
 
     // Initialize rendering state.
     InitSwapchain(rtk, mem, temp_mem);
-    InitRenderCommandPools(rtk, mem, limits->render_thread_count);
+    InitRenderCommandPools(rtk, mem, info->render_thread_count);
     uint32 frame_count = rtk->swapchain.image_count + 1;
     InitFrames(rtk, mem, frame_count);
 };

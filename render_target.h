@@ -4,6 +4,7 @@
 #include "ctk2/memory.h"
 #include "ctk2/containers.h"
 #include "rtk/rtk_context.h"
+#include "rtk/memory.h"
 #include "rtk/debug.h"
 
 using namespace CTK;
@@ -182,7 +183,7 @@ static void InitDepthImages(RenderTarget* render_target, Stack* mem, RTKContext*
     };
 
     for (uint32 i = 0; i < swapchain->image_count; ++i)
-        InitImage(Push(&render_target->depth_images), rtk->device, rtk->physical_device, &depth_image_info);
+        InitImage(Push(&render_target->depth_images), rtk, &depth_image_info);
 }
 
 static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp_mem, RTKContext* rtk,

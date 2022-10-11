@@ -3,7 +3,6 @@
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/vk_array.h"
-#include "rtk/memory.h"
 #include "rtk/device.h"
 #include "ctk2/ctk.h"
 #include "ctk2/memory.h"
@@ -72,8 +71,6 @@ struct Frame
 struct RTKLimits
 {
     uint32 max_physical_devices;
-    uint32 max_host_memory;
-    uint32 max_device_memory;
     uint32 render_thread_count;
 };
 
@@ -90,8 +87,6 @@ struct RTKContext
     VkDevice              device;
     VkQueue               graphics_queue;
     VkQueue               present_queue;
-    Buffer                host_buffer;
-    Buffer                device_buffer;
     VkCommandPool         main_command_pool;
     VkCommandBuffer       temp_command_buffer;
 
@@ -366,31 +361,6 @@ static void GetSurfaceInfo(RTKContext* rtk, Stack* mem)
     LoadVkSurfacePresentModes(&surface->present_modes, mem, vk_physical_device, surface->hnd);
 }
 
-static void InitMemory(RTKContext* rtk, uint32 max_host_memory, uint32 max_device_memory)
-{
-    InitBuffer(&rtk->host_buffer, rtk->device, rtk->physical_device,
-    {
-        .size               = max_host_memory,
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    });
-    InitBuffer(&rtk->device_buffer, rtk->device, rtk->physical_device,
-    {
-        .size               = max_device_memory,
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    });
-}
-
 static void InitMainCommandState(RTKContext* rtk)
 {
     VkDevice device = rtk->device;
@@ -646,7 +616,6 @@ static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* 
     InitDevice(rtk, required_features);
     InitQueues(rtk);
     GetSurfaceInfo(rtk, mem);
-    InitMemory(rtk, limits->max_host_memory, limits->max_device_memory);
     InitMainCommandState(rtk);
 
     // Initialize rendering state.

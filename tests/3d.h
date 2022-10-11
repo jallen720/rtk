@@ -41,6 +41,8 @@ struct Game
     VertexLayout vertex_layout;
     Pipeline     pipeline;
     uint32       test_mesh_indexes_offset;
+    Buffer       host_buffer;
+    Buffer       device_buffer;
 
     // Sim State
     View          view;
@@ -75,8 +77,6 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     RTKLimits limits =
     {
         .max_physical_devices = 8,
-        .max_host_memory      = Megabyte(128),
-        .max_device_memory    = Megabyte(256),
         .render_thread_count  = 1,
     };
     InstanceInfo instance_info =
@@ -150,14 +150,39 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
     InitPipeline(&game->pipeline, temp_mem, &game->render_target, rtk, &pipeline_info);
 }
 
-static void LoadMeshData(Game* game, RTKContext* rtk)
+static void InitGraphicMem(Game* game, RTKContext* rtk)
+{
+    InitBuffer(&game->host_buffer, rtk,
+    {
+        .size               = Megabyte(128),
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    });
+    InitBuffer(&game->device_buffer, rtk,
+    {
+        .size               = Megabyte(256),
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    });
+}
+
+static void LoadMeshData(Game* game)
 {
     // Load test mesh into host memory.
     {
         #include "rtk/meshes/cube.h"
         game->test_mesh_indexes_offset = sizeof(vertexes);
-        memcpy(rtk->host_buffer.mapped_mem, vertexes, sizeof(vertexes));
-        memcpy(rtk->host_buffer.mapped_mem + sizeof(vertexes), indexes, sizeof(indexes));
+        memcpy(game->host_buffer.mapped_mem, vertexes, sizeof(vertexes));
+        memcpy(game->host_buffer.mapped_mem + sizeof(vertexes), indexes, sizeof(indexes));
     }
 }
 
@@ -194,7 +219,8 @@ static void InitGame(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
     InitRenderTargets(game, mem, temp_mem, rtk);
     InitVertexLayout(game, mem);
     InitPipelines(game, temp_mem, rtk);
-    LoadMeshData(game, rtk);
+    InitGraphicMem(game, rtk);
+    LoadMeshData(game);
     InitGameState(game, mem);
 }
 
@@ -325,11 +351,11 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
         vkCmdBindVertexBuffers(render_command_buffer,
                                0, // First Binding
                                1, // Binding Count
-                               &rtk->host_buffer.hnd,
+                               &game->host_buffer.hnd,
                                &vertexes_offset);
 
         vkCmdBindIndexBuffer(render_command_buffer,
-                             rtk->host_buffer.hnd,
+                             game->host_buffer.hnd,
                              indexes_offset,
                              VK_INDEX_TYPE_UINT32);
 

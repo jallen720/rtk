@@ -3,6 +3,7 @@
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/device.h"
+#include "rtk/rtk_context.h"
 #include "ctk2/ctk.h"
 
 using namespace CTK;
@@ -46,12 +47,11 @@ struct Image
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* physical_device,
-                                           VkMemoryRequirements mem_requirements,
+static VkDeviceMemory AllocateDeviceMemory(RTKContext* rtk, VkMemoryRequirements mem_requirements,
                                            VkMemoryPropertyFlags mem_property_flags)
 {
     // Find memory type index in memory properties based on memory property flags.
-    VkPhysicalDeviceMemoryProperties* mem_properties = &physical_device->mem_properties;
+    VkPhysicalDeviceMemoryProperties* mem_properties = &rtk->physical_device->mem_properties;
     uint32 mem_type_index = U32_MAX;
     for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
     {
@@ -78,7 +78,7 @@ static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* phys
         .memoryTypeIndex = mem_type_index,
     };
     VkDeviceMemory mem = VK_NULL_HANDLE;
-    VkResult res = vkAllocateMemory(device, &info, NULL, &mem);
+    VkResult res = vkAllocateMemory(rtk->device, &info, NULL, &mem);
     Validate(res, "failed to allocate memory");
 
     return mem;
@@ -86,8 +86,9 @@ static VkDeviceMemory AllocateDeviceMemory(VkDevice device, PhysicalDevice* phys
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical_device, BufferInfo* info)
+static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo* info)
 {
+    VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
 
     VkBufferCreateInfo create_info =
@@ -106,7 +107,7 @@ static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical
     VkMemoryRequirements mem_requirements = {};
     vkGetBufferMemoryRequirements(device, buffer->hnd, &mem_requirements);
 
-    buffer->mem = AllocateDeviceMemory(device, physical_device, mem_requirements, info->mem_property_flags);
+    buffer->mem = AllocateDeviceMemory(rtk, mem_requirements, info->mem_property_flags);
     res = vkBindBufferMemory(device, buffer->hnd, buffer->mem, 0);
     Validate(res, "failed to bind buffer memory");
 
@@ -117,13 +118,14 @@ static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical
         vkMapMemory(device, buffer->mem, 0, buffer->size, 0, (void**)&buffer->mapped_mem);
 }
 
-static void InitBuffer(Buffer* buffer, VkDevice device, PhysicalDevice* physical_device, BufferInfo info)
+static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo info)
 {
-    InitBuffer(buffer, device, physical_device, &info);
+    InitBuffer(buffer, rtk, &info);
 }
 
-static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_device, ImageInfo* info)
+static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
 {
+    VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
 
     res = vkCreateImage(device, &info->image, NULL, &image->hnd);
@@ -133,7 +135,7 @@ static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_de
     VkMemoryRequirements mem_requirements = {};
     vkGetImageMemoryRequirements(device, image->hnd, &mem_requirements);
 
-    image->mem = AllocateDeviceMemory(device, physical_device, mem_requirements, info->mem_property_flags);
+    image->mem = AllocateDeviceMemory(rtk, mem_requirements, info->mem_property_flags);
     res = vkBindImageMemory(device, image->hnd, image->mem, 0);
     Validate(res, "failed to bind image memory");
 
@@ -144,9 +146,9 @@ static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_de
     image->extent = info->image.extent;
 }
 
-static void InitImage(Image* image, VkDevice device, PhysicalDevice* physical_device, ImageInfo info)
+static void InitImage(Image* image, RTKContext* rtk, ImageInfo info)
 {
-    InitImage(image, device, physical_device, &info);
+    InitImage(image, rtk, &info);
 }
 
 }

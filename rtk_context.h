@@ -612,7 +612,7 @@ static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* 
     // Initialize device state.
     InitArray(&rtk->physical_devices, mem, limits->max_physical_devices);
     LoadCapablePhysicalDevices(rtk, temp_mem, required_features);
-    UsePhysicalDevice(rtk, 0);
+    UsePhysicalDevice(rtk, 0); // Default to first capable device found. Required by InitDevice().
     InitDevice(rtk, required_features);
     InitQueues(rtk);
     GetSurfaceInfo(rtk, mem);
@@ -647,38 +647,38 @@ static void NextFrame(RTKContext* rtk)
     rtk->frame = frame;
 }
 
-// static void BeginTempCommandBuffer(VkCommandBuffer command_buffer)
-// {
-//     VkCommandBufferBeginInfo info =
-//     {
-//         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-//         .pNext = NULL,
-//         .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
-//         .pInheritanceInfo = NULL,
-//     };
-//     vkBeginCommandBuffer(command_buffer, &info);
-// }
+static void BeginTempCommandBuffer(RTKContext* rtk)
+{
+    VkCommandBufferBeginInfo info =
+    {
+        .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .pNext            = NULL,
+        .flags            = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .pInheritanceInfo = NULL,
+    };
+    vkBeginCommandBuffer(rtk->temp_command_buffer, &info);
+}
 
-// static void SubmitTempCommandBuffer(VkCommandBuffer command_buffer, VkQueue queue)
-// {
-//     vkEndCommandBuffer(command_buffer);
+static void SubmitTempCommandBuffer(RTKContext* rtk)
+{
+    vkEndCommandBuffer(rtk->temp_command_buffer);
 
-//     VkSubmitInfo submit_info =
-//     {
-//         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-//         .pNext = NULL,
-//         .waitSemaphoreCount = 0,
-//         .pWaitSemaphores = NULL,
-//         .pWaitDstStageMask = NULL,
-//         .commandBufferCount = 1,
-//         .pCommandBuffers = &command_buffer,
-//         .signalSemaphoreCount = 0,
-//         .pSignalSemaphores = NULL,
-//     };
-//     VkResult res = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
-//     Validate(res, "failed to submit temp command buffer");
+    VkSubmitInfo submit_info =
+    {
+        .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext                = NULL,
+        .waitSemaphoreCount   = 0,
+        .pWaitSemaphores      = NULL,
+        .pWaitDstStageMask    = NULL,
+        .commandBufferCount   = 1,
+        .pCommandBuffers      = &rtk->temp_command_buffer,
+        .signalSemaphoreCount = 0,
+        .pSignalSemaphores    = NULL,
+    };
+    VkResult res = vkQueueSubmit(rtk->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+    Validate(res, "failed to submit temp command buffer");
 
-//     vkQueueWaitIdle(queue);
-// }
+    vkQueueWaitIdle(rtk->graphics_queue);
+}
 
 }

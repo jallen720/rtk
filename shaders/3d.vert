@@ -4,11 +4,14 @@
 layout (location = 0) in vec3 in_vert_pos;
 layout (location = 0) out vec3 out_vert_color;
 
-layout (push_constant) uniform PushConstants {
+layout (push_constant) uniform PushConstants
+{
     mat4 mvp_matrix;
-} push_constants;
+}
+push_constants;
 
-void main() {
+void main()
+{
     gl_Position = push_constants.mvp_matrix * vec4(in_vert_pos, 1);
     out_vert_color = in_vert_pos;
 }

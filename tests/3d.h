@@ -31,7 +31,14 @@ struct Entity
 {
     Vec3<float32> position;
     Vec3<float32> rotation;
-    Matrix        mvp_matrix;
+};
+
+struct EntityData
+{
+    Entity *entities;
+    Matrix *mvp_matrixes;
+    uint32 count;
+    uint32 size;
 };
 
 struct Game
@@ -45,9 +52,9 @@ struct Game
     Buffer       device_buffer;
 
     // Sim State
-    View          view;
-    Array<Entity> entities;
-    Mouse         mouse;
+    Mouse      mouse;
+    View       view;
+    EntityData entity_data;
 };
 
 struct Vertex
@@ -55,8 +62,50 @@ struct Vertex
     Vec3<float32> position;
 };
 
-/// Test Functions
+/// Game Functions
 ////////////////////////////////////////////////////////////
+static void Init(EntityData* entity_data, Stack* mem, uint32 max_entities)
+{
+    entity_data->size = max_entities;
+    entity_data->entities = Allocate<Entity>(mem, max_entities);
+    entity_data->mvp_matrixes = Allocate<Matrix>(mem, max_entities);
+}
+
+static Entity* Push(EntityData* entity_data, Entity entity)
+{
+    if (entity_data->count == entity_data->size)
+        CTK_FATAL("can't push another entity: entity count (%u) at max (%u)", entity_data->count, entity_data->size);
+
+    Entity* new_entity = entity_data->entities + entity_data->count;
+    *new_entity = entity;
+    ++entity_data->count;
+    return new_entity;
+}
+
+static void ValidateIndex(EntityData* entity_data, uint32 index)
+{
+    if (index >= entity_data->count)
+        CTK_FATAL("can't access entity at index %u: index exceeds highest index %u", index, entity_data->count - 1);
+}
+
+static Entity* GetEntityPtr(EntityData* entity_data, uint32 index)
+{
+    ValidateIndex(entity_data, index);
+    return entity_data->entities + index;
+}
+
+static Matrix* GetMVPMatrixPtr(EntityData* entity_data, uint32 index)
+{
+    ValidateIndex(entity_data, index);
+    return entity_data->mvp_matrixes + index;
+}
+
+static void SetMVPMatrix(EntityData* entity_data, uint32 index, Matrix mvp_matrix)
+{
+    ValidateIndex(entity_data, index);
+    entity_data->mvp_matrixes[index] = mvp_matrix;
+}
+
 static void SelectPhysicalDevice(RTKContext* rtk)
 {
     // Use first discrete device if any are available.
@@ -198,12 +247,12 @@ static void InitGameState(Game* game, Stack* mem)
 
     static constexpr uint32 CUBE_SIZE = 4;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
-    InitArray(&game->entities, mem, CUBE_ENTITY_COUNT);
+    Init(&game->entity_data, mem, CUBE_ENTITY_COUNT);
     for (uint32 z = 0; z < CUBE_SIZE; ++z)
     for (uint32 y = 0; y < CUBE_SIZE; ++y)
     for (uint32 x = 0; x < CUBE_SIZE; ++x)
     {
-        Push(&game->entities,
+        Push(&game->entity_data,
         {
             .position = { x * 1.5f, y * 1.5f, z * 1.5f },
             .rotation = { 0, 0, 0 },
@@ -310,9 +359,9 @@ static void UpdateMVPMatrixes(Game* game)
 {
     // Update entity MVP matrixes.
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    for (uint32 i = 0; i < game->entities.count; ++i)
+    for (uint32 i = 0; i < game->entity_data.count; ++i)
     {
-        Entity* entity = GetPtr(&game->entities, i);
+        Entity* entity = GetEntityPtr(&game->entity_data, i);
         Matrix model_matrix = ID_MATRIX;
         model_matrix = Translate(model_matrix, entity->position);
         model_matrix = RotateX(model_matrix, entity->rotation.x);
@@ -320,7 +369,7 @@ static void UpdateMVPMatrixes(Game* game)
         model_matrix = RotateZ(model_matrix, entity->rotation.z);
         // model_matrix = Scale(model_matrix, entity->scale);
 
-        entity->mvp_matrix = view_projection_matrix * model_matrix;
+        SetMVPMatrix(&game->entity_data, i, view_projection_matrix * model_matrix);
     }
 }
 
@@ -356,12 +405,13 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
                              indexes_offset,
                              VK_INDEX_TYPE_UINT32);
 
-        for (uint32 i = 0; i < game->entities.count; ++i)
+        for (uint32 i = 0; i < game->entity_data.count; ++i)
         {
-            Entity* entity = GetPtr(&game->entities, i);
+            Entity* entity = GetEntityPtr(&game->entity_data, i);
+            Matrix* mvp_matrix = GetMVPMatrixPtr(&game->entity_data, i);
             vkCmdPushConstants(render_command_buffer, pipeline->layout,
                                VK_SHADER_STAGE_VERTEX_BIT,
-                               0, sizeof(entity->mvp_matrix), &entity->mvp_matrix);
+                               0, sizeof(Matrix), (void*)mvp_matrix);
             vkCmdDrawIndexed(render_command_buffer,
                              36, // Index Count
                              1, // Instance Count

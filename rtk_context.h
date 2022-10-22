@@ -122,7 +122,6 @@ static QueueFamilies FindQueueFamilies(Stack temp_mem, VkPhysicalDevice physical
         // Check if queue supports present operations.
         VkBool32 present_supported = VK_FALSE;
         vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, queue_family_index, surface->hnd, &present_supported);
-
         if (present_supported)
         {
             queue_families.present = queue_family_index;

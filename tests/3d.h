@@ -9,6 +9,7 @@
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
+#include "rtk/tests/defs.h"
 
 using namespace CTK;
 using namespace STK;
@@ -35,21 +36,25 @@ struct Entity
 
 struct EntityData
 {
-    Entity* entities;
-    Matrix* mvp_matrixes;
-    uint32  count;
-    uint32  size;
+    Entity entities[MAX_ENTITIES];
+    uint32 count;
+};
+
+struct VSBuffer
+{
+    Matrix mvp_matrixes[MAX_ENTITIES];
 };
 
 struct Game
 {
-    // Graphics
-    RenderTarget render_target;
-    VertexLayout vertex_layout;
-    Pipeline     pipeline;
-    uint32       test_mesh_indexes_offset;
-    Buffer       host_buffer;
-    Buffer       device_buffer;
+    // Graphics State
+    RenderTarget         render_target;
+    VertexLayout         vertex_layout;
+    Pipeline             pipeline;
+    uint32               test_mesh_indexes_offset;
+    Buffer               host_buffer;
+    Buffer               device_buffer;
+    ShaderData<VSBuffer> vs_data;
 
     // Sim State
     Mouse      mouse;
@@ -64,17 +69,10 @@ struct Vertex
 
 /// Game Functions
 ////////////////////////////////////////////////////////////
-static void Init(EntityData* entity_data, Stack* mem, uint32 max_entities)
-{
-    entity_data->size         = max_entities;
-    entity_data->entities     = Allocate<Entity>(mem, max_entities);
-    entity_data->mvp_matrixes = Allocate<Matrix>(mem, max_entities);
-}
-
 static Entity* Push(EntityData* entity_data, Entity entity)
 {
-    if (entity_data->count == entity_data->size)
-        CTK_FATAL("can't push another entity: entity count (%u) at max (%u)", entity_data->count, entity_data->size);
+    if (entity_data->count == MAX_ENTITIES)
+        CTK_FATAL("can't push another entity: entity count (%u) at max (%u)", entity_data->count, MAX_ENTITIES);
 
     Entity* new_entity = entity_data->entities + entity_data->count;
     *new_entity = entity;
@@ -92,18 +90,6 @@ static Entity* GetEntityPtr(EntityData* entity_data, uint32 index)
 {
     ValidateIndex(entity_data, index);
     return entity_data->entities + index;
-}
-
-static Matrix* GetMVPMatrixPtr(EntityData* entity_data, uint32 index)
-{
-    ValidateIndex(entity_data, index);
-    return entity_data->mvp_matrixes + index;
-}
-
-static void SetMVPMatrix(EntityData* entity_data, uint32 index, Matrix mvp_matrix)
-{
-    ValidateIndex(entity_data, index);
-    entity_data->mvp_matrixes[index] = mvp_matrix;
 }
 
 static void SelectPhysicalDevice(RTKContext* rtk)
@@ -232,8 +218,24 @@ static void LoadMeshData(Game* game)
     }
 }
 
-static void InitGameState(Game* game, Stack* mem)
+static void InitShaderData(Game* game, Stack* mem, RTKContext* rtk)
 {
+    Init(&game->vs_data, mem, rtk);
+}
+
+static void InitGraphicsState(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+{
+    InitRenderTargets(game, mem, temp_mem, rtk);
+    InitVertexLayout(game, mem);
+    InitPipelines(game, temp_mem, rtk);
+    InitGraphicMem(game, rtk);
+    LoadMeshData(game);
+    InitShaderData(game, mem, rtk);
+}
+
+static void InitSimState(Game* game, Stack* mem, RTKContext* rtk)
+{
+    // View
     game->view =
     {
         .position     = { 0, 0, -1 },
@@ -245,9 +247,10 @@ static void InitGameState(Game* game, Stack* mem)
         .max_x_angle  = 85.0f,
     };
 
+    // Entities
     static constexpr uint32 CUBE_SIZE = 4;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
-    Init(&game->entity_data, mem, CUBE_ENTITY_COUNT);
+    static_assert(CUBE_ENTITY_COUNT < MAX_ENTITIES);
     for (uint32 z = 0; z < CUBE_SIZE; ++z)
     for (uint32 y = 0; y < CUBE_SIZE; ++y)
     for (uint32 x = 0; x < CUBE_SIZE; ++x)
@@ -262,12 +265,8 @@ static void InitGameState(Game* game, Stack* mem)
 
 static void InitGame(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    InitRenderTargets(game, mem, temp_mem, rtk);
-    InitVertexLayout(game, mem);
-    InitPipelines(game, temp_mem, rtk);
-    InitGraphicMem(game, rtk);
-    LoadMeshData(game);
-    InitGameState(game, mem);
+    InitGraphicsState(game, mem, temp_mem, rtk);
+    InitSimState(game, mem, rtk);
 }
 
 static void LocalTranslate(View* view, Vec3<float32> translation)
@@ -355,10 +354,11 @@ static Matrix CreateViewProjectionMatrix(View* view)
     return projection_matrix * view_matrix;
 }
 
-static void UpdateMVPMatrixes(Game* game)
+static void UpdateMVPMatrixes(Game* game, RTKContext* rtk)
 {
     // Update entity MVP matrixes.
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
+    VSBuffer* frame_vs_buffer = GetPtr(&game->vs_data, rtk->frames.index);
     for (uint32 i = 0; i < game->entity_data.count; ++i)
     {
         Entity* entity = GetEntityPtr(&game->entity_data, i);
@@ -369,11 +369,11 @@ static void UpdateMVPMatrixes(Game* game)
         model_matrix = RotateZ(model_matrix, entity->rotation.z);
         // model_matrix = Scale(model_matrix, entity->scale);
 
-        SetMVPMatrix(&game->entity_data, i, view_projection_matrix * model_matrix);
+        frame_vs_buffer->mvp_matrixes[i] = view_projection_matrix * model_matrix;
     }
 }
 
-static void UpdateGame(Game* game, Window* window)
+static void UpdateGame(Game* game, RTKContext* rtk, Window* window)
 {
     UpdateMouse(&game->mouse, window);
 
@@ -381,7 +381,7 @@ static void UpdateGame(Game* game, Window* window)
     if (!window->open)
         return; // Controls closed window.
 
-    UpdateMVPMatrixes(game);
+    UpdateMVPMatrixes(game, rtk);
 }
 
 static void RecordRenderCommands(Game* game, RTKContext* rtk)
@@ -407,11 +407,10 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
 
         for (uint32 i = 0; i < game->entity_data.count; ++i)
         {
-            Entity* entity = GetEntityPtr(&game->entity_data, i);
-            Matrix* mvp_matrix = GetMVPMatrixPtr(&game->entity_data, i);
+            Matrix* mvp_matrix = GetPtr(&game->vs_data, rtk->frames.index)->mvp_matrixes + i;
             vkCmdPushConstants(render_command_buffer, pipeline->layout,
                                VK_SHADER_STAGE_VERTEX_BIT,
-                               0, sizeof(Matrix), (void*)mvp_matrix);
+                               0, sizeof(Matrix), mvp_matrix);
             vkCmdDrawIndexed(render_command_buffer,
                              36, // Index Count
                              1, // Instance Count
@@ -457,8 +456,8 @@ void TestMain()
 
         if (IsActive(window))
         {
-            UpdateGame(game, window);
             NextFrame(rtk);
+            UpdateGame(game, rtk, window);
             RecordRenderCommands(game, rtk);
             SubmitRenderCommands(rtk, &game->render_target);
         }

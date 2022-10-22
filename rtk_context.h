@@ -552,10 +552,11 @@ static VkSemaphore CreateSemaphore(VkDevice device)
     return semaphore;
 }
 
-static void InitFrames(RTKContext* rtk, Stack* mem, uint32 frame_count)
+static void InitFrames(RTKContext* rtk, Stack* mem)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = rtk->device;
+    uint32 frame_count = rtk->swapchain.image_count + 1;
 
     InitRingBuffer(&rtk->frames, mem, frame_count);
     for (uint32 i = 0; i < frame_count; ++i)
@@ -616,8 +617,7 @@ static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* 
     // Initialize rendering state.
     InitSwapchain(rtk, mem, temp_mem);
     InitRenderCommandPools(rtk, mem, info->render_thread_count);
-    uint32 frame_count = rtk->swapchain.image_count + 1;
-    InitFrames(rtk, mem, frame_count);
+    InitFrames(rtk, mem);
 };
 
 static void NextFrame(RTKContext* rtk)

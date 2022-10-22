@@ -57,6 +57,12 @@
     <ClInclude Include="rendering.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="shader_data.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\defs.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="test.cc">

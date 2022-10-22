@@ -148,8 +148,10 @@
     <ClInclude Include="render_target.h" />
     <ClInclude Include="rtk.h" />
     <ClInclude Include="rtk_context.h" />
+    <ClInclude Include="shader_data.h" />
     <ClInclude Include="tests\2d.h" />
     <ClInclude Include="tests\3d.h" />
+    <ClInclude Include="tests\defs.h" />
     <ClInclude Include="tests\shared.h" />
     <ClInclude Include="vulkan.h" />
   </ItemGroup>

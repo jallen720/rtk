@@ -35,10 +35,10 @@ struct Entity
 
 struct EntityData
 {
-    Entity *entities;
-    Matrix *mvp_matrixes;
-    uint32 count;
-    uint32 size;
+    Entity* entities;
+    Matrix* mvp_matrixes;
+    uint32  count;
+    uint32  size;
 };
 
 struct Game
@@ -66,8 +66,8 @@ struct Vertex
 ////////////////////////////////////////////////////////////
 static void Init(EntityData* entity_data, Stack* mem, uint32 max_entities)
 {
-    entity_data->size = max_entities;
-    entity_data->entities = Allocate<Entity>(mem, max_entities);
+    entity_data->size         = max_entities;
+    entity_data->entities     = Allocate<Entity>(mem, max_entities);
     entity_data->mvp_matrixes = Allocate<Matrix>(mem, max_entities);
 }
 

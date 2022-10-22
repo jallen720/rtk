@@ -140,6 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="debug.h" />
+    <ClInclude Include="descriptor_set.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="get_vk_array.h" />
     <ClInclude Include="memory.h" />

@@ -63,6 +63,9 @@
     <ClInclude Include="tests\defs.h">
       <Filter>Source Files\tests</Filter>
     </ClInclude>
+    <ClInclude Include="descriptor_set.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="test.cc">

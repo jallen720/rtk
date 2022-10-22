@@ -55,6 +55,7 @@ struct Game
     Buffer               host_buffer;
     Buffer               device_buffer;
     ShaderData<VSBuffer> vs_data;
+    VkDescriptorPool     descriptor_pool;
 
     // Sim State
     Mouse      mouse;
@@ -218,6 +219,25 @@ static void LoadMeshData(Game* game)
     }
 }
 
+static void InitDescriptorPool(Game* game, Stack temp_mem, RTKContext* rtk)
+{
+    VkDescriptorPoolSize pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
+    };
+    game->descriptor_pool = CreateDescriptorPool(rtk, WRAP_ARRAY(&temp_mem, pool_sizes));
+}
+
 static void InitShaderData(Game* game, Stack* mem, RTKContext* rtk)
 {
     Init(&game->vs_data, mem, rtk);
@@ -230,6 +250,7 @@ static void InitGraphicsState(Game* game, Stack* mem, Stack temp_mem, RTKContext
     InitPipelines(game, temp_mem, rtk);
     InitGraphicMem(game, rtk);
     LoadMeshData(game);
+    InitDescriptorPool(game, temp_mem, rtk);
     InitShaderData(game, mem, rtk);
 }
 

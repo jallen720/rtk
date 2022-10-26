@@ -48,14 +48,15 @@ struct VSBuffer
 struct Game
 {
     // Graphics State
-    RenderTarget         render_target;
-    VertexLayout         vertex_layout;
-    Pipeline             pipeline;
-    uint32               test_mesh_indexes_offset;
-    Buffer               host_buffer;
-    Buffer               device_buffer;
-    ShaderData<VSBuffer> vs_data;
-    VkDescriptorPool     descriptor_pool;
+    RenderTarget     render_target;
+    VertexLayout     vertex_layout;
+    Pipeline         pipeline;
+    uint32           test_mesh_indexes_offset;
+    Buffer           host_buffer;
+    Buffer           device_buffer;
+    VkDescriptorPool descriptor_pool;
+    ShaderData       vs_buffer;
+    ShaderDataSet    vs_data_set;
 
     // Sim State
     Mouse      mouse;
@@ -159,6 +160,44 @@ static void InitVertexLayout(Game* game, Stack* mem)
     // PushAttribute(&pipeline_info.vertex_layout, 3); // Color
 }
 
+static void InitDescriptorPool(Game* game, Stack temp_mem, RTKContext* rtk)
+{
+    VkDescriptorPoolSize pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
+    };
+    game->descriptor_pool = CreateDescriptorPool(rtk, WRAP_ARRAY(&temp_mem, pool_sizes));
+}
+
+static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
+{
+    InitShaderData(&game->vs_buffer, mem, rtk,
+    {
+        .stages      = VK_SHADER_STAGE_VERTEX_BIT,
+        .type        = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .buffer_size = sizeof(VSBuffer),
+    });
+}
+
+static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+{
+    ShaderData* datas[] =
+    {
+        &game->vs_buffer,
+    };
+    InitShaderDataSet(&game->vs_data_set, mem, temp_mem, game->descriptor_pool, rtk, WRAP_ARRAY(&temp_mem, datas));
+}
+
 static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
 {
     PipelineInfo pipeline_info = {};
@@ -170,6 +209,10 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
                VK_SHADER_STAGE_VERTEX_BIT);
     LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.frag.spv",
                VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    // Init descriptor set layouts.
+    InitArray(&pipeline_info.descriptor_set_layouts, &temp_mem, 1);
+    Push(&pipeline_info.descriptor_set_layouts, game->vs_data_set.layout);
 
     // Init push constant ranges.
     InitArray(&pipeline_info.push_constant_ranges, &temp_mem, 1);
@@ -219,39 +262,16 @@ static void LoadMeshData(Game* game)
     }
 }
 
-static void InitDescriptorPool(Game* game, Stack temp_mem, RTKContext* rtk)
-{
-    VkDescriptorPoolSize pool_sizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
-    };
-    game->descriptor_pool = CreateDescriptorPool(rtk, WRAP_ARRAY(&temp_mem, pool_sizes));
-}
-
-static void InitShaderData(Game* game, Stack* mem, RTKContext* rtk)
-{
-    Init(&game->vs_data, mem, rtk);
-}
-
 static void InitGraphicsState(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
     InitRenderTargets(game, mem, temp_mem, rtk);
     InitVertexLayout(game, mem);
+    InitDescriptorPool(game, temp_mem, rtk);
+    InitShaderDatas(game, mem, rtk);
+    InitShaderDataSets(game, mem, temp_mem, rtk);
     InitPipelines(game, temp_mem, rtk);
     InitGraphicMem(game, rtk);
     LoadMeshData(game);
-    InitDescriptorPool(game, temp_mem, rtk);
-    InitShaderData(game, mem, rtk);
 }
 
 static void InitSimState(Game* game, Stack* mem, RTKContext* rtk)
@@ -379,7 +399,7 @@ static void UpdateMVPMatrixes(Game* game, RTKContext* rtk)
 {
     // Update entity MVP matrixes.
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    VSBuffer* frame_vs_buffer = GetPtr(&game->vs_data, rtk->frames.index);
+    auto frame_vs_buffer = GetPtr<VSBuffer>(&game->vs_buffer, rtk->frames.index);
     for (uint32 i = 0; i < game->entity_data.count; ++i)
     {
         Entity* entity = GetEntityPtr(&game->entity_data, i);
@@ -424,14 +444,16 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
         vkCmdBindIndexBuffer(render_command_buffer,
                              game->host_buffer.hnd,
                              indexes_offset,
-                             VK_INDEX_TYPE_UINT32);
+                             VK_INDEX_TYPE_UINT32);\
+
+        BindShaderDataSet(&game->vs_data_set, rtk, pipeline, render_command_buffer, 0);
 
         for (uint32 i = 0; i < game->entity_data.count; ++i)
         {
-            Matrix* mvp_matrix = GetPtr(&game->vs_data, rtk->frames.index)->mvp_matrixes + i;
+            // Matrix* mvp_matrix = GetPtr<VSBuffer>(&game->vs_buffer, rtk->frames.index)->mvp_matrixes + i;
             vkCmdPushConstants(render_command_buffer, pipeline->layout,
                                VK_SHADER_STAGE_VERTEX_BIT,
-                               0, sizeof(Matrix), mvp_matrix);
+                               0, sizeof(Matrix), &i);
             vkCmdDrawIndexed(render_command_buffer,
                              36, // Index Count
                              1, // Instance Count

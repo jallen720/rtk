@@ -1,65 +1,65 @@
 Vertex vertexes[] =
 {
-    // -Z
-    { .position = { 0.0f, 0.0f, 0.0f } },
-    { .position = { 0.0f, 1.0f, 0.0f } },
-    { .position = { 1.0f, 1.0f, 0.0f } },
-    { .position = { 1.0f, 0.0f, 0.0f } },
-
-    // +Z
-    { .position = { 1.0f, 0.0f, 1.0f } },
-    { .position = { 1.0f, 1.0f, 1.0f } },
-    { .position = { 0.0f, 1.0f, 1.0f } },
-    { .position = { 0.0f, 0.0f, 1.0f } },
+    // +X
+    { .position = { 1.0f, 0.0f, 0.0f }, .uv = { 0.00f, 0.00f } },
+    { .position = { 1.0f, 1.0f, 0.0f }, .uv = { 0.00f, 0.00f } },
+    { .position = { 1.0f, 1.0f, 1.0f }, .uv = { 0.00f, 0.00f } },
+    { .position = { 1.0f, 0.0f, 1.0f }, .uv = { 0.00f, 0.00f } },
 
     // -X
-    { .position = { 0.0f, 0.0f, 1.0f } },
-    { .position = { 0.0f, 1.0f, 1.0f } },
-    { .position = { 0.0f, 1.0f, 0.0f } },
-    { .position = { 0.0f, 0.0f, 0.0f } },
-
-    // +X
-    { .position = { 1.0f, 0.0f, 0.0f } },
-    { .position = { 1.0f, 1.0f, 0.0f } },
-    { .position = { 1.0f, 1.0f, 1.0f } },
-    { .position = { 1.0f, 0.0f, 1.0f } },
-
-    // -Y
-    { .position = { 0.0f, 0.0f, 1.0f } },
-    { .position = { 0.0f, 0.0f, 0.0f } },
-    { .position = { 1.0f, 0.0f, 0.0f } },
-    { .position = { 1.0f, 0.0f, 1.0f } },
+    { .position = { 0.0f, 0.0f, 1.0f }, .uv = { 0.00f, 0.50f } },
+    { .position = { 0.0f, 1.0f, 1.0f }, .uv = { 0.00f, 0.50f } },
+    { .position = { 0.0f, 1.0f, 0.0f }, .uv = { 0.00f, 0.50f } },
+    { .position = { 0.0f, 0.0f, 0.0f }, .uv = { 0.00f, 0.50f } },
 
     // +Y
-    { .position = { 0.0f, 1.0f, 0.0f } },
-    { .position = { 0.0f, 1.0f, 1.0f } },
-    { .position = { 1.0f, 1.0f, 1.0f } },
-    { .position = { 1.0f, 1.0f, 0.0f } },
+    { .position = { 0.0f, 1.0f, 0.0f }, .uv = { 0.25f, 0.00f } },
+    { .position = { 0.0f, 1.0f, 1.0f }, .uv = { 0.25f, 0.00f } },
+    { .position = { 1.0f, 1.0f, 1.0f }, .uv = { 0.25f, 0.00f } },
+    { .position = { 1.0f, 1.0f, 0.0f }, .uv = { 0.25f, 0.00f } },
+
+    // -Y
+    { .position = { 0.0f, 0.0f, 1.0f }, .uv = { 0.25f, 0.50f } },
+    { .position = { 0.0f, 0.0f, 0.0f }, .uv = { 0.25f, 0.50f } },
+    { .position = { 1.0f, 0.0f, 0.0f }, .uv = { 0.25f, 0.50f } },
+    { .position = { 1.0f, 0.0f, 1.0f }, .uv = { 0.25f, 0.50f } },
+
+    // +Z
+    { .position = { 1.0f, 0.0f, 1.0f }, .uv = { 0.50f, 0.00f } },
+    { .position = { 1.0f, 1.0f, 1.0f }, .uv = { 0.50f, 0.00f } },
+    { .position = { 0.0f, 1.0f, 1.0f }, .uv = { 0.50f, 0.00f } },
+    { .position = { 0.0f, 0.0f, 1.0f }, .uv = { 0.50f, 0.00f } },
+
+    // -Z
+    { .position = { 0.0f, 0.0f, 0.0f }, .uv = { 0.50f, 0.50f } },
+    { .position = { 0.0f, 1.0f, 0.0f }, .uv = { 0.50f, 0.50f } },
+    { .position = { 1.0f, 1.0f, 0.0f }, .uv = { 0.50f, 0.50f } },
+    { .position = { 1.0f, 0.0f, 0.0f }, .uv = { 0.50f, 0.50f } },
 };
 
 uint32 indexes[] =
 {
-    // -Z
+    // +X
     0, 1, 2,
     0, 2, 3,
 
-    // +Z
+    // -X
     4, 5, 6,
     4, 6, 7,
 
-    // -X
+    // +Y
     8, 9, 10,
     8, 10, 11,
 
-    // +X
+    // -Y
     12, 13, 14,
     12, 14, 15,
 
-    // -Y
+    // +Z
     16, 17, 18,
     16, 18, 19,
 
-    // +Y
+    // -Z
     20, 21, 22,
     20, 22, 23,
 };

@@ -58,8 +58,11 @@ struct Game
     Buffer           host_buffer;
     Buffer           device_buffer;
     VkDescriptorPool descriptor_pool;
+    VkSampler        sampler;
     ShaderData       vs_buffer;
+    ShaderData       textures;
     ShaderDataSet    vs_data_set;
+    ShaderDataSet    fs_data_set;
 
     // Sim State
     Mouse      mouse;
@@ -70,6 +73,7 @@ struct Game
 struct Vertex
 {
     Vec3<float32> position;
+    Vec2<float32> uv;
 };
 
 /// Game Functions
@@ -160,6 +164,7 @@ static void InitVertexLayout(Game* game, Stack* mem)
 
     InitArray(&vertex_layout->attributes, mem, 4);
     PushAttribute(vertex_layout, 3); // Position
+    PushAttribute(vertex_layout, 2); // UV
 }
 
 static void InitDescriptorPool(Game* game, Stack temp_mem, RTKContext* rtk)
@@ -181,6 +186,33 @@ static void InitDescriptorPool(Game* game, Stack temp_mem, RTKContext* rtk)
     game->descriptor_pool = CreateDescriptorPool(rtk, WRAP_ARRAY(&temp_mem, pool_sizes));
 }
 
+static void InitSampler(Game* game, RTKContext* rtk)
+{
+    VkSamplerCreateInfo info =
+    {
+        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext                   = NULL,
+        .flags                   = 0,
+        .magFilter               = VK_FILTER_NEAREST,
+        .minFilter               = VK_FILTER_NEAREST,
+        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .mipLodBias              = 0.0f,
+        .anisotropyEnable        = VK_FALSE,
+        .maxAnisotropy           = rtk->physical_device->properties.limits.maxSamplerAnisotropy,
+        .compareEnable           = VK_FALSE,
+        .compareOp               = VK_COMPARE_OP_ALWAYS,
+        .minLod                  = 0.0f,
+        .maxLod                  = 0.0f,
+        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+    };
+    VkResult res = vkCreateSampler(rtk->device, &info, NULL, &game->sampler);
+    Validate(res, "vkCreateSampler() failed");
+}
+
 static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
 {
     InitShaderData(&game->vs_buffer, mem, rtk,
@@ -199,15 +231,137 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         },
     });
+
+    // Load image.
+    sint32 width;
+    sint32 height;
+    sint32 channel_count;
+    uint8* image_data = stbi_load("images/dir_cube.png", &width, &height, &channel_count, 0);
+
+    // Init shader data for images.
+    Swapchain* swapchain = &rtk->swapchain;
+    InitShaderData(&game->textures, mem, rtk,
+    {
+        .stages = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .type   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .image_info =
+        {
+            .image =
+            {
+                .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .pNext     = NULL,
+                .flags     = 0,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format    = swapchain->image_format,
+                .extent =
+                {
+                    .width  = (uint32)width,
+                    .height = (uint32)height,
+                    .depth  = 1
+                },
+                .mipLevels             = 1,
+                .arrayLayers           = 1,
+                .samples               = VK_SAMPLE_COUNT_1_BIT,
+                .tiling                = VK_IMAGE_TILING_OPTIMAL,
+                .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 0,
+                .pQueueFamilyIndices   = NULL,
+                .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+            },
+            .view =
+            {
+                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .pNext    = NULL,
+                .flags    = 0,
+                .image    = VK_NULL_HANDLE,
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format   = swapchain->image_format,
+                .components =
+                {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+            },
+            .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        },
+        .sampler = game->sampler,
+    });
+
+    // Write image to staging buffer.
+    sint32 image_data_size = width * height * channel_count;
+    for (uint32 i = 0; i < game->textures.images.count; ++i)
+        memcpy(GetPtr(&game->textures.images, i)->mapped_mem, image_data, image_data_size);
+
+    // Image data copied to staging buffer, can be freed now.
+    stbi_image_free(image_data);
+
+    // Transition texture image layouts to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
+    BeginTempCommandBuffer(rtk);
+        for (uint32 i = 0; i < game->textures.images.count; ++i)
+        {
+            VkImageMemoryBarrier image_mem_barrier =
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask       = 0,
+                .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image               = GetPtr(&game->textures.images, i)->hnd,
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+            };
+            vkCmdPipelineBarrier(rtk->temp_command_buffer,
+                                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                 0, // Dependency Flags
+                                 0, // Memory Barrier Count
+                                 NULL, // Memory Barriers
+                                 0, // Buffer Memory Barrier Count
+                                 NULL, // Buffer Memory Barriers
+                                 1, // Image Memory Count
+                                 &image_mem_barrier); // Image Memory Barriers
+        }
+    SubmitTempCommandBuffer(rtk);
 }
 
 static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    ShaderData* datas[] =
+    // vs_data_set
     {
-        &game->vs_buffer,
-    };
-    InitShaderDataSet(&game->vs_data_set, mem, temp_mem, game->descriptor_pool, rtk, WRAP_ARRAY(&temp_mem, datas));
+        ShaderData* datas[] =
+        {
+            &game->vs_buffer,
+        };
+        InitShaderDataSet(&game->vs_data_set, mem, temp_mem, game->descriptor_pool, rtk, WRAP_ARRAY(&temp_mem, datas));
+    }
+
+    // fs_data_set
+    {
+        ShaderData* datas[] =
+        {
+            &game->textures,
+        };
+        InitShaderDataSet(&game->fs_data_set, mem, temp_mem, game->descriptor_pool, rtk, WRAP_ARRAY(&temp_mem, datas));
+    }
 }
 
 static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
@@ -223,8 +377,9 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
                VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Init descriptor set layouts.
-    InitArray(&pipeline_info.descriptor_set_layouts, &temp_mem, 1);
+    InitArray(&pipeline_info.descriptor_set_layouts, &temp_mem, 2);
     Push(&pipeline_info.descriptor_set_layouts, game->vs_data_set.layout);
+    Push(&pipeline_info.descriptor_set_layouts, game->fs_data_set.layout);
 
     // Init push constant ranges.
     InitArray(&pipeline_info.push_constant_ranges, &temp_mem, 1);
@@ -279,6 +434,7 @@ static void InitGraphicsState(Game* game, Stack* mem, Stack temp_mem, RTKContext
     InitRenderTargets(game, mem, temp_mem, rtk);
     InitVertexLayout(game, mem);
     InitDescriptorPool(game, temp_mem, rtk);
+    InitSampler(game, rtk);
     InitShaderDatas(game, mem, rtk);
     InitShaderDataSets(game, mem, temp_mem, rtk);
     InitPipelines(game, temp_mem, rtk);
@@ -459,6 +615,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
                              VK_INDEX_TYPE_UINT32);\
 
         BindShaderDataSet(&game->vs_data_set, rtk, pipeline, render_command_buffer, 0);
+        BindShaderDataSet(&game->fs_data_set, rtk, pipeline, render_command_buffer, 1);
 
         for (uint32 i = 0; i < game->entity_data.count; ++i)
         {

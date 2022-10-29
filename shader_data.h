@@ -21,6 +21,11 @@ struct ShaderDataInfo
     union
     {
         BufferInfo buffer_info;
+        struct
+        {
+            ImageInfo image_info;
+            VkSampler sampler;
+        };
     };
 };
 
@@ -31,6 +36,11 @@ struct ShaderData
     union
     {
         Array<Buffer> buffers;
+        struct
+        {
+            Array<Image> images;
+            VkSampler    sampler;
+        };
     };
 };
 
@@ -55,6 +65,15 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
         InitArray(&shader_data->buffers, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
             InitBuffer(Push(&shader_data->buffers), rtk, &info.buffer_info);
+    }
+    else if (info.type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+    {
+        shader_data->sampler = info.sampler;
+        InitArray(&shader_data->images, mem, instance_count);
+        for (uint32 i = 0; i < instance_count; ++i)
+        {
+            InitImage(Push(&shader_data->images), rtk, &info.image_info);
+        }
     }
     else
     {
@@ -145,7 +164,8 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, Vk
     // Bind descriptor data.
     uint32 max_writes = datas->count * instance_count;
     auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&temp_mem, max_writes);
-    auto writes = CreateArray<VkWriteDescriptorSet>(&temp_mem, max_writes);
+    auto image_infos  = CreateArray<VkDescriptorImageInfo> (&temp_mem, max_writes);
+    auto writes       = CreateArray<VkWriteDescriptorSet>  (&temp_mem, max_writes);
 
     for (uint32 instance_index = 0; instance_index < instance_count; ++instance_index)
     {
@@ -196,9 +216,19 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, Vk
                 // // Update write with sampled image data info.
                 // write->pImageInfo      = sampled_image_infos->data;
             }
+            else if (data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+            {
+                // Map combined image sampler to image info for write.
+                write->pImageInfo = Push(image_infos,
+                {
+                    .sampler     = data->sampler,
+                    .imageView   = GetPtr(&data->images, instance_index)->view,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                });
+            }
             else
             {
-                // Map buffer info to descriptor buffer info for write.
+                // Map buffer to buffer info for write.
                 Buffer* buffer = GetPtr(&data->buffers, instance_index);
                 write->pBufferInfo = Push(buffer_infos,
                 {

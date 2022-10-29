@@ -181,11 +181,11 @@ static void BindShaderDataSet(ShaderDataSet* set, RTKContext* rtk, Pipeline* pip
                               uint32 binding)
 {
     vkCmdBindDescriptorSets(command_buffer,
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        pipeline->layout,
-        0, // First set
-        1, GetPtr(&set->hnds, rtk->frames.index), // Descriptor set count + pointer
-        0, NULL); // Dynamic offset count + pointer
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipeline->layout,
+                            binding, // First set
+                            1, GetPtr(&set->hnds, rtk->frames.index), // Descriptor set count + pointer
+                            0, NULL); // Dynamic offset count + pointer
 }
 
 }

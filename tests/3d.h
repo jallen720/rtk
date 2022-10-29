@@ -160,7 +160,6 @@ static void InitVertexLayout(Game* game, Stack* mem)
 
     InitArray(&vertex_layout->attributes, mem, 4);
     PushAttribute(vertex_layout, 3); // Position
-    // PushAttribute(&pipeline_info.vertex_layout, 3); // Color
 }
 
 static void InitDescriptorPool(Game* game, Stack temp_mem, RTKContext* rtk)

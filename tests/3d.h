@@ -183,9 +183,19 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
 {
     InitShaderData(&game->vs_buffer, mem, rtk,
     {
-        .stages      = VK_SHADER_STAGE_VERTEX_BIT,
-        .type        = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .buffer_size = sizeof(VSBuffer),
+        .stages = VK_SHADER_STAGE_VERTEX_BIT,
+        .type   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .buffer_info =
+        {
+            .size               = sizeof(VSBuffer),
+            .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+            .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        },
     });
 }
 

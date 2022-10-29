@@ -26,15 +26,14 @@ struct Buffer
     VkBuffer       hnd;
     VkDeviceMemory mem;
     VkDeviceSize   size;
-    VkDeviceSize   offset;
     uint8*         mapped_mem;
 };
 
 struct ImageInfo
 {
-    VkImageCreateInfo        image;
-    VkImageViewCreateInfo    view;
-    VkMemoryPropertyFlagBits mem_property_flags;
+    VkImageCreateInfo     image;
+    VkImageViewCreateInfo view;
+    VkMemoryPropertyFlags mem_property_flags;
 };
 
 struct Image

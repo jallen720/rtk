@@ -18,14 +18,20 @@ struct ShaderDataInfo
 {
     VkShaderStageFlags stages;
     VkDescriptorType   type;
-    uint32             buffer_size;
+    union
+    {
+        BufferInfo buffer_info;
+    };
 };
 
 struct ShaderData
 {
     VkShaderStageFlags stages;
     VkDescriptorType   type;
-    Array<Buffer>      buffers;
+    union
+    {
+        Array<Buffer> buffers;
+    };
 };
 
 struct ShaderDataSet
@@ -46,21 +52,9 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
     if (info.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
         info.type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
     {
-        InitArrayFull(&shader_data->buffers, mem, instance_count);
+        InitArray(&shader_data->buffers, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
-        {
-            InitBuffer(GetPtr(&shader_data->buffers, i), rtk,
-            {
-                .size               = info.buffer_size,
-                .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-                .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            });
-        }
+            InitBuffer(Push(&shader_data->buffers), rtk, &info.buffer_info);
     }
     else
     {
@@ -217,17 +211,6 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, Vk
     }
 
     vkUpdateDescriptorSets(device, writes->count, writes->data, 0, NULL);
-}
-
-static void BindShaderDataSet(ShaderDataSet* set, RTKContext* rtk, Pipeline* pipeline, VkCommandBuffer command_buffer,
-                              uint32 binding)
-{
-    vkCmdBindDescriptorSets(command_buffer,
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipeline->layout,
-                            0, // First set
-                            1, GetPtr(&set->hnds, rtk->frames.index), // Descriptor set count + pointer
-                            0, NULL); // Dynamic offset count + pointer
 }
 
 }

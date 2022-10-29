@@ -5,6 +5,9 @@
 #include "ctk2/math.h"
 #include "stk2/stk.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "rtk/stb/stb_image.h"
+
 #define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
 

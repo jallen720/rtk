@@ -39,6 +39,7 @@ struct RTKInfo
     DeviceFeatures                      required_features;
     uint32                              max_physical_devices;
     uint32                              render_thread_count;
+    Array<VkDescriptorPoolSize>         descriptor_pool_sizes;
 };
 
 struct Surface
@@ -92,6 +93,7 @@ struct RTKContext
     Array<VkCommandPool> render_command_pools;
     RingBuffer<Frame>    frames;
     Frame*               frame;
+    VkDescriptorPool     descriptor_pool;
 };
 
 /// Internal
@@ -598,6 +600,25 @@ static void InitFrames(RTKContext* rtk, Stack* mem)
     }
 }
 
+static void InitDescriptorPool(RTKContext* rtk, Array<VkDescriptorPoolSize>* descriptor_pool_sizes)
+{
+    // Count total descriptors from pool sizes.
+    uint32 total_descriptors = 0;
+    for (uint32 i = 0; i < descriptor_pool_sizes->count; ++i)
+        total_descriptors += GetPtr(descriptor_pool_sizes, i)->descriptorCount;
+
+    VkDescriptorPoolCreateInfo pool_info =
+    {
+        .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags         = 0,
+        .maxSets       = total_descriptors,
+        .poolSizeCount = descriptor_pool_sizes->count,
+        .pPoolSizes    = descriptor_pool_sizes->data,
+    };
+    VkResult res = vkCreateDescriptorPool(rtk->device, &pool_info, NULL, &rtk->descriptor_pool);
+    Validate(res, "vkCreateDescriptorPool() failed");
+}
+
 /// Interface
 ////////////////////////////////////////////////////////////
 static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window, RTKInfo* info)
@@ -618,6 +639,7 @@ static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* 
     InitSwapchain(rtk, mem, temp_mem);
     InitRenderCommandPools(rtk, mem, info->render_thread_count);
     InitFrames(rtk, mem);
+    InitDescriptorPool(rtk, &info->descriptor_pool_sizes);
 };
 
 static void NextFrame(RTKContext* rtk)

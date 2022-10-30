@@ -85,18 +85,18 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
     layout->attribute_location++;
 }
 
-static VkPipelineLayout CreatePipelineLayout(RTKContext* rtk, Stack temp_mem, Array<ShaderDataSet*>* data_sets,
-                                             Array<VkPushConstantRange>* push_constant_ranges)
+static VkPipelineLayout CreatePipelineLayout(RTKContext* rtk, Stack temp_mem, Array<ShaderDataSet*> data_sets,
+                                             Array<VkPushConstantRange> push_constant_ranges)
 {
-    auto descriptor_set_layouts = CreateArrayFull<VkDescriptorSetLayout>(&temp_mem, data_sets->count);
-    for (uint32 i = 0; i < data_sets->count; ++i)
-        Set(descriptor_set_layouts, i, Get(data_sets, i)->layout);
+    auto descriptor_set_layouts = CreateArrayFull<VkDescriptorSetLayout>(&temp_mem, data_sets.count);
+    for (uint32 i = 0; i < data_sets.count; ++i)
+        Set(descriptor_set_layouts, i, Get(&data_sets, i)->layout);
 
     VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
     layout_create_info.setLayoutCount         = descriptor_set_layouts->count;
     layout_create_info.pSetLayouts            = descriptor_set_layouts->data;
-    layout_create_info.pushConstantRangeCount = push_constant_ranges->count;
-    layout_create_info.pPushConstantRanges    = push_constant_ranges->data;
+    layout_create_info.pushConstantRangeCount = push_constant_ranges.count;
+    layout_create_info.pPushConstantRanges    = push_constant_ranges.data;
 
     VkPipelineLayout layout = VK_NULL_HANDLE;
     VkResult res = vkCreatePipelineLayout(rtk->device, &layout_create_info, NULL, &layout);

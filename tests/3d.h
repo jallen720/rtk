@@ -51,19 +51,18 @@ struct VSBuffer
 struct Game
 {
     // Graphics State
-    Buffer           host_buffer;
-    Buffer           device_buffer;
-    Buffer           staging_buffer;
-    RenderTarget     render_target;
-    VertexLayout     vertex_layout;
-    Pipeline         pipeline;
-    uint32           test_mesh_indexes_offset;
-    VkDescriptorPool descriptor_pool;
-    VkSampler        sampler;
-    ShaderData       vs_buffer;
-    ShaderData       texture;
-    ShaderDataSet    vs_data_set;
-    ShaderDataSet    fs_data_set;
+    Buffer        host_buffer;
+    Buffer        device_buffer;
+    Buffer        staging_buffer;
+    RenderTarget  render_target;
+    VertexLayout  vertex_layout;
+    Pipeline      pipeline;
+    uint32        test_mesh_indexes_offset;
+    VkSampler     sampler;
+    ShaderData    vs_buffer;
+    ShaderData    texture;
+    ShaderDataSet vs_data_set;
+    ShaderDataSet fs_data_set;
 
     // Sim State
     Mouse      mouse;
@@ -119,6 +118,21 @@ static void SelectPhysicalDevice(RTKContext* rtk)
 
 static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 {
+    VkDescriptorPoolSize descriptor_pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
+    };
+
     RTKInfo rtk_info =
     {
         .application_name = "RTK Test",
@@ -140,9 +154,11 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
                 .samplerAnisotropy = VK_TRUE,
             },
         },
-        .max_physical_devices = 8,
-        .render_thread_count  = 1,
+        .max_physical_devices  = 8,
+        .render_thread_count   = 1,
+        .descriptor_pool_sizes = WRAP_ARRAY(descriptor_pool_sizes),
     };
+
     InitRTKContext(rtk, mem, temp_mem, window, &rtk_info);
 }
 
@@ -199,25 +215,6 @@ static void InitVertexLayout(Game* game, Stack* mem)
     InitArray(&vertex_layout->attributes, mem, 4);
     PushAttribute(vertex_layout, 3); // Position
     PushAttribute(vertex_layout, 2); // UV
-}
-
-static void InitDescriptorPool(Game* game, Stack temp_mem, RTKContext* rtk)
-{
-    VkDescriptorPoolSize pool_sizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
-    };
-    game->descriptor_pool = CreateDescriptorPool(rtk, WRAP_ARRAY(&temp_mem, pool_sizes));
 }
 
 static void InitSampler(Game* game, RTKContext* rtk)
@@ -445,7 +442,7 @@ static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContex
         {
             &game->vs_buffer,
         };
-        InitShaderDataSet(&game->vs_data_set, mem, temp_mem, game->descriptor_pool, rtk, WRAP_ARRAY(&temp_mem, datas));
+        InitShaderDataSet(&game->vs_data_set, mem, temp_mem, rtk->descriptor_pool, rtk, WRAP_ARRAY(datas));
     }
 
     // fs_data_set
@@ -454,7 +451,7 @@ static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContex
         {
             &game->texture,
         };
-        InitShaderDataSet(&game->fs_data_set, mem, temp_mem, game->descriptor_pool, rtk, WRAP_ARRAY(&temp_mem, datas));
+        InitShaderDataSet(&game->fs_data_set, mem, temp_mem, rtk->descriptor_pool, rtk, WRAP_ARRAY(datas));
     }
 }
 
@@ -484,9 +481,7 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
             .size       = sizeof(Matrix),
         }
     };
-    pipeline_info.layout = CreatePipelineLayout(rtk, temp_mem,
-                                                WRAP_ARRAY(&temp_mem, data_sets),
-                                                WRAP_ARRAY(&temp_mem, push_constant_ranges));
+    pipeline_info.layout = CreatePipelineLayout(rtk, temp_mem, WRAP_ARRAY(data_sets), WRAP_ARRAY(push_constant_ranges));
 
     InitPipeline(&game->pipeline, temp_mem, &game->render_target, rtk, &pipeline_info);
 }
@@ -507,7 +502,6 @@ static void InitGraphicsState(Game* game, Stack* mem, Stack temp_mem, RTKContext
     InitGraphicMem(game, rtk);
     InitRenderTargets(game, mem, temp_mem, rtk);
     InitVertexLayout(game, mem);
-    InitDescriptorPool(game, temp_mem, rtk);
     InitSampler(game, rtk);
     InitShaderDatas(game, mem, rtk);
     InitShaderDataSets(game, mem, temp_mem, rtk);

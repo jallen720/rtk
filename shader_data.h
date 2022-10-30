@@ -85,40 +85,18 @@ static Layout* GetPtr(ShaderData* shader_data, uint32 instance)
     return (Layout*)GetPtr(&shader_data->buffers, instance)->mapped_mem;
 }
 
-static VkDescriptorPool CreateDescriptorPool(RTKContext* rtk, Array<VkDescriptorPoolSize>* pool_sizes)
-{
-    // Count total descriptors from pool sizes.
-    uint32 total_descriptors = 0;
-    for (uint32 i = 0; i < pool_sizes->count; ++i)
-        total_descriptors += GetPtr(pool_sizes, i)->descriptorCount;
-
-    VkDescriptorPoolCreateInfo pool_info =
-    {
-        .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags         = 0,
-        .maxSets       = total_descriptors,
-        .poolSizeCount = pool_sizes->count,
-        .pPoolSizes    = pool_sizes->data,
-    };
-    VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
-    VkResult res = vkCreateDescriptorPool(rtk->device, &pool_info, NULL, &descriptor_pool);
-    Validate(res, "vkCreateDescriptorPool() failed");
-
-    return descriptor_pool;
-}
-
 static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, VkDescriptorPool pool, RTKContext* rtk,
-                              Array<ShaderData*>* datas)
+                              Array<ShaderData*> datas)
 {
     VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
     uint32 instance_count = rtk->frames.size;
 
     // Generate descriptor bindings.
-    auto bindings = CreateArray<VkDescriptorSetLayoutBinding>(&temp_mem, datas->count);
-    for (uint32 i = 0; i < datas->count; ++i)
+    auto bindings = CreateArray<VkDescriptorSetLayoutBinding>(&temp_mem, datas.count);
+    for (uint32 i = 0; i < datas.count; ++i)
     {
-        ShaderData* data = Get(datas, i);
+        ShaderData* data = Get(&datas, i);
         Push(bindings,
         {
             .binding            = i,
@@ -160,7 +138,7 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, Vk
     Validate(res, "vkAllocateDescriptorSets() failed");
 
     // Bind descriptor data.
-    uint32 max_writes = datas->count * instance_count;
+    uint32 max_writes = datas.count * instance_count;
     auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&temp_mem, max_writes);
     auto image_infos  = CreateArray<VkDescriptorImageInfo> (&temp_mem, max_writes);
     auto writes       = CreateArray<VkWriteDescriptorSet>  (&temp_mem, max_writes);
@@ -168,9 +146,9 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, Vk
     for (uint32 instance_index = 0; instance_index < instance_count; ++instance_index)
     {
         VkDescriptorSet desc_set = Get(&set->hnds, instance_index);
-        for (uint32 data_binding = 0; data_binding < datas->count; ++data_binding)
+        for (uint32 data_binding = 0; data_binding < datas.count; ++data_binding)
         {
-            ShaderData* data = Get(datas, data_binding);
+            ShaderData* data = Get(&datas, data_binding);
 
             VkWriteDescriptorSet* write = Push(writes);
             write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

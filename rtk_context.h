@@ -227,12 +227,12 @@ static void InitInstance(RTKContext* rtk, RTKInfo* info)
     create_info.ppEnabledLayerNames     = NULL;
 #endif
     res = vkCreateInstance(&create_info, NULL, &rtk->instance);
-    Validate(res, "failed to create Vulkan instance");
+    Validate(res, "vkCreateInstance() failed");
 
 #ifdef RTK_ENABLE_VALIDATION
     RTK_LOAD_INSTANCE_EXTENSION_FUNCTION(rtk->instance, vkCreateDebugUtilsMessengerEXT);
     res = vkCreateDebugUtilsMessengerEXT(rtk->instance, &debug_msgr_info, NULL, &rtk->debug_messenger);
-    Validate(res, "failed to create debug messenger");
+    Validate(res, "vkCreateDebugUtilsMessengerEXT() failed");
 #endif
 }
 
@@ -245,7 +245,7 @@ static void InitSurface(RTKContext* rtk, Window* window)
         .hwnd      = window->handle,
     };
     VkResult res = vkCreateWin32SurfaceKHR(rtk->instance, &info, NULL, &rtk->surface.hnd);
-    Validate(res, "failed to create win32 surface");
+    Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
 static void UsePhysicalDevice(RTKContext* rtk, uint32 index)
@@ -335,7 +335,7 @@ static void InitDevice(RTKContext* rtk, DeviceFeatures* enabled_features)
         .pEnabledFeatures        = &enabled_features->as_struct,
     };
     VkResult res = vkCreateDevice(rtk->physical_device->hnd, &create_info, NULL, &rtk->device);
-    Validate(res, "failed to create device");
+    Validate(res, "vkCreateDevice() failed");
 }
 
 static void InitQueues(RTKContext* rtk)
@@ -351,7 +351,7 @@ static void GetSurfaceInfo(RTKContext* rtk, Stack* mem)
     VkPhysicalDevice vk_physical_device = rtk->physical_device->hnd;
 
     VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, surface->hnd, &surface->capabilities);
-    Validate(res, "failed to get physical device surface capabilities");
+    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
 
     LoadVkSurfaceFormats(&surface->formats, mem, vk_physical_device, surface->hnd);
     LoadVkSurfacePresentModes(&surface->present_modes, mem, vk_physical_device, surface->hnd);
@@ -370,7 +370,7 @@ static void InitMainCommandState(RTKContext* rtk)
         .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
     };
     res = vkCreateCommandPool(device, &pool_info, NULL, &rtk->main_command_pool);
-    Validate(res, "failed to create main_command_pool");
+    Validate(res, "vkCreateCommandPool() failed");
 
     // Temp Command Buffer
     VkCommandBufferAllocateInfo allocate_info =
@@ -381,7 +381,7 @@ static void InitMainCommandState(RTKContext* rtk)
         .commandBufferCount = 1,
     };
     res = vkAllocateCommandBuffers(device, &allocate_info, &rtk->temp_command_buffer);
-    Validate(res, "failed to allocate temp_command_buffer");
+    Validate(res, "vkAllocateCommandBuffers() failed");
 }
 
 static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
@@ -465,7 +465,7 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
     }
 
     res = vkCreateSwapchainKHR(device, &info, NULL, &swapchain->hnd);
-    Validate(res, "failed to create swapchain");
+    Validate(res, "vkCreateSwapchainKHR() failed");
 
     // Store surface state used to create swapchain for future reference.
     swapchain->image_format = selected_format.format;
@@ -502,7 +502,7 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
             },
         };
         res = vkCreateImageView(device, &view_info, NULL, GetPtr(&swapchain->image_views, i));
-        Validate(res, "failed to create swapchain image view");
+        Validate(res, "vkCreateImageView() failed");
     }
 }
 
@@ -518,7 +518,7 @@ static void InitRenderCommandPools(RTKContext* rtk, Stack* mem, uint32 render_th
     for (uint32 i = 0; i < render_thread_count; ++i)
     {
         VkResult res = vkCreateCommandPool(rtk->device, &info, NULL, Push(&rtk->render_command_pools));
-        Validate(res, "failed to create render_command_pools");
+        Validate(res, "vkCreateCommandPool() failed");
     }
 }
 
@@ -532,7 +532,7 @@ static VkFence CreateFence(VkDevice device)
     };
     VkFence fence = VK_NULL_HANDLE;
     VkResult res = vkCreateFence(device, &info, NULL, &fence);
-    Validate(res, "failed to create fence");
+    Validate(res, "vkCreateFence() failed");
 
     return fence;
 }
@@ -547,7 +547,7 @@ static VkSemaphore CreateSemaphore(VkDevice device)
     };
     VkSemaphore semaphore = VK_NULL_HANDLE;
     VkResult res = vkCreateSemaphore(device, &info, NULL, &semaphore);
-    Validate(res, "failed to create semaphore");
+    Validate(res, "vkCreateSemaphore() failed");
 
     return semaphore;
 }
@@ -578,7 +578,7 @@ static void InitFrames(RTKContext* rtk, Stack* mem)
                 .commandBufferCount = 1,
             };
             res = vkAllocateCommandBuffers(device, &allocate_info, &frame->primary_render_command_buffer);
-            Validate(res, "failed to allocate primary_render_command_buffer");
+            Validate(res, "vkAllocateCommandBuffers() failed");
         }
 
         // render_command_buffers
@@ -593,7 +593,7 @@ static void InitFrames(RTKContext* rtk, Stack* mem)
                 .commandBufferCount = 1,
             };
             res = vkAllocateCommandBuffers(device, &allocate_info, Push(&frame->render_command_buffers));
-            Validate(res, "failed to allocate render_command_buffers[%u]", i);
+            Validate(res, "vkAllocateCommandBuffers() failed");
         }
     }
 }
@@ -671,7 +671,7 @@ static void SubmitTempCommandBuffer(RTKContext* rtk)
         .pSignalSemaphores    = NULL,
     };
     VkResult res = vkQueueSubmit(rtk->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
-    Validate(res, "failed to submit temp command buffer");
+    Validate(res, "vkQueueSubmit() failed");
 
     vkQueueWaitIdle(rtk->graphics_queue);
 }

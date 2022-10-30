@@ -102,7 +102,7 @@ static VkDescriptorPool CreateDescriptorPool(RTKContext* rtk, Array<VkDescriptor
     };
     VkDescriptorPool descriptor_pool = VK_NULL_HANDLE;
     VkResult res = vkCreateDescriptorPool(rtk->device, &pool_info, NULL, &descriptor_pool);
-    Validate(res, "failed to create descriptor pool");
+    Validate(res, "vkCreateDescriptorPool() failed");
 
     return descriptor_pool;
 }

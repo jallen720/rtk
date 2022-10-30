@@ -78,7 +78,7 @@ static VkDeviceMemory AllocateDeviceMemory(RTKContext* rtk, VkMemoryRequirements
     };
     VkDeviceMemory mem = VK_NULL_HANDLE;
     VkResult res = vkAllocateMemory(rtk->device, &info, NULL, &mem);
-    Validate(res, "failed to allocate memory");
+    Validate(res, "vkAllocateMemory() failed");
 
     return mem;
 }
@@ -100,7 +100,7 @@ static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo* info)
         .pQueueFamilyIndices   = NULL, // Ignored if sharingMode is not VK_SHARING_MODE_CONCURRENT.
     };
     res = vkCreateBuffer(device, &create_info, NULL, &buffer->hnd);
-    Validate(res, "failed to create buffer");
+    Validate(res, "vkCreateBuffer() failed");
 
     // Allocate/bind buffer memory.
     VkMemoryRequirements mem_requirements = {};
@@ -108,7 +108,7 @@ static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo* info)
 
     buffer->mem = AllocateDeviceMemory(rtk, mem_requirements, info->mem_property_flags);
     res = vkBindBufferMemory(device, buffer->hnd, buffer->mem, 0);
-    Validate(res, "failed to bind buffer memory");
+    Validate(res, "vkBindBufferMemory() failed");
 
     buffer->size = mem_requirements.size;
 
@@ -128,7 +128,7 @@ static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
     VkResult res = VK_SUCCESS;
 
     res = vkCreateImage(device, &info->image, NULL, &image->hnd);
-    Validate(res, "failed to create image");
+    Validate(res, "vkCreateImage() failed");
 
     // Allocate/bind image memory.
     VkMemoryRequirements mem_requirements = {};
@@ -136,14 +136,14 @@ static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
 
     image->mem = AllocateDeviceMemory(rtk, mem_requirements, info->mem_property_flags);
     res = vkBindImageMemory(device, image->hnd, image->mem, 0);
-    Validate(res, "failed to bind image memory");
+    Validate(res, "vkBindImageMemory() failed");
 
     image->extent = info->image.extent;
 
 
     info->view.image = image->hnd;
     res = vkCreateImageView(device, &info->view, NULL, &image->view);
-    Validate(res, "failed to create image view");
+    Validate(res, "vkCreateImageView() failed");
 }
 
 static void InitImage(Image* image, RTKContext* rtk, ImageInfo info)

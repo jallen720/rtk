@@ -100,7 +100,7 @@ static VkPipelineLayout CreatePipelineLayout(RTKContext* rtk, Stack temp_mem, Ar
 
     VkPipelineLayout layout = VK_NULL_HANDLE;
     VkResult res = vkCreatePipelineLayout(rtk->device, &layout_create_info, NULL, &layout);
-    Validate(res, "failed to create graphics pipeline layout");
+    Validate(res, "vkCreatePipelineLayout() failed");
 
     return layout;
 }
@@ -187,7 +187,7 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTarget* rende
         .basePipelineIndex   = -1,
     };
     res = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline->hnd);
-    Validate(res, "failed to create graphics pipeline");
+    Validate(res, "vkCreateGraphicsPipelines() failed");
 }
 
 static void BindShaderDataSet(ShaderDataSet* set, RTKContext* rtk, Pipeline* pipeline, VkCommandBuffer command_buffer,

@@ -123,7 +123,7 @@ static void InitRenderPass(RenderTarget* render_target, Stack temp_mem, RTKConte
         .pDependencies   = NULL,
     };
     VkResult res = vkCreateRenderPass(rtk->device, &create_info, NULL, &render_target->render_pass);
-    Validate(res, "failed to create render pass");
+    Validate(res, "vkCreateRenderPass() failed");
 }
 
 static void InitDepthImages(RenderTarget* render_target, Stack* mem, RTKContext* rtk)
@@ -211,7 +211,7 @@ static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp
             .layers          = 1,
         };
         VkResult res = vkCreateFramebuffer(rtk->device, &info, NULL, Push(&render_target->framebuffers));
-        Validate(res, "failed to create framebuffer");
+        Validate(res, "vkCreateFramebuffer() failed");
 
         // Clear attachments for next iteration.
         Clear(attachments);

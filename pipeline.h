@@ -83,7 +83,7 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
 
     // Update binding state for future attributes.
     current_binding->stride += field_count * 4;
-    layout->attribute_location++;
+    ++layout->attribute_location;
 }
 
 static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTarget* render_target, RTKContext* rtk,

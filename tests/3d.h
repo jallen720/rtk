@@ -51,16 +51,17 @@ struct VSBuffer
 struct Game
 {
     // Graphics State
+    Buffer           host_buffer;
+    Buffer           device_buffer;
+    Buffer           staging_buffer;
     RenderTarget     render_target;
     VertexLayout     vertex_layout;
     Pipeline         pipeline;
     uint32           test_mesh_indexes_offset;
-    Buffer           host_buffer;
-    Buffer           device_buffer;
     VkDescriptorPool descriptor_pool;
     VkSampler        sampler;
     ShaderData       vs_buffer;
-    ShaderData       textures;
+    ShaderData       texture;
     ShaderDataSet    vs_data_set;
     ShaderDataSet    fs_data_set;
 
@@ -143,6 +144,39 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
         .render_thread_count  = 1,
     };
     InitRTKContext(rtk, mem, temp_mem, window, &rtk_info);
+}
+
+static void InitGraphicMem(Game* game, RTKContext* rtk)
+{
+    InitBuffer(&game->host_buffer, rtk,
+    {
+        .size               = Megabyte(128),
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    });
+    InitBuffer(&game->staging_buffer, rtk,
+    {
+        .size               = Megabyte(16),
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    });
+    // InitBuffer(&game->device_buffer, rtk,
+    // {
+    //     .size               = Megabyte(256),
+    //     .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+    //     .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+    //                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+    //                           VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+    //                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+    //     .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    // });
 }
 
 static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -232,15 +266,21 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
         },
     });
 
-    // Load image.
+    // Load image into staging buffer.
     sint32 width;
     sint32 height;
     sint32 channel_count;
     uint8* image_data = stbi_load("images/dir_cube.png", &width, &height, &channel_count, 0);
 
+    if (image_data == NULL)
+        CTK_FATAL("failed to open image file");
+
+    memcpy(game->staging_buffer.mapped_mem, image_data, width * height * channel_count);
+    stbi_image_free(image_data);
+
     // Init shader data for images.
     Swapchain* swapchain = &rtk->swapchain;
-    InitShaderData(&game->textures, mem, rtk,
+    InitShaderData(&game->texture, mem, rtk,
     {
         .stages = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -293,33 +333,28 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
                     .layerCount     = 1,
                 },
             },
-            .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         },
         .sampler = game->sampler,
     });
 
-    // Write image to staging buffer.
-    sint32 image_data_size = width * height * channel_count;
-    for (uint32 i = 0; i < game->textures.images.count; ++i)
-        memcpy(GetPtr(&game->textures.images, i)->mapped_mem, image_data, image_data_size);
+    // Copy image data from staging buffer to image memory.
+    for (uint32 i = 0; i < game->texture.images.count; ++i)
+    {
+        BeginTempCommandBuffer(rtk);
+            VkImage image = GetPtr(&game->texture.images, i)->hnd;
 
-    // Image data copied to staging buffer, can be freed now.
-    stbi_image_free(image_data);
-
-    // Transition texture image layouts to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL.
-    BeginTempCommandBuffer(rtk);
-        for (uint32 i = 0; i < game->textures.images.count; ++i)
-        {
+            // Transition image layout for use in shader.
             VkImageMemoryBarrier image_mem_barrier =
             {
                 .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
                 .srcAccessMask       = 0,
-                .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+                .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
                 .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image               = GetPtr(&game->textures.images, i)->hnd,
+                .image               = image,
                 .subresourceRange =
                 {
                     .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -331,7 +366,7 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
             };
             vkCmdPipelineBarrier(rtk->temp_command_buffer,
                                  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
                                  0, // Dependency Flags
                                  0, // Memory Barrier Count
                                  NULL, // Memory Barriers
@@ -339,8 +374,67 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
                                  NULL, // Buffer Memory Barriers
                                  1, // Image Memory Count
                                  &image_mem_barrier); // Image Memory Barriers
-        }
-    SubmitTempCommandBuffer(rtk);
+
+            VkBufferImageCopy copy =
+            {
+                .bufferOffset      = 0,
+                .bufferRowLength   = 0,
+                .bufferImageHeight = 0,
+                .imageSubresource =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel       = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+                .imageOffset =
+                {
+                    .x = 0,
+                    .y = 0,
+                    .z = 0,
+                },
+                .imageExtent =
+                {
+                    .width  = (uint32)width,
+                    .height = (uint32)height,
+                    .depth  = 1,
+                },
+            };
+            vkCmdCopyBufferToImage(rtk->temp_command_buffer, game->staging_buffer.hnd, image,
+                                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+            // Transition image layout for use in shader.
+            VkImageMemoryBarrier image_mem_barrier2 =
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image               = image,
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+            };
+            vkCmdPipelineBarrier(rtk->temp_command_buffer,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                                 0, // Dependency Flags
+                                 0, // Memory Barrier Count
+                                 NULL, // Memory Barriers
+                                 0, // Buffer Memory Barrier Count
+                                 NULL, // Buffer Memory Barriers
+                                 1, // Image Memory Count
+                                 &image_mem_barrier2); // Image Memory Barriers
+        SubmitTempCommandBuffer(rtk);
+    }
 }
 
 static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -358,7 +452,7 @@ static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContex
     {
         ShaderData* datas[] =
         {
-            &game->textures,
+            &game->texture,
         };
         InitShaderDataSet(&game->fs_data_set, mem, temp_mem, game->descriptor_pool, rtk, WRAP_ARRAY(&temp_mem, datas));
     }
@@ -393,31 +487,6 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
     InitPipeline(&game->pipeline, temp_mem, &game->render_target, rtk, &pipeline_info);
 }
 
-static void InitGraphicMem(Game* game, RTKContext* rtk)
-{
-    InitBuffer(&game->host_buffer, rtk,
-    {
-        .size               = Megabyte(128),
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    });
-    // InitBuffer(&game->device_buffer, rtk,
-    // {
-    //     .size               = Megabyte(256),
-    //     .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-    //     .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-    //                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-    //                           VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-    //                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-    //     .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    // });
-}
-
 static void LoadMeshData(Game* game)
 {
     // Load test mesh into host memory.
@@ -431,6 +500,7 @@ static void LoadMeshData(Game* game)
 
 static void InitGraphicsState(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
+    InitGraphicMem(game, rtk);
     InitRenderTargets(game, mem, temp_mem, rtk);
     InitVertexLayout(game, mem);
     InitDescriptorPool(game, temp_mem, rtk);
@@ -438,7 +508,6 @@ static void InitGraphicsState(Game* game, Stack* mem, Stack temp_mem, RTKContext
     InitShaderDatas(game, mem, rtk);
     InitShaderDataSets(game, mem, temp_mem, rtk);
     InitPipelines(game, temp_mem, rtk);
-    InitGraphicMem(game, rtk);
     LoadMeshData(game);
 }
 

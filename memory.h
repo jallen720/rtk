@@ -42,7 +42,6 @@ struct Image
     VkImageView    view;
     VkDeviceMemory mem;
     VkExtent3D     extent;
-    uint8*         mapped_mem;
 };
 
 /// Utils
@@ -141,12 +140,6 @@ static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
 
     image->extent = info->image.extent;
 
-    // Map host visible buffer memory.
-    if (info->mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
-    {
-        vkMapMemory(device, image->mem, 0, image->extent.width * image->extent.height * 4, 0,
-                    (void**)&image->mapped_mem);
-    }
 
     info->view.image = image->hnd;
     res = vkCreateImageView(device, &info->view, NULL, &image->view);

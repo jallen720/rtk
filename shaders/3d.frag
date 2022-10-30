@@ -10,5 +10,5 @@ layout (set = 1, binding = 0) uniform sampler2D texture_sampler;
 void main()
 {
     // out_color = vec4(in_vert_color, 1);
-    out_color = vec4(texture(texture_sampler, in_vert_uv).xyz, 1);
+    out_color = texture(texture_sampler, in_vert_uv);
 }

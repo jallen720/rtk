@@ -71,9 +71,7 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
         shader_data->sampler = info.sampler;
         InitArray(&shader_data->images, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
-        {
             InitImage(Push(&shader_data->images), rtk, &info.image_info);
-        }
     }
     else
     {

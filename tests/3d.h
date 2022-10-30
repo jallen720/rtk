@@ -463,26 +463,30 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
     PipelineInfo pipeline_info = {};
     pipeline_info.vertex_layout = &game->vertex_layout;
 
-    // Load pipeline shaders.
+    // Load shaders.
     InitArray(&pipeline_info.shaders, &temp_mem, 2);
     LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.vert.spv",
                VK_SHADER_STAGE_VERTEX_BIT);
     LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.frag.spv",
                VK_SHADER_STAGE_FRAGMENT_BIT);
 
-    // Init descriptor set layouts.
-    InitArray(&pipeline_info.descriptor_set_layouts, &temp_mem, 2);
-    Push(&pipeline_info.descriptor_set_layouts, game->vs_data_set.layout);
-    Push(&pipeline_info.descriptor_set_layouts, game->fs_data_set.layout);
-
-    // Init push constant ranges.
-    InitArray(&pipeline_info.push_constant_ranges, &temp_mem, 1);
-    Push(&pipeline_info.push_constant_ranges,
+    // Describe layout.
+    ShaderDataSet* data_sets[] =
     {
-        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-        .offset     = 0,
-        .size       = sizeof(Matrix),
-    });
+        &game->vs_data_set,
+        &game->fs_data_set,
+    };
+    VkPushConstantRange push_constant_ranges[] =
+    {
+        {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset     = 0,
+            .size       = sizeof(Matrix),
+        }
+    };
+    pipeline_info.layout = CreatePipelineLayout(rtk, temp_mem,
+                                                WRAP_ARRAY(&temp_mem, data_sets),
+                                                WRAP_ARRAY(&temp_mem, push_constant_ranges));
 
     InitPipeline(&game->pipeline, temp_mem, &game->render_target, rtk, &pipeline_info);
 }

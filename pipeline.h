@@ -31,10 +31,9 @@ struct VertexLayout
 
 struct PipelineInfo
 {
-    VertexLayout*                vertex_layout;
-    Array<Shader>                shaders;
-    Array<VkDescriptorSetLayout> descriptor_set_layouts;
-    Array<VkPushConstantRange>   push_constant_ranges;
+    VertexLayout*    vertex_layout;
+    Array<Shader>    shaders;
+    VkPipelineLayout layout;
 };
 
 struct Pipeline
@@ -84,6 +83,26 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
     // Update binding state for future attributes.
     current_binding->stride += field_count * 4;
     layout->attribute_location++;
+}
+
+static VkPipelineLayout CreatePipelineLayout(RTKContext* rtk, Stack temp_mem, Array<ShaderDataSet*>* data_sets,
+                                             Array<VkPushConstantRange>* push_constant_ranges)
+{
+    auto descriptor_set_layouts = CreateArrayFull<VkDescriptorSetLayout>(&temp_mem, data_sets->count);
+    for (uint32 i = 0; i < data_sets->count; ++i)
+        Set(descriptor_set_layouts, i, Get(data_sets, i)->layout);
+
+    VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
+    layout_create_info.setLayoutCount         = descriptor_set_layouts->count;
+    layout_create_info.pSetLayouts            = descriptor_set_layouts->data;
+    layout_create_info.pushConstantRangeCount = push_constant_ranges->count;
+    layout_create_info.pPushConstantRanges    = push_constant_ranges->data;
+
+    VkPipelineLayout layout = VK_NULL_HANDLE;
+    VkResult res = vkCreatePipelineLayout(rtk->device, &layout_create_info, NULL, &layout);
+    Validate(res, "failed to create graphics pipeline layout");
+
+    return layout;
 }
 
 static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTarget* render_target, RTKContext* rtk, PipelineInfo* info)
@@ -138,13 +157,7 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTarget* rende
     VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
 
     // Pipeline Layout
-    VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
-    layout_create_info.setLayoutCount         = info->descriptor_set_layouts.count;
-    layout_create_info.pSetLayouts            = info->descriptor_set_layouts.data;
-    layout_create_info.pushConstantRangeCount = info->push_constant_ranges.count;
-    layout_create_info.pPushConstantRanges    = info->push_constant_ranges.data;
-    res = vkCreatePipelineLayout(device, &layout_create_info, NULL, &pipeline->layout);
-    Validate(res, "failed to create graphics pipeline layout");
+    pipeline->layout = info->layout;
 
     // Pipeline
     auto shader_stages = CreateArray<VkPipelineShaderStageCreateInfo>(&temp_mem, info->shaders.count);

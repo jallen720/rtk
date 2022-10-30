@@ -2,6 +2,7 @@
 
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
+#include "rtk/rtk_context.h"
 #include "ctk2/ctk.h"
 #include "ctk2/memory.h"
 #include "ctk2/containers.h"
@@ -16,16 +17,15 @@ namespace RTK
 ////////////////////////////////////////////////////////////
 struct Shader
 {
-    VkShaderModule        hnd;
+    VkShaderModule        module;
     VkShaderStageFlagBits stage;
 };
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void LoadShader(Shader* shader, Stack temp_mem, VkDevice device, cstring path, VkShaderStageFlagBits stage)
+static VkShaderModule LoadShaderModule(RTKContext* rtk, Stack temp_mem, cstring path)
 {
     Array<uint32>* bytecode = ReadFile<uint32>(&temp_mem, path);
-    shader->stage = stage;
     VkShaderModuleCreateInfo info =
     {
         .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -34,8 +34,12 @@ static void LoadShader(Shader* shader, Stack temp_mem, VkDevice device, cstring 
         .codeSize = ByteSize(bytecode),
         .pCode    = bytecode->data,
     };
-    VkResult res = vkCreateShaderModule(device, &info, NULL, &shader->hnd);
+
+    VkShaderModule module = VK_NULL_HANDLE;
+    VkResult res = vkCreateShaderModule(rtk->device, &info, NULL, &module);
     Validate(res, "vkCreateShaderModule() failed");
+
+    return module;
 }
 
 }

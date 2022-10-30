@@ -442,7 +442,7 @@ static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContex
         {
             &game->vs_buffer,
         };
-        InitShaderDataSet(&game->vs_data_set, mem, temp_mem, rtk->descriptor_pool, rtk, WRAP_ARRAY(datas));
+        InitShaderDataSet(&game->vs_data_set, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
     // fs_data_set
@@ -451,38 +451,45 @@ static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContex
         {
             &game->texture,
         };
-        InitShaderDataSet(&game->fs_data_set, mem, temp_mem, rtk->descriptor_pool, rtk, WRAP_ARRAY(datas));
+        InitShaderDataSet(&game->fs_data_set, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 }
 
 static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
 {
-    PipelineInfo pipeline_info = {};
-    pipeline_info.vertex_layout = &game->vertex_layout;
-
-    // Load shaders.
-    InitArray(&pipeline_info.shaders, &temp_mem, 2);
-    LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.vert.spv",
-               VK_SHADER_STAGE_VERTEX_BIT);
-    LoadShader(Push(&pipeline_info.shaders), temp_mem, rtk->device, "shaders/bin/3d.frag.spv",
-               VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    // Describe layout.
-    ShaderDataSet* data_sets[] =
+    // Pipeline info arrays.
+    Shader shaders[] =
     {
-        &game->vs_data_set,
-        &game->fs_data_set,
+        {
+            .module = LoadShaderModule(rtk, temp_mem, "shaders/bin/3d.vert.spv"),
+            .stage  = VK_SHADER_STAGE_VERTEX_BIT
+        },
+        {
+            .module = LoadShaderModule(rtk, temp_mem, "shaders/bin/3d.frag.spv"),
+            .stage  = VK_SHADER_STAGE_FRAGMENT_BIT
+        },
+    };
+    VkDescriptorSetLayout descriptor_set_layouts[] =
+    {
+        game->vs_data_set.layout,
+        game->fs_data_set.layout,
     };
     VkPushConstantRange push_constant_ranges[] =
     {
         {
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
             .offset     = 0,
-            .size       = sizeof(Matrix),
-        }
+            .size       = sizeof(Matrix)
+        },
     };
-    pipeline_info.layout = CreatePipelineLayout(rtk, temp_mem, WRAP_ARRAY(data_sets), WRAP_ARRAY(push_constant_ranges));
 
+    PipelineInfo pipeline_info =
+    {
+        .vertex_layout          = &game->vertex_layout,
+        .shaders                = WRAP_ARRAY(shaders),
+        .descriptor_set_layouts = WRAP_ARRAY(descriptor_set_layouts),
+        .push_constant_ranges   = WRAP_ARRAY(push_constant_ranges),
+    };
     InitPipeline(&game->pipeline, temp_mem, &game->render_target, rtk, &pipeline_info);
 }
 

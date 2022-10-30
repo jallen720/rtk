@@ -145,7 +145,7 @@ static VkPipelineShaderStageCreateInfo DefaultShaderStageCreateInfo(Shader* shad
         .pNext               = NULL,
         .flags               = 0,
         .stage               = shader->stage,
-        .module              = shader->hnd,
+        .module              = shader->module,
         .pName               = "main",
         .pSpecializationInfo = NULL,
     };

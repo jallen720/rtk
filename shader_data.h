@@ -85,8 +85,7 @@ static Layout* GetPtr(ShaderData* shader_data, uint32 instance)
     return (Layout*)GetPtr(&shader_data->buffers, instance)->mapped_mem;
 }
 
-static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, VkDescriptorPool pool, RTKContext* rtk,
-                              Array<ShaderData*> datas)
+static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RTKContext* rtk, Array<ShaderData*> datas)
 {
     VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
@@ -129,7 +128,7 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, Vk
     {
         .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext              = NULL,
-        .descriptorPool     = pool,
+        .descriptorPool     = rtk->descriptor_pool,
         .descriptorSetCount = instance_count,
         .pSetLayouts        = desc_set_alloc_layouts->data,
     };

@@ -246,94 +246,103 @@ static void InitSampler(Game* game, RTKContext* rtk)
 
 static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
 {
-    InitShaderData(&game->vs_buffer, mem, rtk,
+    // vs_buffer
     {
-        .stages = VK_SHADER_STAGE_VERTEX_BIT,
-        .type   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .buffer_info =
+        game->vs_buffer.stages    = VK_SHADER_STAGE_VERTEX_BIT;
+        game->vs_buffer.type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        game->vs_buffer.per_frame = true;
+        ShaderDataInfo info =
         {
-            .size               = sizeof(VSBuffer),
-            .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-            .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                                  VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                  VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        },
-    });
+            .buffer_info =
+            {
+                .size               = sizeof(VSBuffer),
+                .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+                .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            }
+        };
+        InitShaderData(&game->vs_buffer, mem, rtk, &info);
+    }
 
-    // Load image into staging buffer.
+    // Load image data into staging buffer.
     sint32 width;
     sint32 height;
     sint32 channel_count;
     uint8* image_data = stbi_load("images/dir_cube.png", &width, &height, &channel_count, 0);
-
     if (image_data == NULL)
         CTK_FATAL("failed to open image file");
 
     memcpy(game->staging_buffer.mapped_mem, image_data, width * height * channel_count);
     stbi_image_free(image_data);
 
-    // Init shader data for images.
-    Swapchain* swapchain = &rtk->swapchain;
-    InitShaderData(&game->texture, mem, rtk,
+    // texture
     {
-        .stages = VK_SHADER_STAGE_FRAGMENT_BIT,
-        .type   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        .image_info =
+        Swapchain* swapchain = &rtk->swapchain;
+
+        game->texture.stages    = VK_SHADER_STAGE_FRAGMENT_BIT;
+        game->texture.type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        game->texture.per_frame = true;
+        game->texture.sampler   = game->sampler;
+        ShaderDataInfo info =
         {
-            .image =
+            .image_info =
             {
-                .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                .pNext     = NULL,
-                .flags     = 0,
-                .imageType = VK_IMAGE_TYPE_2D,
-                .format    = swapchain->image_format,
-                .extent =
+                .image =
                 {
-                    .width  = (uint32)width,
-                    .height = (uint32)height,
-                    .depth  = 1
+                    .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                    .pNext     = NULL,
+                    .flags     = 0,
+                    .imageType = VK_IMAGE_TYPE_2D,
+                    .format    = swapchain->image_format,
+                    .extent =
+                    {
+                        .width  = (uint32)width,
+                        .height = (uint32)height,
+                        .depth  = 1
+                    },
+                    .mipLevels             = 1,
+                    .arrayLayers           = 1,
+                    .samples               = VK_SAMPLE_COUNT_1_BIT,
+                    .tiling                = VK_IMAGE_TILING_OPTIMAL,
+                    .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+                    .queueFamilyIndexCount = 0,
+                    .pQueueFamilyIndices   = NULL,
+                    .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
                 },
-                .mipLevels             = 1,
-                .arrayLayers           = 1,
-                .samples               = VK_SAMPLE_COUNT_1_BIT,
-                .tiling                = VK_IMAGE_TILING_OPTIMAL,
-                .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = 0,
-                .pQueueFamilyIndices   = NULL,
-                .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-            },
-            .view =
-            {
-                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .pNext    = NULL,
-                .flags    = 0,
-                .image    = VK_NULL_HANDLE,
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format   = swapchain->image_format,
-                .components =
+                .view =
                 {
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                    .pNext    = NULL,
+                    .flags    = 0,
+                    .image    = VK_NULL_HANDLE,
+                    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                    .format   = swapchain->image_format,
+                    .components =
+                    {
+                        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    },
+                    .subresourceRange =
+                    {
+                        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel   = 0,
+                        .levelCount     = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount     = 1,
+                    },
                 },
-                .subresourceRange =
-                {
-                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel   = 0,
-                    .levelCount     = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount     = 1,
-                },
-            },
-            .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        },
-        .sampler = game->sampler,
-    });
+                .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            }
+        };
+        InitShaderData(&game->texture, mem, rtk, &info);
+    }
 
     // Copy image data from staging buffer to image memory.
     for (uint32 i = 0; i < game->texture.images.count; ++i)

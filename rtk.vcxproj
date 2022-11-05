@@ -142,6 +142,7 @@
     <ClInclude Include="debug.h" />
     <ClInclude Include="device.h" />
     <ClInclude Include="get_vk_array.h" />
+    <ClInclude Include="image_data.h" />
     <ClInclude Include="memory.h" />
     <ClInclude Include="pipeline.h" />
     <ClInclude Include="pipeline_defaults.h" />

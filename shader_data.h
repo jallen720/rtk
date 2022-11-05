@@ -67,10 +67,13 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
     }
 }
 
-template<typename Layout>
-static Layout* GetPtr(ShaderData* shader_data, uint32 instance)
+template<typename Type>
+static Type* GetBuffer(ShaderData* shader_data, uint32 instance)
 {
-    return (Layout*)GetPtr(&shader_data->buffers, instance)->mapped_mem;
+    CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+               shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
+
+    return (Type*)GetPtr(&shader_data->buffers, instance)->mapped_mem;
 }
 
 static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RTKContext* rtk, Array<ShaderData*> datas)

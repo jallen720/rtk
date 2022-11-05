@@ -622,9 +622,8 @@ void TestMain()
     Stack* mem = CreateStack(Megabyte(4));
     Stack* temp_mem = CreateStack(mem, Megabyte(1));
 
-    auto window = Allocate<Window>(mem, 1);
     InitWin32();
-    InitWindow(window,
+    WindowInfo window_info =
     {
         .surface =
         {
@@ -635,7 +634,9 @@ void TestMain()
         },
         .title    = L"3D Test",
         .callback = DefaultWindowCallback,
-    });
+    };
+    auto window = Allocate<Window>(mem, 1);
+    InitWindow(window, &window_info);
 
     auto rtk = Allocate<RTKContext>(mem, 1);
     InitRTK(rtk, mem, *temp_mem, window);

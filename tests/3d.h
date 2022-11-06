@@ -45,6 +45,12 @@ struct VSBuffer
     Matrix mvp_matrixes[MAX_ENTITIES];
 };
 
+struct Mesh
+{
+    Mem vertexes;
+    Mem indexes;
+};
+
 struct Game
 {
     // Graphics State
@@ -54,12 +60,12 @@ struct Game
     RenderTarget  render_target;
     VertexLayout  vertex_layout;
     Pipeline      pipeline;
-    uint32        test_mesh_indexes_offset;
     VkSampler     sampler;
     ShaderData    vs_buffer;
     ShaderData    texture;
     ShaderDataSet vs_data_set;
     ShaderDataSet fs_data_set;
+    Mesh          cube;
 
     // Sim State
     Mouse      mouse;
@@ -161,7 +167,7 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
 
 static void InitGraphicMem(Game* game, RTKContext* rtk)
 {
-    InitBuffer(&game->host_buffer, rtk,
+    BufferInfo host_buffer_info =
     {
         .size               = Megabyte(128),
         .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
@@ -171,16 +177,10 @@ static void InitGraphicMem(Game* game, RTKContext* rtk)
                               VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    });
-    InitBuffer(&game->staging_buffer, rtk,
-    {
-        .size               = Megabyte(16),
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-        .usage_flags        = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    });
-    // InitBuffer(&game->device_buffer, rtk,
+    };
+    InitBuffer(&game->host_buffer, rtk, &host_buffer_info);
+
+    // BufferInfo device_buffer_info =
     // {
     //     .size               = Megabyte(256),
     //     .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
@@ -189,7 +189,10 @@ static void InitGraphicMem(Game* game, RTKContext* rtk)
     //                           VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
     //                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     //     .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    // });
+    // };
+    // InitBuffer(&game->device_buffer, rtk, &device_buffer_info);
+
+    Allocate(&game->staging_buffer, &game->host_buffer, Megabyte(16));
 }
 
 static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -336,7 +339,8 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
         InitShaderData(&game->texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.
-        memcpy(game->staging_buffer.mapped_mem, image_data.data, image_data.size);
+        Clear(&game->staging_buffer);
+        Write(&game->staging_buffer, image_data.data, image_data.size);
         for (uint32 i = 0; i < game->texture.images.count; ++i)
             WriteToImage(GetPtr(&game->texture.images, i), &game->staging_buffer, rtk);
 
@@ -408,9 +412,10 @@ static void LoadMeshData(Game* game)
     // Load test mesh into host memory.
     {
         #include "rtk/meshes/cube.h"
-        game->test_mesh_indexes_offset = sizeof(vertexes);
-        memcpy(game->host_buffer.mapped_mem, vertexes, sizeof(vertexes));
-        memcpy(game->host_buffer.mapped_mem + sizeof(vertexes), indexes, sizeof(indexes));
+        Allocate(&game->cube.vertexes, &game->host_buffer, sizeof(vertexes));
+        Allocate(&game->cube.indexes, &game->host_buffer, sizeof(indexes));
+        Write(&game->cube.vertexes, vertexes, sizeof(vertexes));
+        Write(&game->cube.indexes, indexes, sizeof(indexes));
     }
 }
 
@@ -581,22 +586,21 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
 {
     Pipeline* pipeline = &game->pipeline;
     VkDeviceSize vertexes_offset = 0;
-    VkDeviceSize indexes_offset = game->test_mesh_indexes_offset;
 
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &game->render_target, 0);
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 
         // Bind mesh data buffers.
+        Mesh* mesh = &game->cube;
         vkCmdBindVertexBuffers(render_command_buffer,
                                0, // First Binding
                                1, // Binding Count
-                               &game->host_buffer.hnd,
-                               &vertexes_offset);
-
+                               &mesh->vertexes.buffer,
+                               &mesh->vertexes.offset);
         vkCmdBindIndexBuffer(render_command_buffer,
-                             game->host_buffer.hnd,
-                             indexes_offset,
-                             VK_INDEX_TYPE_UINT32);\
+                             mesh->indexes.buffer,
+                             mesh->indexes.offset,
+                             VK_INDEX_TYPE_UINT32);
 
         BindShaderDataSet(&game->vs_data_set, rtk, pipeline, render_command_buffer, 0);
         BindShaderDataSet(&game->fs_data_set, rtk, pipeline, render_command_buffer, 1);

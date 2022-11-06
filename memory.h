@@ -25,8 +25,18 @@ struct Buffer
 {
     VkBuffer       hnd;
     VkDeviceMemory mem;
-    VkDeviceSize   size;
     uint8*         mapped_mem;
+    VkDeviceSize   offset;
+    VkDeviceSize   size;
+    VkDeviceSize   index;
+};
+
+struct Mem
+{
+    VkBuffer     buffer;
+    uint8*       mapped_mem;
+    VkDeviceSize size;
+    VkDeviceSize offset;
 };
 
 struct ImageInfo
@@ -115,11 +125,74 @@ static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo* info)
     // Map host visible buffer memory.
     if (info->mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         vkMapMemory(device, buffer->mem, 0, buffer->size, 0, (void**)&buffer->mapped_mem);
+
+    // Buffers allocated directly from device memory manage the entire region of memory.
+    buffer->offset = 0;
 }
 
-static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo info)
+static void Allocate(Buffer* buffer, Buffer* parent_buffer, VkDeviceSize size)
 {
-    InitBuffer(buffer, rtk, &info);
+    if (parent_buffer->index + size > parent_buffer->size)
+    {
+        CTK_FATAL("can't allocate %u bytes from parent buffer at index %u: allocation would exceed parent buffer size "
+                  "of %u", size, parent_buffer->index, parent_buffer->size);
+    }
+
+    buffer->hnd        = parent_buffer->hnd;
+    buffer->mem        = parent_buffer->mem;
+    buffer->mapped_mem = parent_buffer->mapped_mem == NULL ? NULL : parent_buffer->mapped_mem + parent_buffer->index;
+    buffer->offset     = parent_buffer->index;
+    buffer->size       = size;
+    buffer->index      = 0;
+
+    parent_buffer->index += size;
+}
+
+static void Write(Buffer* buffer, void* data, VkDeviceSize data_size)
+{
+    if (buffer->mapped_mem == NULL)
+        CTK_FATAL("can't write to buffer: buffer is not host visible (mapped_mem == NULL)");
+
+    if (buffer->index + data_size > buffer->size)
+    {
+        CTK_FATAL("can't write %u bytes to buffer at index %u: write would exceed buffer size of %u", data_size,
+                  buffer->index, buffer->size);
+    }
+
+    memcpy(buffer->mapped_mem + buffer->index, data, data_size);
+    buffer->index += data_size;
+}
+
+static void Clear(Buffer* buffer)
+{
+    buffer->index = 0;
+}
+
+static void Allocate(Mem* mem, Buffer* buffer, VkDeviceSize size)
+{
+    if (buffer->index + size > buffer->size)
+    {
+        CTK_FATAL("can't allocate %u bytes from buffer at index %u: allocation would exceed buffer size of %u", size,
+                  buffer->index, buffer->size);
+    }
+
+    mem->buffer     = buffer->hnd;
+    mem->mapped_mem = buffer->mapped_mem == NULL ? NULL : buffer->mapped_mem + buffer->index;
+    mem->size       = size;
+    mem->offset     = buffer->offset + buffer->index;
+
+    buffer->index += size;
+}
+
+static void Write(Mem* mem, void* data, VkDeviceSize data_size)
+{
+    if (mem->mapped_mem == NULL)
+        CTK_FATAL("can't write to mem: mem is not host visible (mapped_mem == NULL)");
+
+    if (data_size > mem->size)
+        CTK_FATAL("can't write %u bytes to mem: write would exceed mem size of %u", data_size, mem->size);
+
+    memcpy(mem->mapped_mem, data, data_size);
 }
 
 static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
@@ -144,11 +217,6 @@ static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
     info->view.image = image->hnd;
     res = vkCreateImageView(device, &info->view, NULL, &image->view);
     Validate(res, "vkCreateImageView() failed");
-}
-
-static void InitImage(Image* image, RTKContext* rtk, ImageInfo info)
-{
-    InitImage(image, rtk, &info);
 }
 
 static void WriteToImage(Image* image, Buffer* image_data_buffer, RTKContext* rtk)
@@ -188,7 +256,7 @@ static void WriteToImage(Image* image, Buffer* image_data_buffer, RTKContext* rt
 
         VkBufferImageCopy copy =
         {
-            .bufferOffset      = 0,
+            .bufferOffset      = image_data_buffer->offset,
             .bufferRowLength   = 0,
             .bufferImageHeight = 0,
             .imageSubresource =

@@ -47,8 +47,8 @@ struct VSBuffer
 
 struct Mesh
 {
-    Mem vertexes;
-    Mem indexes;
+    Region vertexes;
+    Region indexes;
 };
 
 struct Game

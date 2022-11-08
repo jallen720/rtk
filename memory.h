@@ -31,7 +31,7 @@ struct Buffer
     VkDeviceSize   index;
 };
 
-struct Mem
+struct Region
 {
     VkBuffer     buffer;
     uint8*       mapped_mem;
@@ -168,31 +168,31 @@ static void Clear(Buffer* buffer)
     buffer->index = 0;
 }
 
-static void Allocate(Mem* mem, Buffer* buffer, VkDeviceSize size)
+static void Allocate(Region* region, Buffer* buffer, VkDeviceSize size)
 {
     if (buffer->index + size > buffer->size)
     {
-        CTK_FATAL("can't allocate %u bytes from buffer at index %u: allocation would exceed buffer size of %u", size,
-                  buffer->index, buffer->size);
+        CTK_FATAL("can't allocate %u-byte region from buffer at index %u: allocation would exceed buffer size of %u",
+                  size, buffer->index, buffer->size);
     }
 
-    mem->buffer     = buffer->hnd;
-    mem->mapped_mem = buffer->mapped_mem == NULL ? NULL : buffer->mapped_mem + buffer->index;
-    mem->size       = size;
-    mem->offset     = buffer->offset + buffer->index;
+    region->buffer     = buffer->hnd;
+    region->mapped_mem = buffer->mapped_mem == NULL ? NULL : buffer->mapped_mem + buffer->index;
+    region->size       = size;
+    region->offset     = buffer->offset + buffer->index;
 
     buffer->index += size;
 }
 
-static void Write(Mem* mem, void* data, VkDeviceSize data_size)
+static void Write(Region* region, void* data, VkDeviceSize data_size)
 {
-    if (mem->mapped_mem == NULL)
-        CTK_FATAL("can't write to mem: mem is not host visible (mapped_mem == NULL)");
+    if (region->mapped_mem == NULL)
+        CTK_FATAL("can't write to region: region is not host visible (mapped_mem == NULL)");
 
-    if (data_size > mem->size)
-        CTK_FATAL("can't write %u bytes to mem: write would exceed mem size of %u", data_size, mem->size);
+    if (data_size > region->size)
+        CTK_FATAL("can't write %u bytes to region: write would exceed region size of %u", data_size, region->size);
 
-    memcpy(mem->mapped_mem, data, data_size);
+    memcpy(region->mapped_mem, data, data_size);
 }
 
 static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)

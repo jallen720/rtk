@@ -365,7 +365,7 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
         Clear(&game->staging_buffer);
         Write(&game->staging_buffer, image_data.data, image_data.size);
         for (uint32 i = 0; i < game->texture.images.count; ++i)
-            WriteToImage(GetPtr(&game->texture.images, i), &game->staging_buffer, rtk);
+            WriteToShaderDataImage(&game->texture, i, &game->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
     }

@@ -67,11 +67,11 @@ struct EntityData
 struct Game
 {
     // Graphics State
-    Buffer        host_buffer;
-    Buffer        device_buffer;
-    Buffer        staging_buffer;
-    RenderTarget  render_target;
-    VertexLayout  vertex_layout;
+    Buffer       host_buffer;
+    Buffer       device_buffer;
+    Buffer       staging_buffer;
+    RenderTarget render_target;
+    VertexLayout vertex_layout;
 
     // Assets
     Pipeline      pipeline;
@@ -434,7 +434,7 @@ static void LoadMeshData(Game* game, Stack* mem)
 {
     InitArrayFull(&game->meshes, mem, MESH_COUNT);
 
-    // Allocate mesh regions from host memory.
+    // Allocate vertex and index buffers from host memory, then write data to them.
     {
         #include "rtk/meshes/cube.h"
         Mesh* cube = GetPtr(&game->meshes, MESH_CUBE);
@@ -624,7 +624,6 @@ static void UpdateGame(Game* game, RTKContext* rtk, Window* window)
 static void RecordRenderCommands(Game* game, RTKContext* rtk)
 {
     Pipeline* pipeline = &game->pipeline;
-    VkDeviceSize vertexes_offset = 0;
 
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &game->render_target, 0);
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
@@ -650,7 +649,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
             // Matrix* mvp_matrix = GetPtr<VSBuffer>(&game->vs_buffer, rtk->frames.index)->mvp_matrixes + i;
             vkCmdPushConstants(render_command_buffer, pipeline->layout,
                                VK_SHADER_STAGE_VERTEX_BIT,
-                               0, sizeof(Matrix), &i);
+                               0, sizeof(uint32), &i);
             vkCmdDrawIndexed(render_command_buffer,
                              36, // Index Count
                              1, // Instance Count

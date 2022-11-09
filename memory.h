@@ -178,7 +178,6 @@ static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
 
     image->extent = info->image.extent;
 
-
     info->view.image = image->hnd;
     res = vkCreateImageView(device, &info->view, NULL, &image->view);
     Validate(res, "vkCreateImageView() failed");

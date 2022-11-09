@@ -31,14 +31,6 @@ struct Buffer
     VkDeviceSize   index;
 };
 
-struct Region
-{
-    VkBuffer     buffer;
-    uint8*       mapped_mem;
-    VkDeviceSize size;
-    VkDeviceSize offset;
-};
-
 struct ImageInfo
 {
     VkImageCreateInfo     image;
@@ -130,7 +122,7 @@ static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo* info)
     buffer->offset = 0;
 }
 
-static void Allocate(Buffer* buffer, Buffer* parent_buffer, VkDeviceSize size)
+static void InitBuffer(Buffer* buffer, Buffer* parent_buffer, VkDeviceSize size)
 {
     if (parent_buffer->index + size > parent_buffer->size)
     {
@@ -166,33 +158,6 @@ static void Write(Buffer* buffer, void* data, VkDeviceSize data_size)
 static void Clear(Buffer* buffer)
 {
     buffer->index = 0;
-}
-
-static void Allocate(Region* region, Buffer* buffer, VkDeviceSize size)
-{
-    if (buffer->index + size > buffer->size)
-    {
-        CTK_FATAL("can't allocate %u-byte region from buffer at index %u: allocation would exceed buffer size of %u",
-                  size, buffer->index, buffer->size);
-    }
-
-    region->buffer     = buffer->hnd;
-    region->mapped_mem = buffer->mapped_mem == NULL ? NULL : buffer->mapped_mem + buffer->index;
-    region->size       = size;
-    region->offset     = buffer->offset + buffer->index;
-
-    buffer->index += size;
-}
-
-static void Write(Region* region, void* data, VkDeviceSize data_size)
-{
-    if (region->mapped_mem == NULL)
-        CTK_FATAL("can't write to region: region is not host visible (mapped_mem == NULL)");
-
-    if (data_size > region->size)
-        CTK_FATAL("can't write %u bytes to region: write would exceed region size of %u", data_size, region->size);
-
-    memcpy(region->mapped_mem, data, data_size);
 }
 
 static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)

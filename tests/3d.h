@@ -35,8 +35,8 @@ struct VSBuffer
 
 struct Mesh
 {
-    Region vertexes;
-    Region indexes;
+    Buffer vertexes;
+    Buffer indexes;
 };
 
 struct Transform
@@ -215,7 +215,7 @@ static void InitGraphicMem(Game* game, RTKContext* rtk)
     // };
     // InitBuffer(&game->device_buffer, rtk, &device_buffer_info);
 
-    Allocate(&game->staging_buffer, &game->host_buffer, Megabyte(16));
+    InitBuffer(&game->staging_buffer, &game->host_buffer, Megabyte(16));
 }
 
 static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -438,16 +438,16 @@ static void LoadMeshData(Game* game, Stack* mem)
     {
         #include "rtk/meshes/cube.h"
         Mesh* cube = GetPtr(&game->meshes, MESH_CUBE);
-        Allocate(&cube->vertexes, &game->host_buffer, sizeof(vertexes));
-        Allocate(&cube->indexes, &game->host_buffer, sizeof(indexes));
+        InitBuffer(&cube->vertexes, &game->host_buffer, sizeof(vertexes));
+        InitBuffer(&cube->indexes, &game->host_buffer, sizeof(indexes));
         Write(&cube->vertexes, vertexes, sizeof(vertexes));
         Write(&cube->indexes, indexes, sizeof(indexes));
     }
     {
         #include "rtk/meshes/quad.h"
         Mesh* quad = GetPtr(&game->meshes, MESH_QUAD);
-        Allocate(&quad->vertexes, &game->host_buffer, sizeof(vertexes));
-        Allocate(&quad->indexes, &game->host_buffer, sizeof(indexes));
+        InitBuffer(&quad->vertexes, &game->host_buffer, sizeof(vertexes));
+        InitBuffer(&quad->indexes, &game->host_buffer, sizeof(indexes));
         Write(&quad->vertexes, vertexes, sizeof(vertexes));
         Write(&quad->indexes, indexes, sizeof(indexes));
     }
@@ -640,10 +640,10 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
             vkCmdBindVertexBuffers(render_command_buffer,
                                    0, // First Binding
                                    1, // Binding Count
-                                   &mesh->vertexes.buffer,
+                                   &mesh->vertexes.hnd,
                                    &mesh->vertexes.offset);
             vkCmdBindIndexBuffer(render_command_buffer,
-                                 mesh->indexes.buffer,
+                                 mesh->indexes.hnd,
                                  mesh->indexes.offset,
                                  VK_INDEX_TYPE_UINT32);
 

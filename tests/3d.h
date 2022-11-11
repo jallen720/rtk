@@ -628,7 +628,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &game->render_target, 0);
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 
-        // Bind mesh data buffers.x
+        // Bind mesh data buffers.
         BindShaderDataSet(&game->vs_data_set, rtk, pipeline, render_command_buffer, 0);
         BindShaderDataSet(&game->fs_data_set, rtk, pipeline, render_command_buffer, 1);
 

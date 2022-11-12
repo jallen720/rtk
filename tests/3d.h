@@ -28,17 +28,6 @@ struct View
     float32       max_x_angle;
 };
 
-struct VSBuffer
-{
-    Matrix mvp_matrixes[MAX_ENTITIES];
-};
-
-struct Mesh
-{
-    Buffer vertexes;
-    Buffer indexes;
-};
-
 struct Transform
 {
     Vec3<float32> position;
@@ -66,26 +55,36 @@ struct EntityData
 
 struct Game
 {
-    // Graphics State
-    Buffer       host_buffer;
-    Buffer       device_buffer;
-    Buffer       staging_buffer;
-    RenderTarget render_target;
-    VertexLayout vertex_layout;
+    Mouse      mouse;
+    View       view;
+    EntityData entity_data;
+};
 
-    // Assets
+struct VSBuffer
+{
+    Matrix mvp_matrixes[MAX_ENTITIES];
+};
+
+struct Mesh
+{
+    Buffer vertexes;
+    Buffer indexes;
+};
+
+struct RenderState
+{
+    Buffer        host_buffer;
+    Buffer        device_buffer;
+    Buffer        staging_buffer;
+    RenderTarget  render_target;
+    VertexLayout  vertex_layout;
     Pipeline      pipeline;
     VkSampler     sampler;
     ShaderData    vs_buffer;
     ShaderData    texture;
-    ShaderDataSet vs_data_set;
-    ShaderDataSet fs_data_set;
+    ShaderDataSet vs_buffer_data_set;
+    ShaderDataSet texture_data_set;
     Array<Mesh>   meshes;
-
-    // Sim State
-    Mouse      mouse;
-    View       view;
-    EntityData entity_data;
 };
 
 struct Vertex
@@ -94,39 +93,8 @@ struct Vertex
     Vec2<float32> uv;
 };
 
-/// Game Functions
+/// RTK
 ////////////////////////////////////////////////////////////
-static uint32 PushEntity(EntityData* entity_data)
-{
-    if (entity_data->count == MAX_ENTITIES)
-        CTK_FATAL("can't push another entity: entity count (%u) at max (%u)", entity_data->count, MAX_ENTITIES);
-
-    uint32 new_entity = entity_data->count;
-    ++entity_data->count;
-    return new_entity;
-}
-
-static void ValidateIndex(EntityData* entity_data, uint32 index)
-{
-    if (index >= entity_data->count)
-    {
-        CTK_FATAL("can't access entity data at index %u: index exceeds highest index %u", index,
-                  entity_data->count - 1);
-    }
-}
-
-static Entity* GetEntityPtr(EntityData* entity_data, uint32 index)
-{
-    ValidateIndex(entity_data, index);
-    return entity_data->entities + index;
-}
-
-static Transform* GetTransformPtr(EntityData* entity_data, uint32 index)
-{
-    ValidateIndex(entity_data, index);
-    return entity_data->transforms + index;
-}
-
 static void SelectPhysicalDevice(RTKContext* rtk)
 {
     // Use first discrete device if any are available.
@@ -188,7 +156,81 @@ static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
     InitRTKContext(rtk, mem, temp_mem, window, &rtk_info);
 }
 
-static void InitGraphicMem(Game* game, RTKContext* rtk)
+/// Game
+////////////////////////////////////////////////////////////
+static uint32 PushEntity(EntityData* entity_data)
+{
+    if (entity_data->count == MAX_ENTITIES)
+        CTK_FATAL("can't push another entity: entity count (%u) at max (%u)", entity_data->count, MAX_ENTITIES);
+
+    uint32 new_entity = entity_data->count;
+    ++entity_data->count;
+    return new_entity;
+}
+
+static void InitEntities(Game* game)
+{
+    static constexpr uint32 CUBE_SIZE = 4;
+    static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
+    static_assert(CUBE_ENTITY_COUNT < MAX_ENTITIES);
+    for (uint32 z = 0; z < CUBE_SIZE; ++z)
+    for (uint32 y = 0; y < CUBE_SIZE; ++y)
+    for (uint32 x = 0; x < CUBE_SIZE; ++x)
+    {
+        uint32 entity = PushEntity(&game->entity_data);
+        game->entity_data.entities[entity] =
+        {
+            .mesh = entity % 2 ? MESH_CUBE : MESH_QUAD
+        };
+        game->entity_data.transforms[entity] =
+        {
+            .position = { x * 1.5f, y * 1.5f, z * 1.5f },
+            .rotation = { 0, 0, 0 },
+        };
+    }
+}
+
+static void InitGame(Game* game)
+{
+    // View
+    game->view =
+    {
+        .position     = { 0, 0, -1 },
+        .rotation     = { 0, 0, 0 },
+        .vertical_fov = 90.0f,
+        .aspect       = 16.0f / 9.0f,
+        .z_near       = 0.1f,
+        .z_far        = 1000.0f,
+        .max_x_angle  = 85.0f,
+    };
+
+    InitEntities(game);
+}
+
+static void ValidateIndex(EntityData* entity_data, uint32 index)
+{
+    if (index >= entity_data->count)
+    {
+        CTK_FATAL("can't access entity data at index %u: index exceeds highest index %u", index,
+                  entity_data->count - 1);
+    }
+}
+
+static Entity* GetEntityPtr(EntityData* entity_data, uint32 index)
+{
+    ValidateIndex(entity_data, index);
+    return entity_data->entities + index;
+}
+
+static Transform* GetTransformPtr(EntityData* entity_data, uint32 index)
+{
+    ValidateIndex(entity_data, index);
+    return entity_data->transforms + index;
+}
+
+/// Render State
+////////////////////////////////////////////////////////////
+static void InitGraphicsMem(RenderState* rs, RTKContext* rtk)
 {
     BufferInfo host_buffer_info =
     {
@@ -201,7 +243,7 @@ static void InitGraphicMem(Game* game, RTKContext* rtk)
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    InitBuffer(&game->host_buffer, rtk, &host_buffer_info);
+    InitBuffer(&rs->host_buffer, rtk, &host_buffer_info);
 
     // BufferInfo device_buffer_info =
     // {
@@ -213,23 +255,23 @@ static void InitGraphicMem(Game* game, RTKContext* rtk)
     //                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     //     .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     // };
-    // InitBuffer(&game->device_buffer, rtk, &device_buffer_info);
+    // InitBuffer(&rs->device_buffer, rtk, &device_buffer_info);
 
-    InitBuffer(&game->staging_buffer, &game->host_buffer, Megabyte(16));
+    InitBuffer(&rs->staging_buffer, &rs->host_buffer, Megabyte(16));
 }
 
-static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+static void InitRenderTargets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    RenderTarget* rt = &game->render_target;
+    RenderTarget* rt = &rs->render_target;
     static constexpr bool DEPTH_TESTING = true;
     InitRenderTarget(rt, mem, temp_mem, rtk, DEPTH_TESTING);
     Set(&rt->attachment_clear_values, 0, { 0.0f, 0.1f, 0.2f, 1.0f });
     Set(&rt->attachment_clear_values, 1, { 1.0f });
 }
 
-static void InitVertexLayout(Game* game, Stack* mem)
+static void InitVertexLayout(RenderState* rs, Stack* mem)
 {
-    VertexLayout* vertex_layout = &game->vertex_layout;
+    VertexLayout* vertex_layout = &rs->vertex_layout;
 
     // Init pipeline vertex layout.
     InitArray(&vertex_layout->bindings, mem, 1);
@@ -240,7 +282,7 @@ static void InitVertexLayout(Game* game, Stack* mem)
     PushAttribute(vertex_layout, 2); // UV
 }
 
-static void InitSampler(Game* game, RTKContext* rtk)
+static void InitSampler(RenderState* rs, RTKContext* rtk)
 {
     VkSamplerCreateInfo info =
     {
@@ -263,7 +305,7 @@ static void InitSampler(Game* game, RTKContext* rtk)
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    VkResult res = vkCreateSampler(rtk->device, &info, NULL, &game->sampler);
+    VkResult res = vkCreateSampler(rtk->device, &info, NULL, &rs->sampler);
     Validate(res, "vkCreateSampler() failed");
 }
 
@@ -325,13 +367,13 @@ static ShaderDataInfo DefaultImageShaderDataInfo(VkFormat format, ImageData* ima
     };
 }
 
-static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
+static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
 {
     // vs_buffer
     {
-        game->vs_buffer.stages    = VK_SHADER_STAGE_VERTEX_BIT;
-        game->vs_buffer.type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        game->vs_buffer.per_frame = true;
+        rs->vs_buffer.stages    = VK_SHADER_STAGE_VERTEX_BIT;
+        rs->vs_buffer.type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        rs->vs_buffer.per_frame = true;
         ShaderDataInfo info =
         {
             .buffer_info =
@@ -346,7 +388,7 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             }
         };
-        InitShaderData(&game->vs_buffer, mem, rtk, &info);
+        InitShaderData(&rs->vs_buffer, mem, rtk, &info);
     }
 
     // texture
@@ -354,45 +396,45 @@ static void InitShaderDatas(Game* game, Stack* mem, RTKContext* rtk)
         ImageData image_data = {};
         LoadImageData(&image_data, "images/dir_cube.png");
 
-        game->texture.stages    = VK_SHADER_STAGE_FRAGMENT_BIT;
-        game->texture.type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        game->texture.per_frame = false;
-        game->texture.sampler   = game->sampler;
+        rs->texture.stages    = VK_SHADER_STAGE_FRAGMENT_BIT;
+        rs->texture.type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        rs->texture.per_frame = false;
+        rs->texture.sampler   = rs->sampler;
         ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, &image_data);
-        InitShaderData(&game->texture, mem, rtk, &info);
+        InitShaderData(&rs->texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.
-        Clear(&game->staging_buffer);
-        Write(&game->staging_buffer, image_data.data, image_data.size);
-        for (uint32 i = 0; i < game->texture.images.count; ++i)
-            WriteToShaderDataImage(&game->texture, i, &game->staging_buffer, rtk);
+        Clear(&rs->staging_buffer);
+        Write(&rs->staging_buffer, image_data.data, image_data.size);
+        for (uint32 i = 0; i < rs->texture.images.count; ++i)
+            WriteToShaderDataImage(&rs->texture, i, &rs->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
     }
 }
 
-static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    // vs_data_set
+    // vs_buffer_data_set
     {
         ShaderData* datas[] =
         {
-            &game->vs_buffer,
+            &rs->vs_buffer,
         };
-        InitShaderDataSet(&game->vs_data_set, mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        InitShaderDataSet(&rs->vs_buffer_data_set, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
-    // fs_data_set
+    // texture_data_set
     {
         ShaderData* datas[] =
         {
-            &game->texture,
+            &rs->texture,
         };
-        InitShaderDataSet(&game->fs_data_set, mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        InitShaderDataSet(&rs->texture_data_set, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 }
 
-static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
+static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
 {
     // Pipeline info arrays.
     Shader shaders[] =
@@ -408,8 +450,8 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
     };
     VkDescriptorSetLayout descriptor_set_layouts[] =
     {
-        game->vs_data_set.layout,
-        game->fs_data_set.layout,
+        rs->vs_buffer_data_set.layout,
+        rs->texture_data_set.layout,
     };
     VkPushConstantRange push_constant_ranges[] =
     {
@@ -422,90 +464,51 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
 
     PipelineInfo pipeline_info =
     {
-        .vertex_layout          = &game->vertex_layout,
+        .vertex_layout          = &rs->vertex_layout,
         .shaders                = WRAP_ARRAY(shaders),
         .descriptor_set_layouts = WRAP_ARRAY(descriptor_set_layouts),
         .push_constant_ranges   = WRAP_ARRAY(push_constant_ranges),
     };
-    InitPipeline(&game->pipeline, temp_mem, &game->render_target, rtk, &pipeline_info);
+    InitPipeline(&rs->pipeline, temp_mem, &rs->render_target, rtk, &pipeline_info);
 }
 
-static void LoadMeshData(Game* game, Stack* mem)
+static void LoadMeshData(RenderState* rs, Stack* mem)
 {
-    InitArrayFull(&game->meshes, mem, MESH_COUNT);
+    InitArrayFull(&rs->meshes, mem, MESH_COUNT);
 
     // Allocate vertex and index buffers from host memory, then write data to them.
     {
         #include "rtk/meshes/cube.h"
-        Mesh* cube = GetPtr(&game->meshes, MESH_CUBE);
-        InitBuffer(&cube->vertexes, &game->host_buffer, sizeof(vertexes));
-        InitBuffer(&cube->indexes, &game->host_buffer, sizeof(indexes));
+        Mesh* cube = GetPtr(&rs->meshes, MESH_CUBE);
+        InitBuffer(&cube->vertexes, &rs->host_buffer, sizeof(vertexes));
+        InitBuffer(&cube->indexes, &rs->host_buffer, sizeof(indexes));
         Write(&cube->vertexes, vertexes, sizeof(vertexes));
         Write(&cube->indexes, indexes, sizeof(indexes));
     }
     {
         #include "rtk/meshes/quad.h"
-        Mesh* quad = GetPtr(&game->meshes, MESH_QUAD);
-        InitBuffer(&quad->vertexes, &game->host_buffer, sizeof(vertexes));
-        InitBuffer(&quad->indexes, &game->host_buffer, sizeof(indexes));
+        Mesh* quad = GetPtr(&rs->meshes, MESH_QUAD);
+        InitBuffer(&quad->vertexes, &rs->host_buffer, sizeof(vertexes));
+        InitBuffer(&quad->indexes, &rs->host_buffer, sizeof(indexes));
         Write(&quad->vertexes, vertexes, sizeof(vertexes));
         Write(&quad->indexes, indexes, sizeof(indexes));
     }
 }
 
-static void InitGraphicsState(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
+static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    InitGraphicMem(game, rtk);
-    InitRenderTargets(game, mem, temp_mem, rtk);
-    InitVertexLayout(game, mem);
-    InitSampler(game, rtk);
-    InitShaderDatas(game, mem, rtk);
-    InitShaderDataSets(game, mem, temp_mem, rtk);
-    InitPipelines(game, temp_mem, rtk);
-    LoadMeshData(game, mem);
+    InitGraphicsMem(rs, rtk);
+    InitRenderTargets(rs, mem, temp_mem, rtk);
+    InitVertexLayout(rs, mem);
+    InitSampler(rs, rtk);
+    InitShaderDatas(rs, mem, rtk);
+    InitShaderDataSets(rs, mem, temp_mem, rtk);
+    InitPipelines(rs, temp_mem, rtk);
+    LoadMeshData(rs, mem);
 }
 
-static void InitSimState(Game* game, Stack* mem, RTKContext* rtk)
-{
-    // View
-    game->view =
-    {
-        .position     = { 0, 0, -1 },
-        .rotation     = { 0, 0, 0 },
-        .vertical_fov = 90.0f,
-        .aspect       = 16.0f / 9.0f,
-        .z_near       = 0.1f,
-        .z_far        = 1000.0f,
-        .max_x_angle  = 85.0f,
-    };
-
-    // Entities
-    static constexpr uint32 CUBE_SIZE = 4;
-    static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
-    static_assert(CUBE_ENTITY_COUNT < MAX_ENTITIES);
-    for (uint32 z = 0; z < CUBE_SIZE; ++z)
-    for (uint32 y = 0; y < CUBE_SIZE; ++y)
-    for (uint32 x = 0; x < CUBE_SIZE; ++x)
-    {
-        uint32 entity = PushEntity(&game->entity_data);
-        game->entity_data.entities[entity] =
-        {
-            .mesh = entity % 2 ? MESH_CUBE : MESH_QUAD
-        };
-        game->entity_data.transforms[entity] =
-        {
-            .position = { x * 1.5f, y * 1.5f, z * 1.5f },
-            .rotation = { 0, 0, 0 },
-        };
-    }
-}
-
-static void InitGame(Game* game, Stack* mem, Stack temp_mem, RTKContext* rtk)
-{
-    InitGraphicsState(game, mem, temp_mem, rtk);
-    InitSimState(game, mem, rtk);
-}
-
+/// Game Update
+////////////////////////////////////////////////////////////
 static void LocalTranslate(View* view, Vec3<float32> translation)
 {
     Matrix matrix = ID_MATRIX;
@@ -570,6 +573,17 @@ static void Controls(Game* game, Window* window)
     ViewControls(game, window);
 }
 
+static void UpdateGame(Game* game, RTKContext* rtk, Window* window)
+{
+    UpdateMouse(&game->mouse, window);
+
+    Controls(game, window);
+    if (!window->open)
+        return; // Controls closed window.
+}
+
+/// RenderState Update
+////////////////////////////////////////////////////////////
 static Matrix CreateViewProjectionMatrix(View* view)
 {
     Matrix view_model_matrix = ID_MATRIX;
@@ -591,11 +605,11 @@ static Matrix CreateViewProjectionMatrix(View* view)
     return projection_matrix * view_matrix;
 }
 
-static void UpdateMVPMatrixes(Game* game, RTKContext* rtk)
+static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk)
 {
     // Update entity MVP matrixes.
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    auto frame_vs_buffer = GetBuffer<VSBuffer>(&game->vs_buffer, rtk->frames.index);
+    auto frame_vs_buffer = GetBuffer<VSBuffer>(&rs->vs_buffer, rtk->frames.index);
     for (uint32 i = 0; i < game->entity_data.count; ++i)
     {
         Transform* entity_transform = GetTransformPtr(&game->entity_data, i);
@@ -610,36 +624,30 @@ static void UpdateMVPMatrixes(Game* game, RTKContext* rtk)
     }
 }
 
-static void UpdateGame(Game* game, RTKContext* rtk, Window* window)
+static void UpdateRenderState(RenderState* rs, Game* game, RTKContext* rtk)
 {
-    UpdateMouse(&game->mouse, window);
-
-    Controls(game, window);
-    if (!window->open)
-        return; // Controls closed window.
-
-    UpdateMVPMatrixes(game, rtk);
+    UpdateMVPMatrixes(rs, game, rtk);
 }
 
-static void RecordRenderCommands(Game* game, RTKContext* rtk)
+static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
-    Pipeline* pipeline = &game->pipeline;
+    Pipeline* pipeline = &rs->pipeline;
 
-    VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &game->render_target, 0);
+    VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, 0);
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 
         // Bind mesh data buffers.
         VkDescriptorSet sets[] =
         {
-            Get(&game->vs_data_set.hnds, rtk->frames.index),
-            Get(&game->fs_data_set.hnds, rtk->frames.index),
+            Get(&rs->vs_buffer_data_set.hnds, rtk->frames.index),
+            Get(&rs->texture_data_set.hnds, rtk->frames.index),
         };
         BindShaderDataSets(WRAP_ARRAY(sets), pipeline, render_command_buffer, 0);
 
         for (uint32 i = 0; i < game->entity_data.count; ++i)
         {
             Entity* entity = GetEntityPtr(&game->entity_data, i);
-            Mesh* mesh = GetPtr(&game->meshes, entity->mesh);
+            Mesh* mesh = GetPtr(&rs->meshes, entity->mesh);
             vkCmdBindVertexBuffers(render_command_buffer,
                                    0, // First Binding
                                    1, // Binding Count
@@ -650,7 +658,7 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
                                  mesh->indexes.offset,
                                  VK_INDEX_TYPE_UINT32);
 
-            // Matrix* mvp_matrix = GetPtr<VSBuffer>(&game->vs_buffer, rtk->frames.index)->mvp_matrixes + i;
+            // Matrix* mvp_matrix = GetPtr<VSBuffer>(&rs->vs_buffer, rtk->frames.index)->mvp_matrixes + i;
             vkCmdPushConstants(render_command_buffer, pipeline->layout,
                                VK_SHADER_STAGE_VERTEX_BIT,
                                0, sizeof(uint32), &i);
@@ -689,7 +697,10 @@ void TestMain()
     InitRTK(rtk, mem, *temp_mem, window);
 
     auto game = Allocate<Game>(mem, 1);
-    InitGame(game, mem, *temp_mem, rtk);
+    InitGame(game);
+
+    auto rs = Allocate<RenderState>(mem, 1);
+    InitRenderState(rs, mem, *temp_mem, rtk);
 
     // Run game.
     while (1)
@@ -702,8 +713,9 @@ void TestMain()
         {
             NextFrame(rtk);
             UpdateGame(game, rtk, window);
-            RecordRenderCommands(game, rtk);
-            SubmitRenderCommands(rtk, &game->render_target);
+            UpdateRenderState(rs, game, rtk);
+            RecordRenderCommands(game, rs, rtk);
+            SubmitRenderCommands(rtk, &rs->render_target);
         }
         else
         {

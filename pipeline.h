@@ -180,14 +180,14 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTarget* rende
     Validate(res, "vkCreateGraphicsPipelines() failed");
 }
 
-static void BindShaderDataSet(ShaderDataSet* set, RTKContext* rtk, Pipeline* pipeline, VkCommandBuffer command_buffer,
-                              uint32 binding)
+static void BindShaderDataSets(Array<VkDescriptorSet> sets, Pipeline* pipeline, VkCommandBuffer command_buffer,
+                               uint32 start)
 {
     vkCmdBindDescriptorSets(command_buffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
                             pipeline->layout,
-                            binding, // First set
-                            1, GetPtr(&set->hnds, rtk->frames.index), // Descriptor set count + pointer
+                            start, // First set
+                            sets.count, sets.data, // Descriptor set count + pointer
                             0, NULL); // Dynamic offset count + pointer
 }
 

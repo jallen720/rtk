@@ -416,7 +416,7 @@ static void InitPipelines(Game* game, Stack temp_mem, RTKContext* rtk)
         {
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
             .offset     = 0,
-            .size       = sizeof(Matrix)
+            .size       = sizeof(uint32)
         },
     };
 
@@ -629,8 +629,12 @@ static void RecordRenderCommands(Game* game, RTKContext* rtk)
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 
         // Bind mesh data buffers.
-        BindShaderDataSet(&game->vs_data_set, rtk, pipeline, render_command_buffer, 0);
-        BindShaderDataSet(&game->fs_data_set, rtk, pipeline, render_command_buffer, 1);
+        VkDescriptorSet sets[] =
+        {
+            Get(&game->vs_data_set.hnds, rtk->frames.index),
+            Get(&game->fs_data_set.hnds, rtk->frames.index),
+        };
+        BindShaderDataSets(WRAP_ARRAY(sets), pipeline, render_command_buffer, 0);
 
         for (uint32 i = 0; i < game->entity_data.count; ++i)
         {

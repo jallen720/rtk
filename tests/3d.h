@@ -34,21 +34,8 @@ struct Transform
     Vec3<float32> rotation;
 };
 
-enum MeshHnd
-{
-    MESH_CUBE,
-    MESH_QUAD,
-    MESH_COUNT,
-};
-
-struct Entity
-{
-    MeshHnd mesh;
-};
-
 struct EntityData
 {
-    Entity    entities  [MAX_ENTITIES];
     Transform transforms[MAX_ENTITIES];
     uint32    count;
 };
@@ -67,24 +54,42 @@ struct VSBuffer
 
 struct Mesh
 {
-    Buffer vertexes;
-    Buffer indexes;
+    uint32 vertex_offset;
+    uint32 index_offset;
+    uint32 index_count;
 };
 
 struct RenderState
 {
-    Buffer        host_buffer;
-    Buffer        device_buffer;
-    Buffer        staging_buffer;
-    RenderTarget  render_target;
-    VertexLayout  vertex_layout;
-    Pipeline      pipeline;
-    VkSampler     sampler;
-    ShaderData    vs_buffer;
-    ShaderData    texture;
-    ShaderDataSet vs_buffer_data_set;
-    ShaderDataSet texture_data_set;
-    Array<Mesh>   meshes;
+    Buffer       host_buffer;
+    Buffer       device_buffer;
+    Buffer       staging_buffer;
+    RenderTarget render_target;
+    VertexLayout vertex_layout;
+    Pipeline     pipeline;
+    VkSampler    sampler;
+    struct
+    {
+        ShaderData vs_buffer;
+        ShaderData axis_cube_texture;
+        ShaderData dirt_block_texture;
+    }
+    data;
+    struct
+    {
+        ShaderDataSet vs_buffer;
+        ShaderDataSet axis_cube_texture;
+        ShaderDataSet dirt_block_texture;
+    }
+    data_set;
+    struct
+    {
+        Buffer vertex_buffer;
+        Buffer index_buffer;
+        Mesh   cube;
+        Mesh   quad;
+    }
+    mesh;
 };
 
 struct Vertex
@@ -168,28 +173,6 @@ static uint32 PushEntity(EntityData* entity_data)
     return new_entity;
 }
 
-static void InitEntities(Game* game)
-{
-    static constexpr uint32 CUBE_SIZE = 4;
-    static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
-    static_assert(CUBE_ENTITY_COUNT < MAX_ENTITIES);
-    for (uint32 z = 0; z < CUBE_SIZE; ++z)
-    for (uint32 y = 0; y < CUBE_SIZE; ++y)
-    for (uint32 x = 0; x < CUBE_SIZE; ++x)
-    {
-        uint32 entity = PushEntity(&game->entity_data);
-        game->entity_data.entities[entity] =
-        {
-            .mesh = entity % 2 ? MESH_CUBE : MESH_QUAD
-        };
-        game->entity_data.transforms[entity] =
-        {
-            .position = { x * 1.5f, y * 1.5f, z * 1.5f },
-            .rotation = { 0, 0, 0 },
-        };
-    }
-}
-
 static void InitGame(Game* game)
 {
     // View
@@ -204,7 +187,21 @@ static void InitGame(Game* game)
         .max_x_angle  = 85.0f,
     };
 
-    InitEntities(game);
+    // Entities
+    static constexpr uint32 CUBE_SIZE = 4;
+    static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
+    static_assert(CUBE_ENTITY_COUNT < MAX_ENTITIES);
+    for (uint32 x = 0; x < CUBE_SIZE; ++x)
+    for (uint32 y = 0; y < CUBE_SIZE; ++y)
+    for (uint32 z = 0; z < CUBE_SIZE; ++z)
+    {
+        uint32 entity = PushEntity(&game->entity_data);
+        game->entity_data.transforms[entity] =
+        {
+            .position = { x * 1.5f, y * 1.5f, z * 1.5f },
+            .rotation = { 0, 0, 0 },
+        };
+    }
 }
 
 static void ValidateIndex(EntityData* entity_data, uint32 index)
@@ -214,12 +211,6 @@ static void ValidateIndex(EntityData* entity_data, uint32 index)
         CTK_FATAL("can't access entity data at index %u: index exceeds highest index %u", index,
                   entity_data->count - 1);
     }
-}
-
-static Entity* GetEntityPtr(EntityData* entity_data, uint32 index)
-{
-    ValidateIndex(entity_data, index);
-    return entity_data->entities + index;
 }
 
 static Transform* GetTransformPtr(EntityData* entity_data, uint32 index)
@@ -371,9 +362,9 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
 {
     // vs_buffer
     {
-        rs->vs_buffer.stages    = VK_SHADER_STAGE_VERTEX_BIT;
-        rs->vs_buffer.type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        rs->vs_buffer.per_frame = true;
+        rs->data.vs_buffer.stages    = VK_SHADER_STAGE_VERTEX_BIT;
+        rs->data.vs_buffer.type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        rs->data.vs_buffer.per_frame = true;
         ShaderDataInfo info =
         {
             .buffer_info =
@@ -388,26 +379,47 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             }
         };
-        InitShaderData(&rs->vs_buffer, mem, rtk, &info);
+        InitShaderData(&rs->data.vs_buffer, mem, rtk, &info);
     }
 
-    // texture
+    // axis_cube_texture
     {
         ImageData image_data = {};
-        LoadImageData(&image_data, "images/dir_cube.png");
+        LoadImageData(&image_data, "images/axis_cube.png");
 
-        rs->texture.stages    = VK_SHADER_STAGE_FRAGMENT_BIT;
-        rs->texture.type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        rs->texture.per_frame = false;
-        rs->texture.sampler   = rs->sampler;
+        rs->data.axis_cube_texture.stages    = VK_SHADER_STAGE_FRAGMENT_BIT;
+        rs->data.axis_cube_texture.type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        rs->data.axis_cube_texture.per_frame = false;
+        rs->data.axis_cube_texture.sampler   = rs->sampler;
         ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, &image_data);
-        InitShaderData(&rs->texture, mem, rtk, &info);
+        InitShaderData(&rs->data.axis_cube_texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.
         Clear(&rs->staging_buffer);
         Write(&rs->staging_buffer, image_data.data, image_data.size);
-        for (uint32 i = 0; i < rs->texture.images.count; ++i)
-            WriteToShaderDataImage(&rs->texture, i, &rs->staging_buffer, rtk);
+        for (uint32 i = 0; i < rs->data.axis_cube_texture.images.count; ++i)
+            WriteToShaderDataImage(&rs->data.axis_cube_texture, i, &rs->staging_buffer, rtk);
+
+        DestroyImageData(&image_data);
+    }
+
+    // dirt_block_texture
+    {
+        ImageData image_data = {};
+        LoadImageData(&image_data, "images/dirt_block.png");
+
+        rs->data.dirt_block_texture.stages    = VK_SHADER_STAGE_FRAGMENT_BIT;
+        rs->data.dirt_block_texture.type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        rs->data.dirt_block_texture.per_frame = false;
+        rs->data.dirt_block_texture.sampler   = rs->sampler;
+        ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, &image_data);
+        InitShaderData(&rs->data.dirt_block_texture, mem, rtk, &info);
+
+        // Copy image data into staging buffer.
+        Clear(&rs->staging_buffer);
+        Write(&rs->staging_buffer, image_data.data, image_data.size);
+        for (uint32 i = 0; i < rs->data.dirt_block_texture.images.count; ++i)
+            WriteToShaderDataImage(&rs->data.dirt_block_texture, i, &rs->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
     }
@@ -419,18 +431,27 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
     {
         ShaderData* datas[] =
         {
-            &rs->vs_buffer,
+            &rs->data.vs_buffer,
         };
-        InitShaderDataSet(&rs->vs_buffer_data_set, mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        InitShaderDataSet(&rs->data_set.vs_buffer, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
-    // texture_data_set
+    // axis_cube_texture_data_set
     {
         ShaderData* datas[] =
         {
-            &rs->texture,
+            &rs->data.axis_cube_texture,
         };
-        InitShaderDataSet(&rs->texture_data_set, mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        InitShaderDataSet(&rs->data_set.axis_cube_texture, mem, temp_mem, rtk, WRAP_ARRAY(datas));
+    }
+
+    // dirt_block_texture_data_set
+    {
+        ShaderData* datas[] =
+        {
+            &rs->data.dirt_block_texture,
+        };
+        InitShaderDataSet(&rs->data_set.dirt_block_texture, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 }
 
@@ -450,8 +471,8 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
     };
     VkDescriptorSetLayout descriptor_set_layouts[] =
     {
-        rs->vs_buffer_data_set.layout,
-        rs->texture_data_set.layout,
+        rs->data_set.vs_buffer.layout,
+        rs->data_set.axis_cube_texture.layout,
     };
     VkPushConstantRange push_constant_ranges[] =
     {
@@ -472,26 +493,30 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
     InitPipeline(&rs->pipeline, temp_mem, &rs->render_target, rtk, &pipeline_info);
 }
 
+static void InitMesh(Mesh* mesh, RenderState* rs, uint32 index_count)
+{
+    mesh->vertex_offset = rs->mesh.vertex_buffer.index / sizeof(Vertex);
+    mesh->index_offset  = rs->mesh.index_buffer.index / sizeof(uint32);
+    mesh->index_count   = index_count;
+}
+
 static void LoadMeshData(RenderState* rs, Stack* mem)
 {
-    InitArrayFull(&rs->meshes, mem, MESH_COUNT);
+    InitBuffer(&rs->mesh.vertex_buffer, &rs->host_buffer, Megabyte(1));
+    InitBuffer(&rs->mesh.index_buffer, &rs->host_buffer, Megabyte(1));
 
     // Allocate vertex and index buffers from host memory, then write data to them.
     {
         #include "rtk/meshes/cube.h"
-        Mesh* cube = GetPtr(&rs->meshes, MESH_CUBE);
-        InitBuffer(&cube->vertexes, &rs->host_buffer, sizeof(vertexes));
-        InitBuffer(&cube->indexes, &rs->host_buffer, sizeof(indexes));
-        Write(&cube->vertexes, vertexes, sizeof(vertexes));
-        Write(&cube->indexes, indexes, sizeof(indexes));
+        InitMesh(&rs->mesh.cube, rs, CTK_ARRAY_SIZE(indexes));
+        Write(&rs->mesh.vertex_buffer, vertexes, sizeof(vertexes));
+        Write(&rs->mesh.index_buffer, indexes, sizeof(indexes));
     }
     {
         #include "rtk/meshes/quad.h"
-        Mesh* quad = GetPtr(&rs->meshes, MESH_QUAD);
-        InitBuffer(&quad->vertexes, &rs->host_buffer, sizeof(vertexes));
-        InitBuffer(&quad->indexes, &rs->host_buffer, sizeof(indexes));
-        Write(&quad->vertexes, vertexes, sizeof(vertexes));
-        Write(&quad->indexes, indexes, sizeof(indexes));
+        InitMesh(&rs->mesh.quad, rs, CTK_ARRAY_SIZE(indexes));
+        Write(&rs->mesh.vertex_buffer, vertexes, sizeof(vertexes));
+        Write(&rs->mesh.index_buffer, indexes, sizeof(indexes));
     }
 }
 
@@ -609,7 +634,7 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk)
 {
     // Update entity MVP matrixes.
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    auto frame_vs_buffer = GetBuffer<VSBuffer>(&rs->vs_buffer, rtk->frames.index);
+    auto frame_vs_buffer = GetBuffer<VSBuffer>(&rs->data.vs_buffer, rtk->frames.index);
     for (uint32 i = 0; i < game->entity_data.count; ++i)
     {
         Transform* entity_transform = GetTransformPtr(&game->entity_data, i);
@@ -629,45 +654,81 @@ static void UpdateRenderState(RenderState* rs, Game* game, RTKContext* rtk)
     UpdateMVPMatrixes(rs, game, rtk);
 }
 
+static void RenderEntities(uint32 start, uint32 count, VkCommandBuffer render_command_buffer, Pipeline* pipeline, Mesh* mesh)
+{
+    for (uint32 i = start; i < start + count; ++i)
+    {
+        vkCmdPushConstants(render_command_buffer, pipeline->layout,
+                           VK_SHADER_STAGE_VERTEX_BIT,
+                           0, sizeof(uint32), &i);
+        vkCmdDrawIndexed(render_command_buffer,
+                         mesh->index_count, // Index Count
+                         1, // Instance Count
+                         mesh->index_offset, // Index Offset
+                         mesh->vertex_offset, // Vertex Offset
+                         0); // First Instance
+    }
+}
+
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
     Pipeline* pipeline = &rs->pipeline;
+    uint32 entity_region_size = game->entity_data.count / 4;
+    uint32 entity_region_start = 0;
 
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, 0);
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 
-        // Bind mesh data buffers.
-        VkDescriptorSet sets[] =
+        // Bind per-pipeline shader data.
+        VkDescriptorSet pipeline_sets[] =
         {
-            Get(&rs->vs_buffer_data_set.hnds, rtk->frames.index),
-            Get(&rs->texture_data_set.hnds, rtk->frames.index),
+            Get(&rs->data_set.vs_buffer.hnds, rtk->frames.index),
         };
-        BindShaderDataSets(WRAP_ARRAY(sets), pipeline, render_command_buffer, 0);
+        BindShaderDataSets(WRAP_ARRAY(pipeline_sets), pipeline, render_command_buffer, 0);
 
-        for (uint32 i = 0; i < game->entity_data.count; ++i)
+        // Bind mesh data buffers.
+        vkCmdBindVertexBuffers(render_command_buffer,
+                               0, // First Binding
+                               1, // Binding Count
+                               &rs->mesh.vertex_buffer.hnd,
+                               &rs->mesh.vertex_buffer.offset);
+        vkCmdBindIndexBuffer(render_command_buffer,
+                             rs->mesh.index_buffer.hnd,
+                             rs->mesh.index_buffer.offset,
+                             VK_INDEX_TYPE_UINT32);
+
+        // Axis Cube Texture
         {
-            Entity* entity = GetEntityPtr(&game->entity_data, i);
-            Mesh* mesh = GetPtr(&rs->meshes, entity->mesh);
-            vkCmdBindVertexBuffers(render_command_buffer,
-                                   0, // First Binding
-                                   1, // Binding Count
-                                   &mesh->vertexes.hnd,
-                                   &mesh->vertexes.offset);
-            vkCmdBindIndexBuffer(render_command_buffer,
-                                 mesh->indexes.hnd,
-                                 mesh->indexes.offset,
-                                 VK_INDEX_TYPE_UINT32);
+            VkDescriptorSet texture_sets[] =
+            {
+                Get(&rs->data_set.axis_cube_texture.hnds, rtk->frames.index),
+            };
+            BindShaderDataSets(WRAP_ARRAY(texture_sets), pipeline, render_command_buffer, 1);
 
-            // Matrix* mvp_matrix = GetPtr<VSBuffer>(&rs->vs_buffer, rtk->frames.index)->mvp_matrixes + i;
-            vkCmdPushConstants(render_command_buffer, pipeline->layout,
-                               VK_SHADER_STAGE_VERTEX_BIT,
-                               0, sizeof(uint32), &i);
-            vkCmdDrawIndexed(render_command_buffer,
-                             36, // Index Count
-                             1, // Instance Count
-                             0, // Index Offset
-                             0, // Vertex Offset
-                             0); // First Instance
+            // Cube Mesh
+            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, &rs->mesh.cube);
+            entity_region_start += entity_region_size;
+
+            // Quad Mesh
+            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, &rs->mesh.quad);
+            entity_region_start += entity_region_size;
+        }
+
+        // Dirt Block Texture
+        {
+            VkDescriptorSet texture_sets[] =
+            {
+                Get(&rs->data_set.dirt_block_texture.hnds, rtk->frames.index),
+            };
+            BindShaderDataSets(WRAP_ARRAY(texture_sets), pipeline, render_command_buffer, 1);
+
+            // Cube Mesh
+            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, &rs->mesh.cube);
+            entity_region_start += entity_region_size;
+
+            // Quad Mesh
+            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, &rs->mesh.quad);
+            entity_region_start += entity_region_size;
         }
     EndRecordingRenderCommands(render_command_buffer);
 }

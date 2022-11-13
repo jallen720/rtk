@@ -300,10 +300,13 @@ static void InitSampler(RenderState* rs, RTKContext* rtk)
     Validate(res, "vkCreateSampler() failed");
 }
 
-static ShaderDataInfo DefaultImageShaderDataInfo(VkFormat format, ImageData* image_data)
+static ShaderDataInfo DefaultImageShaderDataInfo(VkFormat format, VkSampler sampler, ImageData* image_data)
 {
     return
     {
+        .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .per_frame = false,
         .image_info =
         {
             .image =
@@ -354,7 +357,8 @@ static ShaderDataInfo DefaultImageShaderDataInfo(VkFormat format, ImageData* ima
                 },
             },
             .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        }
+        },
+        .sampler = sampler,
     };
 }
 
@@ -362,11 +366,11 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
 {
     // vs_buffer
     {
-        rs->data.vs_buffer.stages    = VK_SHADER_STAGE_VERTEX_BIT;
-        rs->data.vs_buffer.type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        rs->data.vs_buffer.per_frame = true;
         ShaderDataInfo info =
         {
+            .stages    = VK_SHADER_STAGE_VERTEX_BIT,
+            .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .per_frame = true,
             .buffer_info =
             {
                 .size               = sizeof(VSBuffer),
@@ -387,11 +391,7 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         ImageData image_data = {};
         LoadImageData(&image_data, "images/axis_cube.png");
 
-        rs->data.axis_cube_texture.stages    = VK_SHADER_STAGE_FRAGMENT_BIT;
-        rs->data.axis_cube_texture.type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        rs->data.axis_cube_texture.per_frame = false;
-        rs->data.axis_cube_texture.sampler   = rs->sampler;
-        ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, &image_data);
+        ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
         InitShaderData(&rs->data.axis_cube_texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.
@@ -408,11 +408,7 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         ImageData image_data = {};
         LoadImageData(&image_data, "images/dirt_block.png");
 
-        rs->data.dirt_block_texture.stages    = VK_SHADER_STAGE_FRAGMENT_BIT;
-        rs->data.dirt_block_texture.type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        rs->data.dirt_block_texture.per_frame = false;
-        rs->data.dirt_block_texture.sampler   = rs->sampler;
-        ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, &image_data);
+        ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
         InitShaderData(&rs->data.dirt_block_texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.

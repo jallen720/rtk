@@ -14,10 +14,20 @@ namespace RTK
 
 /// Data
 ////////////////////////////////////////////////////////////
-union ShaderDataInfo
+struct ShaderDataInfo
 {
-    BufferInfo buffer_info;
-    ImageInfo  image_info;
+    VkShaderStageFlags stages;
+    VkDescriptorType   type;
+    bool               per_frame;
+    union
+    {
+        BufferInfo buffer_info;
+        struct
+        {
+            ImageInfo image_info;
+            VkSampler sampler;
+        };
+    };
 };
 
 struct ShaderData
@@ -46,6 +56,10 @@ struct ShaderDataSet
 ////////////////////////////////////////////////////////////
 static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk, ShaderDataInfo* info)
 {
+    shader_data->stages    = info->stages;
+    shader_data->type      = info->type;
+    shader_data->per_frame = info->per_frame;
+
     uint32 instance_count = shader_data->per_frame ? rtk->frames.size : 1;
 
     if (shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
@@ -57,6 +71,8 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
+        shader_data->sampler = info->sampler;
+
         InitArray(&shader_data->images, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
             InitImage(Push(&shader_data->images), rtk, &info->image_info);

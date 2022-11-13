@@ -300,7 +300,7 @@ static void InitSampler(RenderState* rs, RTKContext* rtk)
     Validate(res, "vkCreateSampler() failed");
 }
 
-static ShaderDataInfo DefaultImageShaderDataInfo(VkFormat format, VkSampler sampler, ImageData* image_data)
+static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, ImageData* image_data)
 {
     return
     {
@@ -391,7 +391,7 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         ImageData image_data = {};
         LoadImageData(&image_data, "images/axis_cube.png");
 
-        ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
+        ShaderDataInfo info = DefaultTextureInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
         InitShaderData(&rs->data.axis_cube_texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.
@@ -408,7 +408,7 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         ImageData image_data = {};
         LoadImageData(&image_data, "images/dirt_block.png");
 
-        ShaderDataInfo info = DefaultImageShaderDataInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
+        ShaderDataInfo info = DefaultTextureInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
         InitShaderData(&rs->data.dirt_block_texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.
@@ -672,7 +672,8 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
     uint32 entity_region_size = game->entity_data.count / 4;
     uint32 entity_region_start = 0;
 
-    VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, 0);
+    static constexpr uint32 THREAD_INDEX = 0;
+    VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, THREAD_INDEX);
         vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 
         // Bind per-pipeline shader data.

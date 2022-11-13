@@ -120,14 +120,14 @@ static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_inde
             },
         };
         vkCmdPipelineBarrier(rtk->temp_command_buffer,
-                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
                              0, // Dependency Flags
                              0, // Memory Barrier Count
                              NULL, // Memory Barriers
                              0, // Buffer Memory Barrier Count
                              NULL, // Buffer Memory Barriers
-                             1, // Image Memory Count
+                             1, // Image Memory Barrier Count
                              &image_mem_barrier); // Image Memory Barriers
 
         VkBufferImageCopy copy =
@@ -174,14 +174,14 @@ static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_inde
             },
         };
         vkCmdPipelineBarrier(rtk->temp_command_buffer,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
                              0, // Dependency Flags
                              0, // Memory Barrier Count
                              NULL, // Memory Barriers
                              0, // Buffer Memory Barrier Count
                              NULL, // Buffer Memory Barriers
-                             1, // Image Memory Count
+                             1, // Image Memory Barrier Count
                              &image_mem_barrier2); // Image Memory Barriers
     SubmitTempCommandBuffer(rtk);
 }

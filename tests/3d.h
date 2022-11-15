@@ -52,13 +52,6 @@ struct VSBuffer
     Matrix mvp_matrixes[MAX_ENTITIES];
 };
 
-struct Mesh
-{
-    uint32 vertex_offset;
-    uint32 index_offset;
-    uint32 index_count;
-};
-
 struct RenderState
 {
     Buffer       host_buffer;
@@ -84,10 +77,8 @@ struct RenderState
     data_set;
     struct
     {
-        Buffer vertex_buffer;
-        Buffer index_buffer;
-        Mesh   cube;
-        Mesh   quad;
+        MeshHnd cube;
+        MeshHnd quad;
     }
     mesh;
 };
@@ -113,52 +104,6 @@ static void SelectPhysicalDevice(RTKContext* rtk)
     }
 
     LogPhysicalDevice(rtk->physical_device, "selected physical device");
-}
-
-static void InitRTK(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window)
-{
-    VkDescriptorPoolSize descriptor_pool_sizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
-    };
-
-    RTKInfo rtk_info =
-    {
-        .application_name = "RTK Test",
-#ifdef RTK_ENABLE_VALIDATION
-        .debug_callback         = DefaultDebugCallback,
-        .debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                  // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        .debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-#endif
-        .required_features =
-        {
-            .as_struct =
-            {
-                .geometryShader    = VK_TRUE,
-                .samplerAnisotropy = VK_TRUE,
-            },
-        },
-        .max_physical_devices  = 8,
-        .render_thread_count   = 1,
-        .descriptor_pool_sizes = WRAP_ARRAY(descriptor_pool_sizes),
-    };
-
-    InitRTKContext(rtk, mem, temp_mem, window, &rtk_info);
 }
 
 /// Game
@@ -489,34 +434,35 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
     InitPipeline(&rs->pipeline, temp_mem, &rs->render_target, rtk, &pipeline_info);
 }
 
-static void InitMesh(Mesh* mesh, RenderState* rs, uint32 index_count)
-{
-    mesh->vertex_offset = rs->mesh.vertex_buffer.index / sizeof(Vertex);
-    mesh->index_offset  = rs->mesh.index_buffer.index / sizeof(uint32);
-    mesh->index_count   = index_count;
-}
+// static void InitMesh(Mesh* mesh, RenderState* rs, uint32 index_count)
+// {
+//     mesh->vertex_offset = rs->mesh.vertex_buffer.index / sizeof(Vertex);
+//     mesh->index_offset  = rs->mesh.index_buffer.index / sizeof(uint32);
+//     mesh->index_count   = index_count;
+// }
 
-static void LoadMeshData(RenderState* rs, Stack* mem)
+static void InitMeshes(RenderState* rs, RTKState* rtk_state)
 {
-    InitBuffer(&rs->mesh.vertex_buffer, &rs->host_buffer, Megabyte(1));
-    InitBuffer(&rs->mesh.index_buffer, &rs->host_buffer, Megabyte(1));
+    // InitBuffer(&rs->mesh.vertex_buffer, &rs->host_buffer, Megabyte(1));
+    // InitBuffer(&rs->mesh.index_buffer, &rs->host_buffer, Megabyte(1));
 
-    // Allocate vertex and index buffers from host memory, then write data to them.
     {
         #include "rtk/meshes/cube.h"
-        InitMesh(&rs->mesh.cube, rs, CTK_ARRAY_SIZE(indexes));
-        Write(&rs->mesh.vertex_buffer, vertexes, sizeof(vertexes));
-        Write(&rs->mesh.index_buffer, indexes, sizeof(indexes));
+        rs->mesh.cube = CreateMesh<Vertex>(rtk_state, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
+        // InitMesh(&rs->mesh.cube, rs, CTK_ARRAY_SIZE(indexes));
+        // Write(&rs->mesh.vertex_buffer, vertexes, sizeof(vertexes));
+        // Write(&rs->mesh.index_buffer, indexes, sizeof(indexes));
     }
     {
         #include "rtk/meshes/quad.h"
-        InitMesh(&rs->mesh.quad, rs, CTK_ARRAY_SIZE(indexes));
-        Write(&rs->mesh.vertex_buffer, vertexes, sizeof(vertexes));
-        Write(&rs->mesh.index_buffer, indexes, sizeof(indexes));
+        rs->mesh.quad = CreateMesh<Vertex>(rtk_state, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
+        // InitMesh(&rs->mesh.quad, rs, CTK_ARRAY_SIZE(indexes));
+        // Write(&rs->mesh.vertex_buffer, vertexes, sizeof(vertexes));
+        // Write(&rs->mesh.index_buffer, indexes, sizeof(indexes));
     }
 }
 
-static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
+static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk, RTKState* rtk_state)
 {
     InitGraphicsMem(rs, rtk);
     InitRenderTargets(rs, mem, temp_mem, rtk);
@@ -525,7 +471,7 @@ static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKCont
     InitShaderDatas(rs, mem, rtk);
     InitShaderDataSets(rs, mem, temp_mem, rtk);
     InitPipelines(rs, temp_mem, rtk);
-    LoadMeshData(rs, mem);
+    InitMeshes(rs, rtk_state);
 }
 
 /// Game Update
@@ -650,27 +596,25 @@ static void UpdateRenderState(RenderState* rs, Game* game, RTKContext* rtk)
     UpdateMVPMatrixes(rs, game, rtk);
 }
 
-static void RenderEntities(uint32 start, uint32 count, VkCommandBuffer render_command_buffer, Pipeline* pipeline, Mesh* mesh)
+static void RenderEntities(uint32 start, uint32 count, VkCommandBuffer render_command_buffer, Pipeline* pipeline,
+                           Mesh* mesh)
 {
     for (uint32 i = start; i < start + count; ++i)
     {
         vkCmdPushConstants(render_command_buffer, pipeline->layout,
                            VK_SHADER_STAGE_VERTEX_BIT,
                            0, sizeof(uint32), &i);
-        vkCmdDrawIndexed(render_command_buffer,
-                         mesh->index_count, // Index Count
-                         1, // Instance Count
-                         mesh->index_offset, // Index Offset
-                         mesh->vertex_offset, // Vertex Offset
-                         0); // First Instance
+        DrawMesh(render_command_buffer, mesh);
     }
 }
 
-static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
+static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, RTKState* rtk_state)
 {
     Pipeline* pipeline = &rs->pipeline;
     uint32 entity_region_size = game->entity_data.count / 4;
     uint32 entity_region_start = 0;
+    Mesh* cube_mesh = GetNodeData(&rtk_state->mesh.pool, rs->mesh.cube);
+    Mesh* quad_mesh = GetNodeData(&rtk_state->mesh.pool, rs->mesh.quad);
 
     static constexpr uint32 THREAD_INDEX = 0;
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, THREAD_INDEX);
@@ -680,26 +624,18 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
         BindShaderDataSet(&rs->data_set.entity_data, pipeline, rtk, render_command_buffer, 0);
 
         // Bind mesh data buffers.
-        vkCmdBindVertexBuffers(render_command_buffer,
-                               0, // First Binding
-                               1, // Binding Count
-                               &rs->mesh.vertex_buffer.hnd,
-                               &rs->mesh.vertex_buffer.offset);
-        vkCmdBindIndexBuffer(render_command_buffer,
-                             rs->mesh.index_buffer.hnd,
-                             rs->mesh.index_buffer.offset,
-                             VK_INDEX_TYPE_UINT32);
+        BindMeshBuffers(rtk_state, render_command_buffer);
 
         // Axis Cube Texture
         {
             BindShaderDataSet(&rs->data_set.axis_cube_texture, pipeline, rtk, render_command_buffer, 1);
 
             // Cube Mesh
-            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, &rs->mesh.cube);
+            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, cube_mesh);
             entity_region_start += entity_region_size;
 
             // Quad Mesh
-            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, &rs->mesh.quad);
+            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, quad_mesh);
             entity_region_start += entity_region_size;
         }
 
@@ -708,11 +644,11 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
             BindShaderDataSet(&rs->data_set.dirt_block_texture, pipeline, rtk, render_command_buffer, 1);
 
             // Cube Mesh
-            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, &rs->mesh.cube);
+            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, cube_mesh);
             entity_region_start += entity_region_size;
 
             // Quad Mesh
-            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, &rs->mesh.quad);
+            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, quad_mesh);
             entity_region_start += entity_region_size;
         }
     EndRecordingRenderCommands(render_command_buffer);
@@ -723,7 +659,9 @@ void TestMain()
     Stack* mem = CreateStack(Megabyte(4));
     Stack* temp_mem = CreateStack(mem, Megabyte(1));
 
+    // Init Win32 + Window
     InitWin32();
+
     WindowInfo window_info =
     {
         .surface =
@@ -739,14 +677,67 @@ void TestMain()
     auto window = Allocate<Window>(mem, 1);
     InitWindow(window, &window_info);
 
+    // Init RTK Context + State
+    VkDescriptorPoolSize descriptor_pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
+    };
+    RTKInfo rtk_info =
+    {
+        .application_name = "RTK Test",
+#ifdef RTK_ENABLE_VALIDATION
+        .debug_callback         = DefaultDebugCallback,
+        .debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                  // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+        .debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+#endif
+        .required_features =
+        {
+            .as_struct =
+            {
+                .geometryShader    = VK_TRUE,
+                .samplerAnisotropy = VK_TRUE,
+            },
+        },
+        .max_physical_devices  = 8,
+        .render_thread_count   = 1,
+        .descriptor_pool_sizes = WRAP_ARRAY(descriptor_pool_sizes),
+    };
     auto rtk = Allocate<RTKContext>(mem, 1);
-    InitRTK(rtk, mem, *temp_mem, window);
+    InitRTKContext(rtk, mem, *temp_mem, window, &rtk_info);
 
+    RTKStateInfo rtk_state_info =
+    {
+        .mesh =
+        {
+            .vertex_buffer_size = Megabyte(1),
+            .index_buffer_size  = Megabyte(1),
+            .pool_size          = 64,
+        },
+    };
+    auto rtk_state = Allocate<RTKState>(mem, 1);
+    InitRTKState(rtk_state, mem, rtk, &rtk_state_info);
+
+    // Init Game
     auto game = Allocate<Game>(mem, 1);
     InitGame(game);
 
     auto rs = Allocate<RenderState>(mem, 1);
-    InitRenderState(rs, mem, *temp_mem, rtk);
+    InitRenderState(rs, mem, *temp_mem, rtk, rtk_state);
 
     // Run game.
     while (1)
@@ -760,7 +751,7 @@ void TestMain()
             NextFrame(rtk);
             UpdateGame(game, rtk, window);
             UpdateRenderState(rs, game, rtk);
-            RecordRenderCommands(game, rs, rtk);
+            RecordRenderCommands(game, rs, rtk, rtk_state);
             SubmitRenderCommands(rtk, &rs->render_target);
         }
         else

@@ -613,8 +613,8 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, R
     Pipeline* pipeline = &rs->pipeline;
     uint32 entity_region_size = game->entity_data.count / 4;
     uint32 entity_region_start = 0;
-    Mesh* cube_mesh = GetNodeData(&rtk_state->mesh.pool, rs->mesh.cube);
-    Mesh* quad_mesh = GetNodeData(&rtk_state->mesh.pool, rs->mesh.quad);
+    Mesh* cube_mesh = GetDataPtr(&rtk_state->mesh_pool, rs->mesh.cube);
+    Mesh* quad_mesh = GetDataPtr(&rtk_state->mesh_pool, rs->mesh.quad);
 
     static constexpr uint32 THREAD_INDEX = 0;
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, THREAD_INDEX);
@@ -722,12 +722,11 @@ void TestMain()
 
     RTKStateInfo rtk_state_info =
     {
-        .mesh =
-        {
-            .vertex_buffer_size = Megabyte(1),
-            .index_buffer_size  = Megabyte(1),
-            .pool_size          = 64,
-        },
+        .max_meshes  = 64,
+        .max_buffers = 64,
+
+        .vertex_buffer_size = Megabyte(1),
+        .index_buffer_size  = Megabyte(1),
     };
     auto rtk_state = Allocate<RTKState>(mem, 1);
     InitRTKState(rtk_state, mem, rtk, &rtk_state_info);

@@ -10,13 +10,15 @@ namespace RTK
 
 /// Data
 ////////////////////////////////////////////////////////////
-static constexpr uint32 NO_NODE = U32_MAX;
+using PoolHnd = uint32;
+
+static constexpr PoolHnd NO_NODE = U32_MAX;
 
 template<typename Type>
 union RTKPoolNode
 {
-    Type   data;
-    uint32 next;
+    Type    data;
+    PoolHnd next;
 };
 
 template<typename Type>
@@ -24,9 +26,20 @@ struct RTKPool
 {
     RTKPoolNode<Type>* nodes;
     uint32             size;
-    uint32             next_free;
+    PoolHnd            next_free;
 };
 
+/// Utils
+////////////////////////////////////////////////////////////
+template<typename Type>
+static void ValidatePoolCanAllocate(RTKPool<Type>* pool)
+{
+    if (pool->next_free == NO_NODE)
+        CTK_FATAL("can't allocate node from pool: pool has no free nodes");
+}
+
+/// Interface
+////////////////////////////////////////////////////////////
 template<typename Type>
 static void InitRTKPool(RTKPool<Type>* pool, Stack* mem, uint32 size)
 {
@@ -35,30 +48,37 @@ static void InitRTKPool(RTKPool<Type>* pool, Stack* mem, uint32 size)
     pool->next_free = 0;
 
     // Point all nodes to next node in array, and last node to nothing.
-    for (uint32 i = 0; i < size - 1; ++i)
-        pool->nodes[i].next = i + 1;
+    for (PoolHnd hnd = 0; hnd < size - 1; ++hnd)
+        pool->nodes[hnd].next = hnd + 1;
 
     pool->nodes[size - 1].next = NO_NODE;
 }
 
 template<typename Type>
-static uint32 Allocate(RTKPool<Type>* pool)
+static PoolHnd AllocateHnd(RTKPool<Type>* pool)
 {
-    if (pool->next_free == NO_NODE)
-        CTK_FATAL("can't allocate node from pool: pool has no free nodes");
-
-    uint32 allocated_node = pool->next_free;
+    ValidatePoolCanAllocate(pool);
+    PoolHnd allocated_node = pool->next_free;
     pool->next_free = pool->nodes[allocated_node].next;
     return allocated_node;
 }
 
 template<typename Type>
-static Type* GetNodeData(RTKPool<Type>* pool, uint32 index)
+static Type* AllocatePtr(RTKPool<Type>* pool)
 {
-    if (index >= pool->size)
-        CTK_FATAL("can't access pool node at index %u: index exceeds max index %u", index, pool->size - 1);
+    ValidatePoolCanAllocate(pool);
+    RTKPoolNode<Type>* allocated_node = pool->nodes + pool->next_free;
+    pool->next_free = allocated_node->next;
+    return &allocated_node->data;
+}
 
-    return &pool->nodes[index].data;
+template<typename Type>
+static Type* GetDataPtr(RTKPool<Type>* pool, PoolHnd hnd)
+{
+    if (hnd >= pool->size)
+        CTK_FATAL("can't access pool node at handle %u: handle exceeds max handle %u", hnd, pool->size - 1);
+
+    return &pool->nodes[hnd].data;
 }
 
 }

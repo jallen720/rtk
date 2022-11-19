@@ -48,11 +48,11 @@ static void BindMeshBuffers(RTKState* state, VkCommandBuffer render_command_buff
     vkCmdBindVertexBuffers(render_command_buffer,
                            0, // First Binding
                            1, // Binding Count
-                           &state->mesh.vertex_buffer.hnd,
-                           &state->mesh.vertex_buffer.offset);
+                           &state->vertex_buffer->hnd,
+                           &state->vertex_buffer->offset);
     vkCmdBindIndexBuffer(render_command_buffer,
-                         state->mesh.index_buffer.hnd,
-                         state->mesh.index_buffer.offset,
+                         state->index_buffer->hnd,
+                         state->index_buffer->offset,
                          VK_INDEX_TYPE_UINT32);
 }
 

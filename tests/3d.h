@@ -136,7 +136,7 @@ static void InitGame(Game* game)
     // Entities
     static constexpr uint32 CUBE_SIZE = 4;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
-    static_assert(CUBE_ENTITY_COUNT < MAX_ENTITIES);
+    static_assert(CUBE_ENTITY_COUNT <= MAX_ENTITIES);
     for (uint32 x = 0; x < CUBE_SIZE; ++x)
     for (uint32 y = 0; y < CUBE_SIZE; ++y)
     for (uint32 z = 0; z < CUBE_SIZE; ++z)

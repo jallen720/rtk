@@ -590,55 +590,50 @@ static void UpdateRenderState(RenderState* rs, Game* game, RTKContext* rtk)
     UpdateMVPMatrixes(rs, game, rtk);
 }
 
-static void RenderEntities(uint32 start, uint32 count, VkCommandBuffer render_command_buffer, Pipeline* pipeline,
-                           Mesh* mesh)
-{
-}
-
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
     Pipeline* pipeline = &rs->pipeline;
     Mesh* cube_mesh = &rs->mesh.cube;
     Mesh* quad_mesh = &rs->mesh.quad;
-    uint32 entity_region_size = game->entity_data.count / 4;
+    uint32 entity_region_count = game->entity_data.count / 4;
     uint32 entity_region_start = 0;
 
     static constexpr uint32 THREAD_INDEX = 0;
-    VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, THREAD_INDEX);
-        vkCmdBindPipeline(render_command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
+    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, THREAD_INDEX);
+        BindPipeline(command_buffer, pipeline);
 
         // Bind per-pipeline shader data.
-        BindShaderDataSet(&rs->data_set.entity_data, pipeline, rtk, render_command_buffer, 0);
+        BindShaderDataSet(command_buffer, &rs->data_set.entity_data, pipeline, rtk, 0);
 
         // Bind mesh data buffers.
-        BindMeshData(&rs->mesh.data, render_command_buffer);
+        BindMeshData(command_buffer, &rs->mesh.data);
 
         // Axis Cube Texture
         {
-            BindShaderDataSet(&rs->data_set.axis_cube_texture, pipeline, rtk, render_command_buffer, 1);
+            BindShaderDataSet(command_buffer, &rs->data_set.axis_cube_texture, pipeline, rtk, 1);
 
             // Cube Mesh
-            DrawMesh(render_command_buffer, cube_mesh, entity_region_start, entity_region_size);
-            entity_region_start += entity_region_size;
+            DrawMesh(command_buffer, cube_mesh, entity_region_start, entity_region_count);
+            entity_region_start += entity_region_count;
 
             // Quad Mesh
-            DrawMesh(render_command_buffer, quad_mesh, entity_region_start, entity_region_size);
-            entity_region_start += entity_region_size;
+            DrawMesh(command_buffer, quad_mesh, entity_region_start, entity_region_count);
+            entity_region_start += entity_region_count;
         }
 
         // Dirt Block Texture
         {
-            BindShaderDataSet(&rs->data_set.dirt_block_texture, pipeline, rtk, render_command_buffer, 1);
+            BindShaderDataSet(command_buffer, &rs->data_set.dirt_block_texture, pipeline, rtk, 1);
 
             // Cube Mesh
-            DrawMesh(render_command_buffer, cube_mesh, entity_region_start, entity_region_size);
-            entity_region_start += entity_region_size;
+            DrawMesh(command_buffer, cube_mesh, entity_region_start, entity_region_count);
+            entity_region_start += entity_region_count;
 
             // Quad Mesh
-            DrawMesh(render_command_buffer, quad_mesh, entity_region_start, entity_region_size);
-            entity_region_start += entity_region_size;
+            DrawMesh(command_buffer, quad_mesh, entity_region_start, entity_region_count);
+            entity_region_start += entity_region_count;
         }
-    EndRecordingRenderCommands(render_command_buffer);
+    EndRecordingRenderCommands(command_buffer);
 }
 
 void TestMain()

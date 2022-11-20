@@ -3,6 +3,8 @@
 #include "rtk/vulkan.h"
 #include "rtk/rtk_context.h"
 #include "rtk/render_target.h"
+#include "rtk/pipeline.h"
+#include "rtk/shader_data.h"
 #include "rtk/mesh_data.h"
 #include "ctk2/ctk.h"
 #include "ctk2/containers.h"
@@ -18,7 +20,7 @@ static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, RenderTarge
                                                     uint32 render_thread_index)
 {
     Frame* frame = rtk->frame;
-    VkCommandBuffer render_command_buffer = Get(&frame->render_command_buffers, render_thread_index);
+    VkCommandBuffer command_buffer = Get(&frame->render_command_buffers, render_thread_index);
 
     VkCommandBufferInheritanceInfo inheritance_info =
     {
@@ -37,28 +39,48 @@ static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, RenderTarge
         .flags            = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
         .pInheritanceInfo = &inheritance_info,
     };
-    VkResult res = vkBeginCommandBuffer(render_command_buffer, &command_buffer_begin_info);
+    VkResult res = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
     Validate(res, "vkBeginCommandBuffer() failed");
 
-    return render_command_buffer;
+    return command_buffer;
 }
 
-static void BindMeshData(MeshData* mesh_data, VkCommandBuffer render_command_buffer)
+static void BindPipeline(VkCommandBuffer command_buffer, Pipeline* pipeline)
 {
-    vkCmdBindVertexBuffers(render_command_buffer,
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
+}
+
+static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSet* set, Pipeline* pipeline, RTKContext* rtk,
+                              uint32 binding)
+{
+    VkDescriptorSet descriptor_sets[] =
+    {
+        Get(&set->hnds, rtk->frames.index)
+    };
+    vkCmdBindDescriptorSets(command_buffer,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipeline->layout,
+                            binding, // First set
+                            CTK_ARRAY_SIZE(descriptor_sets), descriptor_sets, // Descriptor Set
+                            0, NULL); // Dynamic Offsets
+}
+
+static void BindMeshData(VkCommandBuffer command_buffer, MeshData* mesh_data)
+{
+    vkCmdBindVertexBuffers(command_buffer,
                            0, // First Binding
                            1, // Binding Count
                            &mesh_data->vertex_buffer.hnd,
                            &mesh_data->vertex_buffer.offset);
-    vkCmdBindIndexBuffer(render_command_buffer,
+    vkCmdBindIndexBuffer(command_buffer,
                          mesh_data->index_buffer.hnd,
                          mesh_data->index_buffer.offset,
                          VK_INDEX_TYPE_UINT32);
 }
 
-static void DrawMesh(VkCommandBuffer render_command_buffer, Mesh* mesh, uint32 instance_start, uint32 instance_count)
+static void DrawMesh(VkCommandBuffer command_buffer, Mesh* mesh, uint32 instance_start, uint32 instance_count)
 {
-    vkCmdDrawIndexed(render_command_buffer,
+    vkCmdDrawIndexed(command_buffer,
                      mesh->index_count,   // Index Count
                      instance_count,      // Instance Count
                      mesh->index_offset,  // Index Offset
@@ -66,9 +88,9 @@ static void DrawMesh(VkCommandBuffer render_command_buffer, Mesh* mesh, uint32 i
                      instance_start);     // First Instance
 }
 
-static void EndRecordingRenderCommands(VkCommandBuffer render_command_buffer)
+static void EndRecordingRenderCommands(VkCommandBuffer command_buffer)
 {
-    VkResult res = vkEndCommandBuffer(render_command_buffer);
+    VkResult res = vkEndCommandBuffer(command_buffer);
     Validate(res, "vkEndCommandBuffer() failed");
 }
 

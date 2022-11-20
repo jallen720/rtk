@@ -78,7 +78,7 @@
     <ClInclude Include="rtk_pool.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="rtk_state.h">
+    <ClInclude Include="mesh_data.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

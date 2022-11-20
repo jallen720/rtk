@@ -2,8 +2,8 @@
 
 #include "rtk/vulkan.h"
 #include "rtk/rtk_context.h"
-#include "rtk/rtk_state.h"
 #include "rtk/render_target.h"
+#include "rtk/mesh_data.h"
 #include "ctk2/ctk.h"
 #include "ctk2/containers.h"
 
@@ -43,16 +43,16 @@ static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, RenderTarge
     return render_command_buffer;
 }
 
-static void BindMeshBuffers(RTKState* state, VkCommandBuffer render_command_buffer)
+static void BindMeshData(MeshData* mesh_data, VkCommandBuffer render_command_buffer)
 {
     vkCmdBindVertexBuffers(render_command_buffer,
                            0, // First Binding
                            1, // Binding Count
-                           &state->vertex_buffer->hnd,
-                           &state->vertex_buffer->offset);
+                           &mesh_data->vertex_buffer.hnd,
+                           &mesh_data->vertex_buffer.offset);
     vkCmdBindIndexBuffer(render_command_buffer,
-                         state->index_buffer->hnd,
-                         state->index_buffer->offset,
+                         mesh_data->index_buffer.hnd,
+                         mesh_data->index_buffer.offset,
                          VK_INDEX_TYPE_UINT32);
 }
 

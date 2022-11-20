@@ -77,8 +77,9 @@ struct RenderState
     data_set;
     struct
     {
-        MeshHnd cube;
-        MeshHnd quad;
+        MeshData data;
+        Mesh     cube;
+        Mesh     quad;
     }
     mesh;
 };
@@ -434,35 +435,28 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
     InitPipeline(&rs->pipeline, temp_mem, &rs->render_target, rtk, &pipeline_info);
 }
 
-// static void InitMesh(Mesh* mesh, RenderState* rs, uint32 index_count)
-// {
-//     mesh->vertex_offset = rs->mesh.vertex_buffer.index / sizeof(Vertex);
-//     mesh->index_offset  = rs->mesh.index_buffer.index / sizeof(uint32);
-//     mesh->index_count   = index_count;
-// }
-
-static void InitMeshes(RenderState* rs, RTKState* rtk_state)
+static void InitMeshes(RenderState* rs)
 {
-    // InitBuffer(&rs->mesh.vertex_buffer, &rs->host_buffer, Megabyte(1));
-    // InitBuffer(&rs->mesh.index_buffer, &rs->host_buffer, Megabyte(1));
+    MeshDataInfo mesh_data_info =
+    {
+        .parent_buffer      = &rs->host_buffer,
+        .vertex_buffer_size = Megabyte(1),
+        .index_buffer_size  = Megabyte(1),
+    };
+    InitMeshData(&rs->mesh.data, &mesh_data_info);
 
     {
         #include "rtk/meshes/cube.h"
-        rs->mesh.cube = CreateMesh<Vertex>(rtk_state, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
-        // InitMesh(&rs->mesh.cube, rs, CTK_ARRAY_SIZE(indexes));
-        // Write(&rs->mesh.vertex_buffer, vertexes, sizeof(vertexes));
-        // Write(&rs->mesh.index_buffer, indexes, sizeof(indexes));
+        InitMesh<Vertex>(&rs->mesh.cube, &rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
     }
+
     {
         #include "rtk/meshes/quad.h"
-        rs->mesh.quad = CreateMesh<Vertex>(rtk_state, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
-        // InitMesh(&rs->mesh.quad, rs, CTK_ARRAY_SIZE(indexes));
-        // Write(&rs->mesh.vertex_buffer, vertexes, sizeof(vertexes));
-        // Write(&rs->mesh.index_buffer, indexes, sizeof(indexes));
+        InitMesh<Vertex>(&rs->mesh.quad, &rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
     }
 }
 
-static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk, RTKState* rtk_state)
+static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
     InitGraphicsMem(rs, rtk);
     InitRenderTargets(rs, mem, temp_mem, rtk);
@@ -471,7 +465,7 @@ static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKCont
     InitShaderDatas(rs, mem, rtk);
     InitShaderDataSets(rs, mem, temp_mem, rtk);
     InitPipelines(rs, temp_mem, rtk);
-    InitMeshes(rs, rtk_state);
+    InitMeshes(rs);
 }
 
 /// Game Update
@@ -608,13 +602,13 @@ static void RenderEntities(uint32 start, uint32 count, VkCommandBuffer render_co
     }
 }
 
-static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, RTKState* rtk_state)
+static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
     Pipeline* pipeline = &rs->pipeline;
+    Mesh* cube_mesh = &rs->mesh.cube;
+    Mesh* quad_mesh = &rs->mesh.quad;
     uint32 entity_region_size = game->entity_data.count / 4;
     uint32 entity_region_start = 0;
-    Mesh* cube_mesh = GetDataPtr(&rtk_state->mesh_pool, rs->mesh.cube);
-    Mesh* quad_mesh = GetDataPtr(&rtk_state->mesh_pool, rs->mesh.quad);
 
     static constexpr uint32 THREAD_INDEX = 0;
     VkCommandBuffer render_command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, THREAD_INDEX);
@@ -624,7 +618,7 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, R
         BindShaderDataSet(&rs->data_set.entity_data, pipeline, rtk, render_command_buffer, 0);
 
         // Bind mesh data buffers.
-        BindMeshBuffers(rtk_state, render_command_buffer);
+        BindMeshData(&rs->mesh.data, render_command_buffer);
 
         // Axis Cube Texture
         {
@@ -720,23 +714,12 @@ void TestMain()
     auto rtk = Allocate<RTKContext>(mem, 1);
     InitRTKContext(rtk, mem, *temp_mem, window, &rtk_info);
 
-    RTKStateInfo rtk_state_info =
-    {
-        .max_meshes  = 64,
-        .max_buffers = 64,
-
-        .vertex_buffer_size = Megabyte(1),
-        .index_buffer_size  = Megabyte(1),
-    };
-    auto rtk_state = Allocate<RTKState>(mem, 1);
-    InitRTKState(rtk_state, mem, rtk, &rtk_state_info);
-
     // Init Game
     auto game = Allocate<Game>(mem, 1);
     InitGame(game);
 
     auto rs = Allocate<RenderState>(mem, 1);
-    InitRenderState(rs, mem, *temp_mem, rtk, rtk_state);
+    InitRenderState(rs, mem, *temp_mem, rtk);
 
     // Run game.
     while (1)
@@ -750,7 +733,7 @@ void TestMain()
             NextFrame(rtk);
             UpdateGame(game, rtk, window);
             UpdateRenderState(rs, game, rtk);
-            RecordRenderCommands(game, rs, rtk, rtk_state);
+            RecordRenderCommands(game, rs, rtk);
             SubmitRenderCommands(rtk, &rs->render_target);
         }
         else

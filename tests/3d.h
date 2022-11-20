@@ -659,6 +659,9 @@ void TestMain()
     auto window = Allocate<Window>(mem, 1);
     InitWindow(window, &window_info);
 
+    // Init Threadpool
+    // auto thread_pool = CreateThreadPool(mem, 8);
+
     // Init RTK Context + State
     VkDescriptorPoolSize descriptor_pool_sizes[] =
     {

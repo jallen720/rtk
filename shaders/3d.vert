@@ -14,14 +14,14 @@ layout (set = 0, binding = 0) uniform VSBuffer
 }
 vs_buffer;
 
-layout (push_constant) uniform PushConstants
-{
-    uint entity_index;
-}
-push_constants;
+// layout (push_constant) uniform PushConstants
+// {
+//     uint entity_index;
+// }
+// push_constants;
 
 void main()
 {
-    gl_Position = vs_buffer.mvp_matrixes[push_constants.entity_index] * vec4(in_vert_pos, 1);
+    gl_Position = vs_buffer.mvp_matrixes[gl_InstanceIndex] * vec4(in_vert_pos, 1);
     out_vert_uv = in_vert_uv;
 }

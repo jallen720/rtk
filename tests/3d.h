@@ -447,12 +447,12 @@ static void InitMeshes(RenderState* rs)
 
     {
         #include "rtk/meshes/cube.h"
-        InitMesh<Vertex>(&rs->mesh.cube, &rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
+        InitMesh(&rs->mesh.cube, &rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
     }
 
     {
         #include "rtk/meshes/quad.h"
-        InitMesh<Vertex>(&rs->mesh.quad, &rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
+        InitMesh(&rs->mesh.quad, &rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
     }
 }
 
@@ -593,13 +593,6 @@ static void UpdateRenderState(RenderState* rs, Game* game, RTKContext* rtk)
 static void RenderEntities(uint32 start, uint32 count, VkCommandBuffer render_command_buffer, Pipeline* pipeline,
                            Mesh* mesh)
 {
-    for (uint32 i = start; i < start + count; ++i)
-    {
-        vkCmdPushConstants(render_command_buffer, pipeline->layout,
-                           VK_SHADER_STAGE_VERTEX_BIT,
-                           0, sizeof(uint32), &i);
-        DrawMesh(render_command_buffer, mesh);
-    }
 }
 
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
@@ -625,11 +618,11 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
             BindShaderDataSet(&rs->data_set.axis_cube_texture, pipeline, rtk, render_command_buffer, 1);
 
             // Cube Mesh
-            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, cube_mesh);
+            DrawMesh(render_command_buffer, cube_mesh, entity_region_start, entity_region_size);
             entity_region_start += entity_region_size;
 
             // Quad Mesh
-            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, quad_mesh);
+            DrawMesh(render_command_buffer, quad_mesh, entity_region_start, entity_region_size);
             entity_region_start += entity_region_size;
         }
 
@@ -638,11 +631,11 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
             BindShaderDataSet(&rs->data_set.dirt_block_texture, pipeline, rtk, render_command_buffer, 1);
 
             // Cube Mesh
-            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, cube_mesh);
+            DrawMesh(render_command_buffer, cube_mesh, entity_region_start, entity_region_size);
             entity_region_start += entity_region_size;
 
             // Quad Mesh
-            RenderEntities(entity_region_start, entity_region_size, render_command_buffer, pipeline, quad_mesh);
+            DrawMesh(render_command_buffer, quad_mesh, entity_region_start, entity_region_size);
             entity_region_start += entity_region_size;
         }
     EndRecordingRenderCommands(render_command_buffer);

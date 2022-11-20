@@ -56,14 +56,14 @@ static void BindMeshData(MeshData* mesh_data, VkCommandBuffer render_command_buf
                          VK_INDEX_TYPE_UINT32);
 }
 
-static void DrawMesh(VkCommandBuffer render_command_buffer, Mesh* mesh)
+static void DrawMesh(VkCommandBuffer render_command_buffer, Mesh* mesh, uint32 instance_start, uint32 instance_count)
 {
     vkCmdDrawIndexed(render_command_buffer,
-                     mesh->index_count, // Index Count
-                     1, // Instance Count
-                     mesh->index_offset, // Index Offset
+                     mesh->index_count,   // Index Count
+                     instance_count,      // Instance Count
+                     mesh->index_offset,  // Index Offset
                      mesh->vertex_offset, // Vertex Offset
-                     0); // First Instance
+                     instance_start);     // First Instance
 }
 
 static void EndRecordingRenderCommands(VkCommandBuffer render_command_buffer)

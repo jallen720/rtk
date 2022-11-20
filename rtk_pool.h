@@ -55,7 +55,7 @@ static void InitRTKPool(RTKPool<Type>* pool, Stack* mem, uint32 size)
 }
 
 template<typename Type>
-static PoolHnd AllocateHnd(RTKPool<Type>* pool)
+static PoolHnd AllocGetHnd(RTKPool<Type>* pool)
 {
     ValidatePoolCanAllocate(pool);
     PoolHnd allocated_node = pool->next_free;
@@ -64,7 +64,7 @@ static PoolHnd AllocateHnd(RTKPool<Type>* pool)
 }
 
 template<typename Type>
-static Type* AllocatePtr(RTKPool<Type>* pool)
+static Type* AllocGetPtr(RTKPool<Type>* pool)
 {
     ValidatePoolCanAllocate(pool);
     RTKPoolNode<Type>* allocated_node = pool->nodes + pool->next_free;

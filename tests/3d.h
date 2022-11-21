@@ -3,6 +3,7 @@
 #include "ctk2/memory.h"
 #include "ctk2/multithreading.h"
 #include "ctk2/math.h"
+#include "ctk2/profile.h"
 #include "stk2/stk.h"
 
 // #define RTK_ENABLE_VALIDATION
@@ -53,15 +54,32 @@ struct VSBuffer
     Matrix mvp_matrixes[MAX_ENTITIES];
 };
 
+struct MVPMatrixUpdateState
+{
+    BatchRange  batch_range;
+    Matrix      view_projection_matrix;
+    VSBuffer*   frame_vs_buffer;
+    EntityData* entity_data;
+};
+
+struct MVPMatrixUpdate
+{
+    Array<BatchRange>           batch_ranges;
+    Array<MVPMatrixUpdateState> states;
+    Array<Task*>                tasks;
+};
+
 struct RenderState
 {
-    Buffer       host_buffer;
-    Buffer       device_buffer;
-    Buffer       staging_buffer;
-    RenderTarget render_target;
-    VertexLayout vertex_layout;
-    Pipeline     pipeline;
-    VkSampler    sampler;
+    Buffer          host_buffer;
+    Buffer          device_buffer;
+    Buffer          staging_buffer;
+    RenderTarget    render_target;
+    VertexLayout    vertex_layout;
+    Pipeline        pipeline;
+    VkSampler       sampler;
+    MVPMatrixUpdate mvp_matrix_update;
+
     struct
     {
         ShaderData vs_buffer;
@@ -69,6 +87,7 @@ struct RenderState
         ShaderData dirt_block_texture;
     }
     data;
+
     struct
     {
         ShaderDataSet entity_data;
@@ -76,6 +95,7 @@ struct RenderState
         ShaderDataSet dirt_block_texture;
     }
     data_set;
+
     struct
     {
         MeshData data;
@@ -461,7 +481,17 @@ static void InitMeshes(RenderState* rs)
     }
 }
 
-static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
+static void InitMVPMatrixUpdate(RenderState* rs, Stack* mem, ThreadPool* thread_pool)
+{
+    uint32 thread_count = thread_pool->size;
+    MVPMatrixUpdate* mvp_matrix_update = &rs->mvp_matrix_update;
+    InitArrayFull(&mvp_matrix_update->batch_ranges, mem, thread_count);
+    InitArrayFull(&mvp_matrix_update->states, mem, thread_count);
+    InitArrayFull(&mvp_matrix_update->tasks, mem, thread_count);
+}
+
+static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk,
+                            ThreadPool* thread_pool)
 {
     InitGraphicsMem(rs, rtk);
     InitRenderTargets(rs, mem, temp_mem, rtk);
@@ -471,6 +501,7 @@ static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKCont
     InitShaderDataSets(rs, mem, temp_mem, rtk);
     InitPipelines(rs, temp_mem, rtk);
     InitMeshes(rs);
+    InitMVPMatrixUpdate(rs, mem, thread_pool);
 }
 
 /// Game Update
@@ -571,14 +602,18 @@ static Matrix CreateViewProjectionMatrix(View* view)
     return projection_matrix * view_matrix;
 }
 
-static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk)
+static void UpdateMVPMatrixesThread(void* data)
 {
+    auto state = (MVPMatrixUpdateState*)data;
+    BatchRange  batch_range            = state->batch_range;
+    Matrix      view_projection_matrix = state->view_projection_matrix;
+    VSBuffer*   frame_vs_buffer        = state->frame_vs_buffer;
+    EntityData* entity_data            = state->entity_data;
+
     // Update entity MVP matrixes.
-    Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    auto frame_vs_buffer = GetBuffer<VSBuffer>(&rs->data.vs_buffer, rtk->frames.index);
-    for (uint32 i = 0; i < game->entity_data.count; ++i)
+    for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
     {
-        Transform* entity_transform = GetTransformPtr(&game->entity_data, i);
+        Transform* entity_transform = GetTransformPtr(entity_data, i);
         Matrix model_matrix = ID_MATRIX;
         model_matrix = Translate(model_matrix, entity_transform->position);
         model_matrix = RotateX(model_matrix, entity_transform->rotation.x);
@@ -590,13 +625,52 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk)
     }
 }
 
-static void UpdateRenderState(RenderState* rs, Game* game, RTKContext* rtk)
+static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Stack temp_mem, ThreadPool* thread_pool,
+                              ProfileManager* prof_mgr)
 {
-    UpdateMVPMatrixes(rs, game, rtk);
+    StartProfile(prof_mgr, "UpdateMVPMatrixes()");
+
+    MVPMatrixUpdate* mvp_matrix_update = &rs->mvp_matrix_update;
+    Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
+    auto frame_vs_buffer = GetBuffer<VSBuffer>(&rs->data.vs_buffer, rtk->frames.index);
+    uint32 thread_count = thread_pool->size;
+
+    // Initialize thread states.
+    CalculateBatchRanges(&mvp_matrix_update->batch_ranges, game->entity_data.count);
+    for (uint32 i = 0; i < thread_count; ++i)
+    {
+        MVPMatrixUpdateState* state = GetPtr(&mvp_matrix_update->states, i);
+        state->batch_range            = Get(&mvp_matrix_update->batch_ranges, i);
+        state->view_projection_matrix = view_projection_matrix;
+        state->frame_vs_buffer        = frame_vs_buffer;
+        state->entity_data            = &game->entity_data;
+    }
+
+    // Submit tasks.
+    for (uint32 i = 0; i < thread_count; ++i)
+    {
+        MVPMatrixUpdateState* state = GetPtr(&mvp_matrix_update->states, i);
+        Task* task = SubmitTask(thread_pool, state, UpdateMVPMatrixesThread);
+        Set(&mvp_matrix_update->tasks, i, task);
+    }
+
+    // Wait for tasks to complete.
+    for (uint32 i = 0; i < thread_count; ++i)
+        Wait(Get(&mvp_matrix_update->tasks, i));
+
+    EndProfile(prof_mgr);
 }
 
-static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
+static void UpdateRenderState(RenderState* rs, Game* game, RTKContext* rtk, Stack temp_mem, ThreadPool* thread_pool,
+                              ProfileManager* prof_mgr)
 {
+    UpdateMVPMatrixes(rs, game, rtk, temp_mem, thread_pool, prof_mgr);
+}
+
+static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, ProfileManager* prof_mgr)
+{
+    StartProfile(prof_mgr, "RecordRenderCommands()");
+
     Pipeline* pipeline = &rs->pipeline;
     Mesh* cube_mesh = &rs->mesh.cube;
     Mesh* quad_mesh = &rs->mesh.quad;
@@ -639,6 +713,8 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
             entity_region_start += entity_region_count;
         }
     EndRecordingRenderCommands(command_buffer);
+
+    EndProfile(prof_mgr);
 }
 
 void TestMain()
@@ -665,7 +741,7 @@ void TestMain()
     InitWindow(window, &window_info);
 
     // Init Threadpool
-    // auto thread_pool = CreateThreadPool(mem, 8);
+    auto thread_pool = CreateThreadPool(mem, 8);
 
     // Init RTK Context + State
     VkDescriptorPoolSize descriptor_pool_sizes[] =
@@ -715,11 +791,16 @@ void TestMain()
     InitGame(game);
 
     auto rs = Allocate<RenderState>(mem, 1);
-    InitRenderState(rs, mem, *temp_mem, rtk);
+    InitRenderState(rs, mem, *temp_mem, rtk, thread_pool);
+
+    auto prof_mgr = Allocate<ProfileManager>(mem, 1);
+    InitProfileManager(prof_mgr, mem, 64);
 
     // Run game.
     while (1)
     {
+        StartProfile(prof_mgr, "Frame");
+
         ProcessEvents(window);
         if (!window->open)
             break; // Quit event closed window.
@@ -728,14 +809,21 @@ void TestMain()
         {
             NextFrame(rtk);
             UpdateGame(game, rtk, window);
-            UpdateRenderState(rs, game, rtk);
-            RecordRenderCommands(game, rs, rtk);
+            UpdateRenderState(rs, game, rtk, *temp_mem, thread_pool, prof_mgr);
+            RecordRenderCommands(game, rs, rtk, prof_mgr);
+
+            StartProfile(prof_mgr, "SubmitRenderCommands()");
             SubmitRenderCommands(rtk, &rs->render_target);
+            EndProfile(prof_mgr);
         }
         else
         {
             Sleep(1);
         }
+
+        EndProfile(prof_mgr);
+        PrintProfiles(prof_mgr);
+        ClearProfiles(prof_mgr);
         // if (Tick(&game->frame_metrics))
         //     PrintLine("FPS: %.2f", game->frame_metrics.fps);
     }

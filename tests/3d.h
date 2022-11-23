@@ -66,7 +66,7 @@ struct MVPMatrixUpdate
 {
     Array<BatchRange>           batch_ranges;
     Array<MVPMatrixUpdateState> states;
-    Array<Task*>                tasks;
+    Array<TaskHnd>              tasks;
 };
 
 struct RenderState
@@ -650,13 +650,13 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Stac
     for (uint32 i = 0; i < thread_count; ++i)
     {
         MVPMatrixUpdateState* state = GetPtr(&mvp_matrix_update->states, i);
-        Task* task = SubmitTask(thread_pool, state, UpdateMVPMatrixesThread);
+        TaskHnd task = SubmitTask(thread_pool, state, UpdateMVPMatrixesThread);
         Set(&mvp_matrix_update->tasks, i, task);
     }
 
     // Wait for tasks to complete.
     for (uint32 i = 0; i < thread_count; ++i)
-        Wait(Get(&mvp_matrix_update->tasks, i));
+        Wait(thread_pool, Get(&mvp_matrix_update->tasks, i));
 
     EndProfile(prof_mgr);
 }
@@ -741,7 +741,8 @@ void TestMain()
     InitWindow(window, &window_info);
 
     // Init Threadpool
-    auto thread_pool = CreateThreadPool(mem, 8);
+    auto thread_pool = Allocate<ThreadPool>(mem, 1);
+    InitThreadPool(thread_pool, mem, 8);
 
     // Init RTK Context + State
     VkDescriptorPoolSize descriptor_pool_sizes[] =

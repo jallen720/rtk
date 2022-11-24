@@ -570,7 +570,7 @@ static void Controls(Game* game, Window* window)
     ViewControls(game, window);
 }
 
-static void UpdateGame(Game* game, RTKContext* rtk, Window* window)
+static void UpdateGame(Game* game, Window* window)
 {
     UpdateMouse(&game->mouse, window);
 
@@ -625,7 +625,7 @@ static void UpdateMVPMatrixesThread(void* data)
     }
 }
 
-static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Stack temp_mem, ThreadPool* thread_pool)
+static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, ThreadPool* thread_pool)
 {
     MVPMatrixUpdate* mvp_matrix_update = &rs->mvp_matrix_update;
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
@@ -798,11 +798,11 @@ void TestMain()
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "UpdateGame()");
-            UpdateGame(game, rtk, window);
+            UpdateGame(game, window);
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "UpdateMVPMatrixes()");
-            UpdateMVPMatrixes(rs, game, rtk, *temp_mem, thread_pool);
+            UpdateMVPMatrixes(rs, game, rtk, thread_pool);
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "RecordRenderCommands()");

@@ -208,6 +208,8 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
                      VkDebugUtilsMessageTypeFlagsEXT message_type_flags,
                      const VkDebugUtilsMessengerCallbackDataEXT* callback_data, void* user_data)
 {
+    CTK_UNUSED(message_type_flags)
+    CTK_UNUSED(user_data)
     cstring message_id = callback_data->pMessageIdName ? callback_data->pMessageIdName : "";
     if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT & message_severity_flag_bit)
     {

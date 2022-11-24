@@ -625,11 +625,8 @@ static void UpdateMVPMatrixesThread(void* data)
     }
 }
 
-static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Stack temp_mem, ThreadPool* thread_pool,
-                              ProfileManager* prof_mgr)
+static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Stack temp_mem, ThreadPool* thread_pool)
 {
-    StartProfile(prof_mgr, "UpdateMVPMatrixes()");
-
     MVPMatrixUpdate* mvp_matrix_update = &rs->mvp_matrix_update;
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
     auto frame_vs_buffer = GetBuffer<VSBuffer>(&rs->data.vs_buffer, rtk->frames.index);
@@ -657,20 +654,10 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Stac
     // Wait for tasks to complete.
     for (uint32 i = 0; i < thread_count; ++i)
         Wait(thread_pool, Get(&mvp_matrix_update->tasks, i));
-
-    EndProfile(prof_mgr);
 }
 
-static void UpdateRenderState(RenderState* rs, Game* game, RTKContext* rtk, Stack temp_mem, ThreadPool* thread_pool,
-                              ProfileManager* prof_mgr)
+static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
-    UpdateMVPMatrixes(rs, game, rtk, temp_mem, thread_pool, prof_mgr);
-}
-
-static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, ProfileManager* prof_mgr)
-{
-    StartProfile(prof_mgr, "RecordRenderCommands()");
-
     Pipeline* pipeline = &rs->pipeline;
     Mesh* cube_mesh = &rs->mesh.cube;
     Mesh* quad_mesh = &rs->mesh.quad;
@@ -713,8 +700,6 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, P
             entity_region_start += entity_region_count;
         }
     EndRecordingRenderCommands(command_buffer);
-
-    EndProfile(prof_mgr);
 }
 
 void TestMain()
@@ -808,10 +793,21 @@ void TestMain()
 
         if (IsActive(window))
         {
+            StartProfile(prof_mgr, "NextFrame()");
             NextFrame(rtk);
+            EndProfile(prof_mgr);
+
+            StartProfile(prof_mgr, "UpdateGame()");
             UpdateGame(game, rtk, window);
-            UpdateRenderState(rs, game, rtk, *temp_mem, thread_pool, prof_mgr);
-            RecordRenderCommands(game, rs, rtk, prof_mgr);
+            EndProfile(prof_mgr);
+
+            StartProfile(prof_mgr, "UpdateMVPMatrixes()");
+            UpdateMVPMatrixes(rs, game, rtk, *temp_mem, thread_pool);
+            EndProfile(prof_mgr);
+
+            StartProfile(prof_mgr, "RecordRenderCommands()");
+            RecordRenderCommands(game, rs, rtk);
+            EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "SubmitRenderCommands()");
             SubmitRenderCommands(rtk, &rs->render_target);

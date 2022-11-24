@@ -172,6 +172,7 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(uint32 queue_family_index)
 
     return info;
 }
+
 static void InitInstance(RTKContext* rtk, RTKInfo* info)
 {
     VkResult res = VK_SUCCESS;

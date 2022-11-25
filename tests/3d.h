@@ -82,9 +82,9 @@ struct RenderState
 
     struct
     {
-        ShaderData vs_buffer;
-        ShaderData axis_cube_texture;
-        ShaderData dirt_block_texture;
+        ShaderDataHnd vs_buffer;
+        ShaderDataHnd axis_cube_texture;
+        ShaderDataHnd dirt_block_texture;
     }
     data;
 
@@ -355,7 +355,7 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             }
         };
-        InitShaderData(&rs->data.vs_buffer, mem, rtk, &info);
+        rs->data.vs_buffer = CreateShaderData(mem, rtk, &info);
     }
 
     // axis_cube_texture
@@ -364,13 +364,14 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         LoadImageData(&image_data, "images/axis_cube.png");
 
         ShaderDataInfo info = DefaultTextureInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
-        InitShaderData(&rs->data.axis_cube_texture, mem, rtk, &info);
+        rs->data.axis_cube_texture = CreateShaderData(mem, rtk, &info);
 
         // Copy image data into staging buffer.
         Clear(rs->staging_buffer);
         Write(rs->staging_buffer, image_data.data, image_data.size);
-        for (uint32 i = 0; i < rs->data.axis_cube_texture.image_hnds.count; ++i)
-            WriteToShaderDataImage(&rs->data.axis_cube_texture, i, rs->staging_buffer, rtk);
+        uint32 image_count = GetShaderData(rs->data.axis_cube_texture)->image_hnds.count;
+        for (uint32 i = 0; i < image_count; ++i)
+            WriteToShaderDataImage(rs->data.axis_cube_texture, i, rs->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
     }
@@ -381,13 +382,14 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         LoadImageData(&image_data, "images/dirt_block.png");
 
         ShaderDataInfo info = DefaultTextureInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
-        InitShaderData(&rs->data.dirt_block_texture, mem, rtk, &info);
+        rs->data.dirt_block_texture = CreateShaderData(mem, rtk, &info);
 
         // Copy image data into staging buffer.
         Clear(rs->staging_buffer);
         Write(rs->staging_buffer, image_data.data, image_data.size);
-        for (uint32 i = 0; i < rs->data.dirt_block_texture.image_hnds.count; ++i)
-            WriteToShaderDataImage(&rs->data.dirt_block_texture, i, rs->staging_buffer, rtk);
+        uint32 image_count = GetShaderData(rs->data.axis_cube_texture)->image_hnds.count;
+        for (uint32 i = 0; i < image_count; ++i)
+            WriteToShaderDataImage(rs->data.dirt_block_texture, i, rs->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
     }
@@ -397,27 +399,27 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
 {
     // vs_buffer_data_set
     {
-        ShaderData* datas[] =
+        ShaderDataHnd datas[] =
         {
-            &rs->data.vs_buffer,
+            rs->data.vs_buffer,
         };
         InitShaderDataSet(&rs->data_set.entity_data, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
     // axis_cube_texture_data_set
     {
-        ShaderData* datas[] =
+        ShaderDataHnd datas[] =
         {
-            &rs->data.axis_cube_texture,
+            rs->data.axis_cube_texture,
         };
         InitShaderDataSet(&rs->data_set.axis_cube_texture, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
     // dirt_block_texture_data_set
     {
-        ShaderData* datas[] =
+        ShaderDataHnd datas[] =
         {
-            &rs->data.dirt_block_texture,
+            rs->data.dirt_block_texture,
         };
         InitShaderDataSet(&rs->data_set.dirt_block_texture, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
@@ -630,7 +632,7 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
 {
     MVPMatrixUpdate* mvp_matrix_update = &rs->mvp_matrix_update;
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    auto frame_vs_buffer = GetBufferMem<VSBuffer>(&rs->data.vs_buffer, rtk->frames.index);
+    auto frame_vs_buffer = GetBufferMem<VSBuffer>(rs->data.vs_buffer, rtk->frames.index);
     uint32 thread_count = thread_pool->size;
 
     // Initialize thread states.
@@ -775,8 +777,9 @@ void TestMain()
 
     RTKStateInfo state_info =
     {
-        .max_buffers = 8,
-        .max_images  = 8,
+        .max_buffers      = 8,
+        .max_images       = 8,
+        .max_shader_datas = 8,
     };
     InitRTKState(mem, &state_info);
 

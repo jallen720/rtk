@@ -53,10 +53,25 @@ struct ShaderDataSet
     Array<VkDescriptorSet> hnds;
 };
 
+/// Utils
+////////////////////////////////////////////////////////////
+static Buffer* GetBuffer(ShaderData* shader_data, uint32 instance)
+{
+    return GetBuffer(Get(&shader_data->buffer_hnds, instance));
+}
+
+static Image* GetImage(ShaderData* shader_data, uint32 instance)
+{
+    return GetImage(Get(&shader_data->image_hnds, instance));
+}
+
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk, ShaderDataInfo* info)
+static ShaderDataHnd CreateShaderData(Stack* mem, RTKContext* rtk, ShaderDataInfo* info)
 {
+    ShaderDataHnd shader_data_hnd = AllocateShaderData();
+    ShaderData* shader_data = GetShaderData(shader_data_hnd);
+
     shader_data->stages    = info->stages;
     shader_data->type      = info->type;
     shader_data->per_frame = info->per_frame;
@@ -82,30 +97,24 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
     {
         CTK_FATAL("can't init shader data: data type %u is unsupported", shader_data->type);
     }
-}
 
-static Buffer* GetBuffer(ShaderData* shader_data, uint32 instance)
-{
-    return GetBuffer(Get(&shader_data->buffer_hnds, instance));
-}
-
-static Image* GetImage(ShaderData* shader_data, uint32 instance)
-{
-    return GetImage(Get(&shader_data->image_hnds, instance));
+    return shader_data_hnd;
 }
 
 template<typename Type>
-static Type* GetBufferMem(ShaderData* shader_data, uint32 instance)
+static Type* GetBufferMem(ShaderDataHnd shader_data_hnd, uint32 instance)
 {
+    ShaderData* shader_data = GetShaderData(shader_data_hnd);
     CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
     return (Type*)GetBuffer(shader_data, instance)->mapped_mem;
 }
 
-static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, BufferHnd image_data_buffer_hnd,
+static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instance_index, BufferHnd image_data_buffer_hnd,
                                    RTKContext* rtk)
 {
+    ShaderData* shader_data = GetShaderData(shader_data_hnd);
     Buffer* image_data_buffer = GetBuffer(image_data_buffer_hnd);
     Image* image = GetImage(shader_data, instance_index);
 
@@ -198,7 +207,8 @@ static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_inde
     SubmitTempCommandBuffer(rtk);
 }
 
-static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RTKContext* rtk, Array<ShaderData*> datas)
+static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RTKContext* rtk,
+                              Array<ShaderDataHnd> datas)
 {
     VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
@@ -208,7 +218,7 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RT
     auto bindings = CreateArray<VkDescriptorSetLayoutBinding>(&temp_mem, datas.count);
     for (uint32 i = 0; i < datas.count; ++i)
     {
-        ShaderData* data = Get(&datas, i);
+        ShaderData* data = GetShaderData(Get(&datas, i));
         Push(bindings,
         {
             .binding            = i,
@@ -260,7 +270,7 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RT
         VkDescriptorSet desc_set = Get(&set->hnds, instance_index);
         for (uint32 data_binding = 0; data_binding < datas.count; ++data_binding)
         {
-            ShaderData* data = Get(&datas, data_binding);
+            ShaderData* data = GetShaderData(Get(&datas, data_binding));
             uint32 data_instance_index = data->per_frame ? instance_index : 0;
 
             VkWriteDescriptorSet* write = Push(writes);

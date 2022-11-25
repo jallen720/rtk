@@ -67,8 +67,9 @@ static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd s
                             0, NULL); // Dynamic Offsets
 }
 
-static void BindMeshData(VkCommandBuffer command_buffer, MeshData* mesh_data)
+static void BindMeshData(VkCommandBuffer command_buffer, MeshDataHnd mesh_data_hnd)
 {
+    MeshData* mesh_data = GetMeshData(mesh_data_hnd);
     Buffer* vertex_buffer = GetBuffer(mesh_data->vertex_buffer);
     Buffer* index_buffer = GetBuffer(mesh_data->index_buffer);
     vkCmdBindVertexBuffers(command_buffer,
@@ -82,8 +83,9 @@ static void BindMeshData(VkCommandBuffer command_buffer, MeshData* mesh_data)
                          VK_INDEX_TYPE_UINT32);
 }
 
-static void DrawMesh(VkCommandBuffer command_buffer, Mesh* mesh, uint32 instance_start, uint32 instance_count)
+static void DrawMesh(VkCommandBuffer command_buffer, MeshHnd mesh_hnd, uint32 instance_start, uint32 instance_count)
 {
+    Mesh* mesh = GetMesh(mesh_hnd);
     vkCmdDrawIndexed(command_buffer,
                      mesh->index_count,   // Index Count
                      instance_count,      // Instance Count

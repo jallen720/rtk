@@ -95,9 +95,9 @@ struct RenderState
     data_set;
     struct
     {
-        MeshData data;
-        Mesh     cube;
-        Mesh     quad;
+        MeshDataHnd data;
+        MeshHnd     cube;
+        MeshHnd     quad;
     }
     mesh;
 };
@@ -455,16 +455,16 @@ static void InitMeshes(RenderState* rs)
         .vertex_buffer_size = Megabyte(1),
         .index_buffer_size  = Megabyte(1),
     };
-    InitMeshData(&rs->mesh.data, &mesh_data_info);
+    rs->mesh.data = CreateMeshData(&mesh_data_info);
 
     {
         #include "rtk/meshes/cube.h"
-        InitMesh(&rs->mesh.cube, &rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
+        rs->mesh.cube = CreateMesh(rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
     }
 
     {
         #include "rtk/meshes/quad.h"
-        InitMesh(&rs->mesh.quad, &rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
+        rs->mesh.quad = CreateMesh(rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
     }
 }
 
@@ -646,8 +646,6 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
     Pipeline* pipeline = &rs->pipeline;
-    Mesh* cube_mesh = &rs->mesh.cube;
-    Mesh* quad_mesh = &rs->mesh.quad;
     uint32 entity_region_count = game->entity_data.count / 4;
     uint32 entity_region_start = 0;
 
@@ -659,18 +657,18 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
         BindShaderDataSet(command_buffer, rs->data_set.entity_data, pipeline, rtk, 0);
 
         // Bind mesh data buffers.
-        BindMeshData(command_buffer, &rs->mesh.data);
+        BindMeshData(command_buffer, rs->mesh.data);
 
         // Axis Cube Texture
         {
             BindShaderDataSet(command_buffer, rs->data_set.axis_cube_texture, pipeline, rtk, 1);
 
             // Cube Mesh
-            DrawMesh(command_buffer, cube_mesh, entity_region_start, entity_region_count);
+            DrawMesh(command_buffer, rs->mesh.cube, entity_region_start, entity_region_count);
             entity_region_start += entity_region_count;
 
             // Quad Mesh
-            DrawMesh(command_buffer, quad_mesh, entity_region_start, entity_region_count);
+            DrawMesh(command_buffer, rs->mesh.quad, entity_region_start, entity_region_count);
             entity_region_start += entity_region_count;
         }
 
@@ -679,11 +677,11 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
             BindShaderDataSet(command_buffer, rs->data_set.dirt_block_texture, pipeline, rtk, 1);
 
             // Cube Mesh
-            DrawMesh(command_buffer, cube_mesh, entity_region_start, entity_region_count);
+            DrawMesh(command_buffer, rs->mesh.cube, entity_region_start, entity_region_count);
             entity_region_start += entity_region_count;
 
             // Quad Mesh
-            DrawMesh(command_buffer, quad_mesh, entity_region_start, entity_region_count);
+            DrawMesh(command_buffer, rs->mesh.quad, entity_region_start, entity_region_count);
             entity_region_start += entity_region_count;
         }
     EndRecordingRenderCommands(command_buffer);
@@ -765,6 +763,8 @@ void TestMain()
         .max_images           = 8,
         .max_shader_datas     = 8,
         .max_shader_data_sets = 8,
+        .max_mesh_datas       = 1,
+        .max_meshes           = 8,
     };
     InitRTKState(mem, &state_info);
 

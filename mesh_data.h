@@ -2,6 +2,7 @@
 
 #include "ctk2/ctk.h"
 #include "rtk/vulkan.h"
+#include "rtk/rtk_state.h"
 #include "rtk/memory.h"
 
 using namespace CTK;
@@ -33,21 +34,30 @@ struct Mesh
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitMeshData(MeshData* mesh_data, MeshDataInfo* info)
+static MeshDataHnd CreateMeshData(MeshDataInfo* info)
 {
+    MeshDataHnd mesh_data_hnd = AllocateMeshData();
+    MeshData* mesh_data = GetMeshData(mesh_data_hnd);
     mesh_data->vertex_buffer = CreateBuffer(info->parent_buffer, info->vertex_buffer_size);
-    mesh_data->index_buffer = CreateBuffer(info->parent_buffer, info->index_buffer_size);
+    mesh_data->index_buffer  = CreateBuffer(info->parent_buffer, info->index_buffer_size);
+    return mesh_data_hnd;
 }
 
 template<typename VertexType>
-static void InitMesh(Mesh* mesh, MeshData* mesh_data, Array<VertexType> vertexes, Array<uint32> indexes)
+static MeshHnd CreateMesh(MeshDataHnd mesh_data_hnd, Array<VertexType> vertexes, Array<uint32> indexes)
 {
+    MeshData* mesh_data = GetMeshData(mesh_data_hnd);
+
+    MeshHnd mesh_hnd = AllocateMesh();
+    Mesh* mesh = GetMesh(mesh_hnd);
     mesh->vertex_offset = GetBuffer(mesh_data->vertex_buffer)->index / sizeof(VertexType);
     mesh->index_offset  = GetBuffer(mesh_data->index_buffer)->index / sizeof(uint32);
     mesh->index_count   = indexes.count;
 
     Write(mesh_data->vertex_buffer, vertexes.data, ByteSize(&vertexes));
     Write(mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
+
+    return mesh_hnd;
 }
 
 }

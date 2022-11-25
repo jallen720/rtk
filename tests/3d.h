@@ -384,7 +384,7 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
 
 static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    // vs_buffer_data_set
+    // data_set.vs_buffer
     {
         ShaderDataHnd datas[] =
         {
@@ -393,7 +393,7 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
         InitShaderDataSet(&rs->data_set.entity_data, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
-    // axis_cube_texture_data_set
+    // data_set.axis_cube_texture
     {
         ShaderDataHnd datas[] =
         {
@@ -402,7 +402,7 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
         InitShaderDataSet(&rs->data_set.axis_cube_texture, mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
-    // dirt_block_texture_data_set
+    // data_set.dirt_block_texture
     {
         ShaderDataHnd datas[] =
         {

@@ -79,7 +79,6 @@ struct RenderState
     Pipeline        pipeline;
     VkSampler       sampler;
     MVPMatrixUpdate mvp_matrix_update;
-
     struct
     {
         ShaderDataHnd vs_buffer;
@@ -87,15 +86,13 @@ struct RenderState
         ShaderDataHnd dirt_block_texture;
     }
     data;
-
     struct
     {
-        ShaderDataSet entity_data;
-        ShaderDataSet axis_cube_texture;
-        ShaderDataSet dirt_block_texture;
+        ShaderDataSetHnd entity_data;
+        ShaderDataSetHnd axis_cube_texture;
+        ShaderDataSetHnd dirt_block_texture;
     }
     data_set;
-
     struct
     {
         MeshData data;
@@ -390,7 +387,7 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
         {
             rs->data.vs_buffer,
         };
-        InitShaderDataSet(&rs->data_set.entity_data, mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        rs->data_set.entity_data = CreateShaderDataSet(mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
     // data_set.axis_cube_texture
@@ -399,7 +396,7 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
         {
             rs->data.axis_cube_texture,
         };
-        InitShaderDataSet(&rs->data_set.axis_cube_texture, mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        rs->data_set.axis_cube_texture = CreateShaderDataSet(mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 
     // data_set.dirt_block_texture
@@ -408,7 +405,7 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
         {
             rs->data.dirt_block_texture,
         };
-        InitShaderDataSet(&rs->data_set.dirt_block_texture, mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        rs->data_set.dirt_block_texture = CreateShaderDataSet(mem, temp_mem, rtk, WRAP_ARRAY(datas));
     }
 }
 
@@ -428,8 +425,8 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
     };
     VkDescriptorSetLayout descriptor_set_layouts[] =
     {
-        rs->data_set.entity_data.layout,
-        rs->data_set.axis_cube_texture.layout,
+        GetShaderDataSet(rs->data_set.entity_data)->layout,
+        GetShaderDataSet(rs->data_set.axis_cube_texture)->layout,
     };
     VkPushConstantRange push_constant_ranges[] =
     {
@@ -659,14 +656,14 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
         BindPipeline(command_buffer, pipeline);
 
         // Bind per-pipeline shader data.
-        BindShaderDataSet(command_buffer, &rs->data_set.entity_data, pipeline, rtk, 0);
+        BindShaderDataSet(command_buffer, rs->data_set.entity_data, pipeline, rtk, 0);
 
         // Bind mesh data buffers.
         BindMeshData(command_buffer, &rs->mesh.data);
 
         // Axis Cube Texture
         {
-            BindShaderDataSet(command_buffer, &rs->data_set.axis_cube_texture, pipeline, rtk, 1);
+            BindShaderDataSet(command_buffer, rs->data_set.axis_cube_texture, pipeline, rtk, 1);
 
             // Cube Mesh
             DrawMesh(command_buffer, cube_mesh, entity_region_start, entity_region_count);
@@ -679,7 +676,7 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 
         // Dirt Block Texture
         {
-            BindShaderDataSet(command_buffer, &rs->data_set.dirt_block_texture, pipeline, rtk, 1);
+            BindShaderDataSet(command_buffer, rs->data_set.dirt_block_texture, pipeline, rtk, 1);
 
             // Cube Mesh
             DrawMesh(command_buffer, cube_mesh, entity_region_start, entity_region_count);
@@ -764,9 +761,10 @@ void TestMain()
 
     RTKStateInfo state_info =
     {
-        .max_buffers      = 8,
-        .max_images       = 8,
-        .max_shader_datas = 8,
+        .max_buffers          = 8,
+        .max_images           = 8,
+        .max_shader_datas     = 8,
+        .max_shader_data_sets = 8,
     };
     InitRTKState(mem, &state_info);
 

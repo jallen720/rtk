@@ -207,9 +207,11 @@ static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instanc
     SubmitTempCommandBuffer(rtk);
 }
 
-static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RTKContext* rtk,
-                              Array<ShaderDataHnd> datas)
+static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKContext* rtk, Array<ShaderDataHnd> datas)
 {
+    ShaderDataSetHnd shader_data_set_hnd = AllocateShaderDataSet();
+    ShaderDataSet* shader_data_set = GetShaderDataSet(shader_data_set_hnd);
+
     VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
     uint32 instance_count = rtk->frames.size;
@@ -238,13 +240,13 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RT
         .bindingCount = bindings->count,
         .pBindings    = bindings->data,
     };
-    res = vkCreateDescriptorSetLayout(device, &info, NULL, &set->layout);
+    res = vkCreateDescriptorSetLayout(device, &info, NULL, &shader_data_set->layout);
     Validate(res, "vkCreateDescriptorSetLayout() failed");
 
     // Duplicate layouts for allocation.
     auto desc_set_alloc_layouts = CreateArray<VkDescriptorSetLayout>(&temp_mem, instance_count);
     for (uint32 i = 0; i < instance_count; ++i)
-        Push(desc_set_alloc_layouts, set->layout);
+        Push(desc_set_alloc_layouts, shader_data_set->layout);
 
     // Allocate descriptor sets.
     VkDescriptorSetAllocateInfo allocate_info =
@@ -255,8 +257,8 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RT
         .descriptorSetCount = instance_count,
         .pSetLayouts        = desc_set_alloc_layouts->data,
     };
-    InitArrayFull(&set->hnds, mem, instance_count);
-    res = vkAllocateDescriptorSets(device, &allocate_info, set->hnds.data);
+    InitArrayFull(&shader_data_set->hnds, mem, instance_count);
+    res = vkAllocateDescriptorSets(device, &allocate_info, shader_data_set->hnds.data);
     Validate(res, "vkAllocateDescriptorSets() failed");
 
     // Bind descriptor data.
@@ -267,7 +269,7 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RT
 
     for (uint32 instance_index = 0; instance_index < instance_count; ++instance_index)
     {
-        VkDescriptorSet desc_set = Get(&set->hnds, instance_index);
+        VkDescriptorSet desc_set = Get(&shader_data_set->hnds, instance_index);
         for (uint32 data_binding = 0; data_binding < datas.count; ++data_binding)
         {
             ShaderData* data = GetShaderData(Get(&datas, data_binding));
@@ -306,6 +308,8 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RT
     }
 
     vkUpdateDescriptorSets(device, writes->count, writes->data, 0, NULL);
+
+    return shader_data_set_hnd;
 }
 
 }

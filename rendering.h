@@ -2,6 +2,7 @@
 
 #include "rtk/vulkan.h"
 #include "rtk/rtk_context.h"
+#include "rtk/rtk_state.h"
 #include "rtk/render_target.h"
 #include "rtk/pipeline.h"
 #include "rtk/shader_data.h"
@@ -50,12 +51,13 @@ static void BindPipeline(VkCommandBuffer command_buffer, Pipeline* pipeline)
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
 }
 
-static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSet* set, Pipeline* pipeline, RTKContext* rtk,
-                              uint32 binding)
+static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd shader_data_set_hnd, Pipeline* pipeline,
+                              RTKContext* rtk, uint32 binding)
 {
+    ShaderDataSet* shader_data_set = GetShaderDataSet(shader_data_set_hnd);
     VkDescriptorSet descriptor_sets[] =
     {
-        Get(&set->hnds, rtk->frames.index)
+        Get(&shader_data_set->hnds, rtk->frames.index)
     };
     vkCmdBindDescriptorSets(command_buffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,

@@ -18,6 +18,7 @@ namespace RTK
 RTK_DEFINE_RESOURCE(Buffer)
 RTK_DEFINE_RESOURCE(Image)
 RTK_DEFINE_RESOURCE(ShaderData)
+RTK_DEFINE_RESOURCE(ShaderDataSet)
 
 /// Data
 ////////////////////////////////////////////////////////////
@@ -26,13 +27,15 @@ struct RTKStateInfo
     uint32 max_buffers;
     uint32 max_images;
     uint32 max_shader_datas;
+    uint32 max_shader_data_sets;
 };
 
 struct RTKState
 {
-    Pool<Buffer>     buffers;
-    Pool<Image>      images;
-    Pool<ShaderData> shader_datas;
+    Pool<Buffer>        buffers;
+    Pool<Image>         images;
+    Pool<ShaderData>    shader_datas;
+    Pool<ShaderDataSet> shader_data_sets;
 };
 
 /// Instance
@@ -46,6 +49,7 @@ static void InitRTKState(Stack* mem, RTKStateInfo* info)
     InitPool(&rtk_state.buffers, mem, info->max_buffers);
     InitPool(&rtk_state.images, mem, info->max_images);
     InitPool(&rtk_state.shader_datas, mem, info->max_shader_datas);
+    InitPool(&rtk_state.shader_data_sets, mem, info->max_shader_data_sets);
 }
 
 static BufferHnd AllocateBuffer()
@@ -76,6 +80,16 @@ static ShaderDataHnd AllocateShaderData()
 static ShaderData* GetShaderData(ShaderDataHnd hnd)
 {
     return GetData(&rtk_state.shader_datas, hnd);
+}
+
+static ShaderDataSetHnd AllocateShaderDataSet()
+{
+    return Allocate(&rtk_state.shader_data_sets);
+}
+
+static ShaderDataSet* GetShaderDataSet(ShaderDataSetHnd hnd)
+{
+    return GetData(&rtk_state.shader_data_sets, hnd);
 }
 
 }

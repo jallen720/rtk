@@ -772,6 +772,13 @@ void TestMain()
     auto rtk = Allocate<RTKContext>(mem, 1);
     InitRTKContext(rtk, mem, *temp_mem, window, &rtk_info);
 
+    RTKStateInfo state_info =
+    {
+        .max_buffers = 8,
+    };
+    auto rtk_state = Allocate<RTKState>(mem, 1);
+    InitRTKState(rtk_state, mem, &state_info);
+
     // Init Game
     auto game = Allocate<Game>(mem, 1);
     InitGame(game);

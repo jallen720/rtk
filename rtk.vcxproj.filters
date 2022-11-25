@@ -81,6 +81,9 @@
     <ClInclude Include="mesh_data.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="rtk_state.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="test.cc">

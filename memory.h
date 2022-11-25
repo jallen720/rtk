@@ -170,12 +170,14 @@ static void Write(BufferHnd buffer_hnd, void* data, VkDeviceSize data_size)
 
 static void Clear(BufferHnd buffer_hnd)
 {
-    Buffer* buffer = GetBuffer(buffer_hnd);
-    buffer->index = 0;
+    GetBuffer(buffer_hnd)->index = 0;
 }
 
-static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
+static ImageHnd CreateImage(RTKContext* rtk, ImageInfo* info)
 {
+    ImageHnd image_hnd = AllocateImage();
+    Image* image = GetImage(image_hnd);
+
     VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
 
@@ -195,6 +197,8 @@ static void InitImage(Image* image, RTKContext* rtk, ImageInfo* info)
     info->view.image = image->hnd;
     res = vkCreateImageView(device, &info->view, NULL, &image->view);
     Validate(res, "vkCreateImageView() failed");
+
+    return image_hnd;
 }
 
 }

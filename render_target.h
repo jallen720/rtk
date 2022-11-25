@@ -25,7 +25,7 @@ struct RenderPassAttachments
 struct RenderTarget
 {
     VkRenderPass         render_pass;
-    Array<Image>         depth_images;
+    Array<ImageHnd>      depth_images;
     Array<VkFramebuffer> framebuffers;
     Array<VkClearValue>  attachment_clear_values;
 };
@@ -184,7 +184,7 @@ static void InitDepthImages(RenderTarget* render_target, Stack* mem, RTKContext*
     };
 
     for (uint32 i = 0; i < swapchain->image_count; ++i)
-        InitImage(Push(&render_target->depth_images), rtk, &depth_image_info);
+        Push(&render_target->depth_images, CreateImage(rtk, &depth_image_info));
 }
 
 static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp_mem, RTKContext* rtk,
@@ -198,7 +198,7 @@ static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp
         Push(attachments, Get(&swapchain->image_views, i));
 
         if (depth_testing)
-            Push(attachments, GetPtr(&render_target->depth_images, i)->view);
+            Push(attachments, GetImage(Get(&render_target->depth_images, i))->view);
 
         VkFramebufferCreateInfo info =
         {

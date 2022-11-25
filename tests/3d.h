@@ -369,7 +369,7 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         // Copy image data into staging buffer.
         Clear(rs->staging_buffer);
         Write(rs->staging_buffer, image_data.data, image_data.size);
-        for (uint32 i = 0; i < rs->data.axis_cube_texture.images.count; ++i)
+        for (uint32 i = 0; i < rs->data.axis_cube_texture.image_hnds.count; ++i)
             WriteToShaderDataImage(&rs->data.axis_cube_texture, i, rs->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
@@ -386,7 +386,7 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         // Copy image data into staging buffer.
         Clear(rs->staging_buffer);
         Write(rs->staging_buffer, image_data.data, image_data.size);
-        for (uint32 i = 0; i < rs->data.dirt_block_texture.images.count; ++i)
+        for (uint32 i = 0; i < rs->data.dirt_block_texture.image_hnds.count; ++i)
             WriteToShaderDataImage(&rs->data.dirt_block_texture, i, rs->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
@@ -776,6 +776,7 @@ void TestMain()
     RTKStateInfo state_info =
     {
         .max_buffers = 8,
+        .max_images  = 8,
     };
     InitRTKState(mem, &state_info);
 

@@ -38,11 +38,11 @@ struct ShaderData
     bool               per_frame;
     union
     {
-        Array<BufferHnd> buffers;
+        Array<BufferHnd> buffer_hnds;
         struct
         {
-            Array<Image> images;
-            VkSampler    sampler;
+            Array<ImageHnd> image_hnds;
+            VkSampler       sampler;
         };
     };
 };
@@ -66,17 +66,17 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
     if (shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
         shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
     {
-        InitArray(&shader_data->buffers, mem, instance_count);
+        InitArray(&shader_data->buffer_hnds, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
-            Push(&shader_data->buffers, CreateBuffer(rtk, &info->buffer_info));
+            Push(&shader_data->buffer_hnds, CreateBuffer(rtk, &info->buffer_info));
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
         shader_data->sampler = info->sampler;
 
-        InitArray(&shader_data->images, mem, instance_count);
+        InitArray(&shader_data->image_hnds, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
-            InitImage(Push(&shader_data->images), rtk, &info->image_info);
+            Push(&shader_data->image_hnds, CreateImage(rtk, &info->image_info));
     }
     else
     {
@@ -86,7 +86,12 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
 
 static Buffer* GetBuffer(ShaderData* shader_data, uint32 instance)
 {
-    return GetBuffer(Get(&shader_data->buffers, instance));
+    return GetBuffer(Get(&shader_data->buffer_hnds, instance));
+}
+
+static Image* GetImage(ShaderData* shader_data, uint32 instance)
+{
+    return GetImage(Get(&shader_data->image_hnds, instance));
 }
 
 template<typename Type>
@@ -102,7 +107,7 @@ static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_inde
                                    RTKContext* rtk)
 {
     Buffer* image_data_buffer = GetBuffer(image_data_buffer_hnd);
-    Image* image = GetPtr(&shader_data->images, instance_index);
+    Image* image = GetImage(shader_data, instance_index);
 
     // Copy image data from buffer memory to image memory.
     BeginTempCommandBuffer(rtk);
@@ -272,7 +277,7 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RT
                 write->pImageInfo = Push(image_infos,
                 {
                     .sampler     = data->sampler,
-                    .imageView   = GetPtr(&data->images, data_instance_index)->view,
+                    .imageView   = GetImage(data, data_instance_index)->view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 });
             }

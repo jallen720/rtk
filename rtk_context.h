@@ -28,7 +28,7 @@ namespace RTK
 
 /// Data
 ////////////////////////////////////////////////////////////
-static constexpr uint32 UNSET_INDEX = U32_MAX;
+static constexpr uint32 UNSET_INDEX = UINT32_MAX;
 
 struct RTKInfo
 {
@@ -651,14 +651,14 @@ static void NextFrame(RTKContext* rtk)
     // Get next frame and wait for it to be finished (if still in-progress) before proceeding.
     Frame* frame = Next(&rtk->frames);
 
-    res = vkWaitForFences(device, 1, &frame->in_progress, VK_TRUE, U64_MAX);
+    res = vkWaitForFences(device, 1, &frame->in_progress, VK_TRUE, UINT64_MAX);
     Validate(res, "vkWaitForFences() failed");
 
     res = vkResetFences(device, 1, &frame->in_progress);
     Validate(res, "vkResetFences() failed");
 
     // Once frame is ready, aquire next swapchain image's index.
-    res = vkAcquireNextImageKHR(rtk->device, rtk->swapchain.hnd, U64_MAX, frame->image_acquired, VK_NULL_HANDLE,
+    res = vkAcquireNextImageKHR(rtk->device, rtk->swapchain.hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
                                 &frame->swapchain_image_index);
     Validate(res, "vkAcquireNextImageKHR() failed");
 

@@ -53,7 +53,7 @@ static VkDeviceMemory AllocateDeviceMemory(RTKContext* rtk, VkMemoryRequirements
 {
     // Find memory type index in memory properties based on memory property flags.
     VkPhysicalDeviceMemoryProperties* mem_properties = &rtk->physical_device->mem_properties;
-    uint32 mem_type_index = U32_MAX;
+    uint32 mem_type_index = UINT32_MAX;
     for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
     {
         // Ensure memory type at mem_properties->memoryTypes[i] is supported by mem_requirements.
@@ -68,7 +68,7 @@ static VkDeviceMemory AllocateDeviceMemory(RTKContext* rtk, VkMemoryRequirements
         }
     }
 
-    if (mem_type_index == U32_MAX)
+    if (mem_type_index == UINT32_MAX)
         CTK_FATAL("failed to find memory type that satisfies memory requirements");
 
     // Allocate memory using selected memory type index.

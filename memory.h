@@ -4,6 +4,7 @@
 #include "rtk/debug.h"
 #include "rtk/device.h"
 #include "rtk/rtk_context.h"
+#include "rtk/rtk_state.h"
 #include "ctk2/ctk.h"
 
 using namespace CTK;
@@ -87,8 +88,11 @@ static VkDeviceMemory AllocateDeviceMemory(RTKContext* rtk, VkMemoryRequirements
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo* info)
+static BufferHnd CreateBuffer(RTKContext* rtk, BufferInfo* info)
 {
+    BufferHnd buffer_hnd = AllocateBuffer();
+    Buffer* buffer = GetBuffer(buffer_hnd);
+
     VkDevice device = rtk->device;
     VkResult res = VK_SUCCESS;
 
@@ -120,10 +124,16 @@ static void InitBuffer(Buffer* buffer, RTKContext* rtk, BufferInfo* info)
 
     // Buffers allocated directly from device memory manage the entire region of memory.
     buffer->offset = 0;
+
+    return buffer_hnd;
 }
 
-static void InitBuffer(Buffer* buffer, Buffer* parent_buffer, VkDeviceSize size)
+static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, VkDeviceSize size)
 {
+    BufferHnd buffer_hnd = AllocateBuffer();
+    Buffer* buffer = GetBuffer(buffer_hnd);
+    Buffer* parent_buffer = GetBuffer(parent_buffer_hnd);
+
     if (parent_buffer->index + size > parent_buffer->size)
     {
         CTK_FATAL("can't allocate %u bytes from parent buffer at index %u: allocation would exceed parent buffer size "
@@ -138,10 +148,13 @@ static void InitBuffer(Buffer* buffer, Buffer* parent_buffer, VkDeviceSize size)
     buffer->index      = 0;
 
     parent_buffer->index += size;
+
+    return buffer_hnd;
 }
 
-static void Write(Buffer* buffer, void* data, VkDeviceSize data_size)
+static void Write(BufferHnd buffer_hnd, void* data, VkDeviceSize data_size)
 {
+    Buffer* buffer = GetBuffer(buffer_hnd);
     if (buffer->mapped_mem == NULL)
         CTK_FATAL("can't write to buffer: buffer is not host visible (mapped_mem == NULL)");
 
@@ -155,8 +168,9 @@ static void Write(Buffer* buffer, void* data, VkDeviceSize data_size)
     buffer->index += data_size;
 }
 
-static void Clear(Buffer* buffer)
+static void Clear(BufferHnd buffer_hnd)
 {
+    Buffer* buffer = GetBuffer(buffer_hnd);
     buffer->index = 0;
 }
 

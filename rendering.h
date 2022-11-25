@@ -67,14 +67,16 @@ static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSet* set
 
 static void BindMeshData(VkCommandBuffer command_buffer, MeshData* mesh_data)
 {
+    Buffer* vertex_buffer = GetBuffer(mesh_data->vertex_buffer);
+    Buffer* index_buffer = GetBuffer(mesh_data->index_buffer);
     vkCmdBindVertexBuffers(command_buffer,
                            0, // First Binding
                            1, // Binding Count
-                           &mesh_data->vertex_buffer.hnd,
-                           &mesh_data->vertex_buffer.offset);
+                           &vertex_buffer->hnd,
+                           &vertex_buffer->offset);
     vkCmdBindIndexBuffer(command_buffer,
-                         mesh_data->index_buffer.hnd,
-                         mesh_data->index_buffer.offset,
+                         index_buffer->hnd,
+                         index_buffer->offset,
                          VK_INDEX_TYPE_UINT32);
 }
 

@@ -3,7 +3,6 @@
 #include "ctk2/ctk.h"
 #include "ctk2/memory.h"
 #include "ctk2/pool.h"
-#include "rtk/memory.h"
 
 using namespace CTK;
 
@@ -13,8 +12,8 @@ namespace RTK
 /// Resource Definitions
 ////////////////////////////////////////////////////////////
 #define RTK_DEFINE_RESOURCE(TYPE) \
-    using TYPE##Hnd = PoolHnd<TYPE>; \
-    struct TYPE;
+    struct TYPE; \
+    using TYPE##Hnd = PoolHnd<TYPE>;
 
 RTK_DEFINE_RESOURCE(Buffer)
 
@@ -27,14 +26,28 @@ struct RTKStateInfo
 
 struct RTKState
 {
-    Pool<Buffer> buffer_pool;
+    Pool<Buffer> buffers;
 };
+
+/// Instance
+////////////////////////////////////////////////////////////
+static RTKState rtk_state;
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRTKState(RTKState* state, Stack* mem, RTKStateInfo* info)
+static void InitRTKState(Stack* mem, RTKStateInfo* info)
 {
-    InitPool(&state->buffer_pool, mem, info->max_buffers);
+    InitPool(&rtk_state.buffers, mem, info->max_buffers);
+}
+
+static BufferHnd AllocateBuffer()
+{
+    return Allocate(&rtk_state.buffers);
+}
+
+static Buffer* GetBuffer(BufferHnd hnd)
+{
+    return GetData(&rtk_state.buffers, hnd);
 }
 
 }

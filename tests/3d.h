@@ -71,9 +71,9 @@ struct MVPMatrixUpdate
 
 struct RenderState
 {
-    Buffer          host_buffer;
-    Buffer          device_buffer;
-    Buffer          staging_buffer;
+    BufferHnd       host_buffer;
+    BufferHnd       device_buffer;
+    BufferHnd       staging_buffer;
     RenderTarget    render_target;
     VertexLayout    vertex_layout;
     Pipeline        pipeline;
@@ -205,7 +205,7 @@ static void InitGraphicsMem(RenderState* rs, RTKContext* rtk)
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    InitBuffer(&rs->host_buffer, rtk, &host_buffer_info);
+    rs->host_buffer = CreateBuffer(rtk, &host_buffer_info);
 
     // BufferInfo device_buffer_info =
     // {
@@ -217,9 +217,10 @@ static void InitGraphicsMem(RenderState* rs, RTKContext* rtk)
     //                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     //     .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     // };
-    // InitBuffer(&rs->device_buffer, rtk, &device_buffer_info);
+    // rs->device_buffer = CreateBuffer(rtk, &device_buffer_info);
+    rs->device_buffer.index = NULL_HND;
 
-    InitBuffer(&rs->staging_buffer, &rs->host_buffer, Megabyte(16));
+    rs->staging_buffer = CreateBuffer(rs->host_buffer, Megabyte(16));
 }
 
 static void InitRenderTargets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -366,10 +367,10 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         InitShaderData(&rs->data.axis_cube_texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.
-        Clear(&rs->staging_buffer);
-        Write(&rs->staging_buffer, image_data.data, image_data.size);
+        Clear(rs->staging_buffer);
+        Write(rs->staging_buffer, image_data.data, image_data.size);
         for (uint32 i = 0; i < rs->data.axis_cube_texture.images.count; ++i)
-            WriteToShaderDataImage(&rs->data.axis_cube_texture, i, &rs->staging_buffer, rtk);
+            WriteToShaderDataImage(&rs->data.axis_cube_texture, i, rs->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
     }
@@ -383,10 +384,10 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         InitShaderData(&rs->data.dirt_block_texture, mem, rtk, &info);
 
         // Copy image data into staging buffer.
-        Clear(&rs->staging_buffer);
-        Write(&rs->staging_buffer, image_data.data, image_data.size);
+        Clear(rs->staging_buffer);
+        Write(rs->staging_buffer, image_data.data, image_data.size);
         for (uint32 i = 0; i < rs->data.dirt_block_texture.images.count; ++i)
-            WriteToShaderDataImage(&rs->data.dirt_block_texture, i, &rs->staging_buffer, rtk);
+            WriteToShaderDataImage(&rs->data.dirt_block_texture, i, rs->staging_buffer, rtk);
 
         DestroyImageData(&image_data);
     }
@@ -464,7 +465,7 @@ static void InitMeshes(RenderState* rs)
 {
     MeshDataInfo mesh_data_info =
     {
-        .parent_buffer      = &rs->host_buffer,
+        .parent_buffer      = rs->host_buffer,
         .vertex_buffer_size = Megabyte(1),
         .index_buffer_size  = Megabyte(1),
     };
@@ -629,7 +630,7 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
 {
     MVPMatrixUpdate* mvp_matrix_update = &rs->mvp_matrix_update;
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    auto frame_vs_buffer = GetBuffer<VSBuffer>(&rs->data.vs_buffer, rtk->frames.index);
+    auto frame_vs_buffer = GetBufferMem<VSBuffer>(&rs->data.vs_buffer, rtk->frames.index);
     uint32 thread_count = thread_pool->size;
 
     // Initialize thread states.
@@ -776,8 +777,7 @@ void TestMain()
     {
         .max_buffers = 8,
     };
-    auto rtk_state = Allocate<RTKState>(mem, 1);
-    InitRTKState(rtk_state, mem, &state_info);
+    InitRTKState(mem, &state_info);
 
     // Init Game
     auto game = Allocate<Game>(mem, 1);

@@ -2,6 +2,7 @@
 
 #include "rtk/vulkan.h"
 #include "rtk/rtk_context.h"
+#include "rtk/rtk_state.h"
 #include "rtk/memory.h"
 #include "ctk2/ctk.h"
 #include "ctk2/memory.h"
@@ -37,7 +38,7 @@ struct ShaderData
     bool               per_frame;
     union
     {
-        Array<Buffer> buffers;
+        Array<BufferHnd> buffers;
         struct
         {
             Array<Image> images;
@@ -67,7 +68,7 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
     {
         InitArray(&shader_data->buffers, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
-            InitBuffer(Push(&shader_data->buffers), rtk, &info->buffer_info);
+            Push(&shader_data->buffers, CreateBuffer(rtk, &info->buffer_info));
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
@@ -83,18 +84,24 @@ static void InitShaderData(ShaderData* shader_data, Stack* mem, RTKContext* rtk,
     }
 }
 
+static Buffer* GetBuffer(ShaderData* shader_data, uint32 instance)
+{
+    return GetBuffer(Get(&shader_data->buffers, instance));
+}
+
 template<typename Type>
-static Type* GetBuffer(ShaderData* shader_data, uint32 instance)
+static Type* GetBufferMem(ShaderData* shader_data, uint32 instance)
 {
     CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
-    return (Type*)GetPtr(&shader_data->buffers, instance)->mapped_mem;
+    return (Type*)GetBuffer(shader_data, instance)->mapped_mem;
 }
 
-static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, Buffer* image_data_buffer,
+static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, BufferHnd image_data_buffer_hnd,
                                    RTKContext* rtk)
 {
+    Buffer* image_data_buffer = GetBuffer(image_data_buffer_hnd);
     Image* image = GetPtr(&shader_data->images, instance_index);
 
     // Copy image data from buffer memory to image memory.
@@ -272,7 +279,7 @@ static void InitShaderDataSet(ShaderDataSet* set, Stack* mem, Stack temp_mem, RT
             else
             {
                 // Map buffer to buffer info for write.
-                Buffer* buffer = GetPtr(&data->buffers, data_instance_index);
+                Buffer* buffer = GetBuffer(data, data_instance_index);
                 write->pBufferInfo = Push(buffer_infos,
                 {
                     .buffer = buffer->hnd,

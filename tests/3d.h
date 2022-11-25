@@ -423,10 +423,10 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
             .stage  = VK_SHADER_STAGE_FRAGMENT_BIT
         },
     };
-    VkDescriptorSetLayout descriptor_set_layouts[] =
+    ShaderDataSetHnd shader_data_sets[] =
     {
-        GetShaderDataSet(rs->data_set.entity_data)->layout,
-        GetShaderDataSet(rs->data_set.axis_cube_texture)->layout,
+        rs->data_set.entity_data,
+        rs->data_set.axis_cube_texture,
     };
     VkPushConstantRange push_constant_ranges[] =
     {
@@ -439,10 +439,10 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
 
     PipelineInfo pipeline_info =
     {
-        .vertex_layout          = &rs->vertex_layout,
-        .shaders                = WRAP_ARRAY(shaders),
-        .descriptor_set_layouts = WRAP_ARRAY(descriptor_set_layouts),
-        .push_constant_ranges   = WRAP_ARRAY(push_constant_ranges),
+        .vertex_layout        = &rs->vertex_layout,
+        .shaders              = WRAP_ARRAY(shaders),
+        .shader_data_sets     = WRAP_ARRAY(shader_data_sets),
+        .push_constant_ranges = WRAP_ARRAY(push_constant_ranges),
     };
     InitPipeline(&rs->pipeline, temp_mem, &rs->render_target, rtk, &pipeline_info);
 }

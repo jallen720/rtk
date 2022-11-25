@@ -334,6 +334,26 @@ static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, Ima
     };
 }
 
+static ShaderDataHnd CreateTexture(cstring image_data_path, RTKContext* rtk, RenderState* rs, Stack* mem)
+{
+    ImageData image_data = {};
+    LoadImageData(&image_data, image_data_path);
+
+    ShaderDataInfo info = DefaultTextureInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
+    ShaderDataHnd shader_data_hnd = CreateShaderData(mem, rtk, &info);
+
+    // Copy image data into staging buffer.
+    Clear(rs->staging_buffer);
+    Write(rs->staging_buffer, image_data.data, image_data.size);
+    uint32 image_count = GetShaderData(shader_data_hnd)->image_hnds.count;
+    for (uint32 i = 0; i < image_count; ++i)
+        WriteToShaderDataImage(shader_data_hnd, i, rs->staging_buffer, rtk);
+
+    DestroyImageData(&image_data);
+
+    return shader_data_hnd;
+}
+
 static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
 {
     // vs_buffer
@@ -358,41 +378,8 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
         rs->data.vs_buffer = CreateShaderData(mem, rtk, &info);
     }
 
-    // axis_cube_texture
-    {
-        ImageData image_data = {};
-        LoadImageData(&image_data, "images/axis_cube.png");
-
-        ShaderDataInfo info = DefaultTextureInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
-        rs->data.axis_cube_texture = CreateShaderData(mem, rtk, &info);
-
-        // Copy image data into staging buffer.
-        Clear(rs->staging_buffer);
-        Write(rs->staging_buffer, image_data.data, image_data.size);
-        uint32 image_count = GetShaderData(rs->data.axis_cube_texture)->image_hnds.count;
-        for (uint32 i = 0; i < image_count; ++i)
-            WriteToShaderDataImage(rs->data.axis_cube_texture, i, rs->staging_buffer, rtk);
-
-        DestroyImageData(&image_data);
-    }
-
-    // dirt_block_texture
-    {
-        ImageData image_data = {};
-        LoadImageData(&image_data, "images/dirt_block.png");
-
-        ShaderDataInfo info = DefaultTextureInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
-        rs->data.dirt_block_texture = CreateShaderData(mem, rtk, &info);
-
-        // Copy image data into staging buffer.
-        Clear(rs->staging_buffer);
-        Write(rs->staging_buffer, image_data.data, image_data.size);
-        uint32 image_count = GetShaderData(rs->data.axis_cube_texture)->image_hnds.count;
-        for (uint32 i = 0; i < image_count; ++i)
-            WriteToShaderDataImage(rs->data.dirt_block_texture, i, rs->staging_buffer, rtk);
-
-        DestroyImageData(&image_data);
-    }
+    rs->data.axis_cube_texture = CreateTexture("images/axis_cube.png", rtk, rs, mem);
+    rs->data.dirt_block_texture = CreateTexture("images/dirt_block.png", rtk, rs, mem);
 }
 
 static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -539,7 +526,7 @@ static void ViewControls(Game* game, Window* window)
 
     // Translation
     static constexpr float32 BASE_TRANSLATION_SPEED = 0.01f;
-    float32 mod = KeyDown(window, Key::SHIFT) ? 8 : 1;
+    float32 mod = KeyDown(window, Key::SHIFT) ? 8.0f : 1.0f;
     float32 translation_speed = BASE_TRANSLATION_SPEED * mod;
     Vec3<float32> translation = {};
 

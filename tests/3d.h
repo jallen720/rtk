@@ -182,7 +182,7 @@ static void InitGame(Game* game)
     }
 
     // FrameMetrics
-    static constexpr float64 FPS_UPDATE_FREQUENCY = 0.25;
+    static constexpr float64 FPS_UPDATE_FREQUENCY = 0.0;
     InitFrameMetrics(&game->frame_metrics, FPS_UPDATE_FREQUENCY);
 }
 
@@ -842,7 +842,7 @@ void TestMain()
         EndProfile(prof_mgr);
         PrintProfiles(prof_mgr);
         ClearProfiles(prof_mgr);
-        // if (Tick(&game->frame_metrics))
-        //     PrintLine("FPS: %.2f", game->frame_metrics.fps);
+        if (Tick(&game->frame_metrics))
+            PrintLine("FPS: %.2f", game->frame_metrics.fps);
     }
 }

@@ -54,7 +54,7 @@ struct VSBuffer
     Matrix mvp_matrixes[MAX_ENTITIES];
 };
 
-struct MVPMatrixUpdateState
+struct UpdateMVPMatrixState
 {
     BatchRange  batch_range;
     Matrix      view_projection_matrix;
@@ -65,7 +65,7 @@ struct MVPMatrixUpdateState
 struct MVPMatrixUpdate
 {
     Array<BatchRange>           batch_ranges;
-    Array<MVPMatrixUpdateState> states;
+    Array<UpdateMVPMatrixState> states;
     Array<TaskHnd>              tasks;
 };
 
@@ -203,7 +203,7 @@ static Transform* GetTransformPtr(EntityData* entity_data, uint32 index)
 
 /// Render State
 ////////////////////////////////////////////////////////////
-static void InitGraphicsMem(RenderState* rs, RTKContext* rtk)
+static void InitBuffers(RenderState* rs, RTKContext* rtk)
 {
     BufferInfo host_buffer_info =
     {
@@ -218,18 +218,17 @@ static void InitGraphicsMem(RenderState* rs, RTKContext* rtk)
     };
     rs->buffer.host = CreateBuffer(rtk, &host_buffer_info);
 
-    // BufferInfo device_buffer_info =
-    // {
-    //     .size               = Megabyte(256),
-    //     .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-    //     .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-    //                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-    //                           VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-    //                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-    //     .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    // };
-    // rs->buffer.device = CreateBuffer(rtk, &device_buffer_info);
-    rs->buffer.device.index = NULL_HND;
+    BufferInfo device_buffer_info =
+    {
+        .size               = Megabyte(256),
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    rs->buffer.device = CreateBuffer(rtk, &device_buffer_info);
 
     rs->buffer.staging = CreateBuffer(rs->buffer.host, Megabyte(16));
 }
@@ -497,7 +496,7 @@ static void InitMVPMatrixUpdate(RenderState* rs, Stack* mem, ThreadPool* thread_
 static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk,
                             ThreadPool* thread_pool)
 {
-    InitGraphicsMem(rs, rtk);
+    InitBuffers(rs, rtk);
     InitRenderTargets(rs, mem, temp_mem, rtk);
     InitVertexLayout(rs, mem);
     InitSampler(rs, rtk);
@@ -608,7 +607,7 @@ static Matrix CreateViewProjectionMatrix(View* view)
 
 static void UpdateMVPMatrixesThread(void* data)
 {
-    auto state = (MVPMatrixUpdateState*)data;
+    auto state = (UpdateMVPMatrixState*)data;
     BatchRange  batch_range            = state->batch_range;
     Matrix      view_projection_matrix = state->view_projection_matrix;
     VSBuffer*   frame_vs_buffer        = state->frame_vs_buffer;
@@ -640,7 +639,7 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
     CalculateBatchRanges(&mvp_matrix_update->batch_ranges, game->entity_data.count);
     for (uint32 i = 0; i < thread_count; ++i)
     {
-        MVPMatrixUpdateState* state = GetPtr(&mvp_matrix_update->states, i);
+        UpdateMVPMatrixState* state = GetPtr(&mvp_matrix_update->states, i);
         state->batch_range            = Get(&mvp_matrix_update->batch_ranges, i);
         state->view_projection_matrix = view_projection_matrix;
         state->frame_vs_buffer        = frame_vs_buffer;
@@ -650,7 +649,7 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
     // Submit tasks.
     for (uint32 i = 0; i < thread_count; ++i)
     {
-        MVPMatrixUpdateState* state = GetPtr(&mvp_matrix_update->states, i);
+        UpdateMVPMatrixState* state = GetPtr(&mvp_matrix_update->states, i);
         TaskHnd task = SubmitTask(thread_pool, state, UpdateMVPMatrixesThread);
         Set(&mvp_matrix_update->tasks, i, task);
     }
@@ -775,7 +774,7 @@ void TestMain()
 
     RTKStateInfo state_info =
     {
-        .max_buffers          = 8,
+        .max_buffers          = 16,
         .max_images           = 8,
         .max_shader_datas     = 8,
         .max_shader_data_sets = 8,

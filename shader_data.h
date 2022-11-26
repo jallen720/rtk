@@ -22,12 +22,18 @@ struct ShaderDataInfo
     bool               per_frame;
     union
     {
-        BufferInfo buffer_info;
         struct
         {
-            ImageInfo image_info;
+            BufferHnd parent;
+            uint32    size;
+        }
+        buffer;
+        struct
+        {
+            ImageInfo info;
             VkSampler sampler;
-        };
+        }
+        image;
     };
 };
 
@@ -83,15 +89,15 @@ static ShaderDataHnd CreateShaderData(Stack* mem, RTKContext* rtk, ShaderDataInf
     {
         InitArray(&shader_data->buffer_hnds, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
-            Push(&shader_data->buffer_hnds, CreateBuffer(rtk, &info->buffer_info));
+            Push(&shader_data->buffer_hnds, CreateBuffer(info->buffer.parent, info->buffer.size));
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
-        shader_data->sampler = info->sampler;
+        shader_data->sampler = info->image.sampler;
 
         InitArray(&shader_data->image_hnds, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
-            Push(&shader_data->image_hnds, CreateImage(rtk, &info->image_info));
+            Push(&shader_data->image_hnds, CreateImage(rtk, &info->image.info));
     }
     else
     {
@@ -300,7 +306,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKConte
                 write->pBufferInfo = Push(buffer_infos,
                 {
                     .buffer = buffer->hnd,
-                    .offset = 0,
+                    .offset = buffer->offset,
                     .range  = buffer->size,
                 });
             }

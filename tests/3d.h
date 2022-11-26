@@ -292,58 +292,61 @@ static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, Ima
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .per_frame = false,
-        .image_info =
+        .image =
         {
-            .image =
+            .info =
             {
-                .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                .pNext     = NULL,
-                .flags     = 0,
-                .imageType = VK_IMAGE_TYPE_2D,
-                .format    = format,
-                .extent =
+                .image =
                 {
-                    .width  = (uint32)image_data->width,
-                    .height = (uint32)image_data->height,
-                    .depth  = 1
+                    .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                    .pNext     = NULL,
+                    .flags     = 0,
+                    .imageType = VK_IMAGE_TYPE_2D,
+                    .format    = format,
+                    .extent =
+                    {
+                        .width  = (uint32)image_data->width,
+                        .height = (uint32)image_data->height,
+                        .depth  = 1
+                    },
+                    .mipLevels             = 1,
+                    .arrayLayers           = 1,
+                    .samples               = VK_SAMPLE_COUNT_1_BIT,
+                    .tiling                = VK_IMAGE_TILING_OPTIMAL,
+                    .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+                    .queueFamilyIndexCount = 0,
+                    .pQueueFamilyIndices   = NULL,
+                    .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
                 },
-                .mipLevels             = 1,
-                .arrayLayers           = 1,
-                .samples               = VK_SAMPLE_COUNT_1_BIT,
-                .tiling                = VK_IMAGE_TILING_OPTIMAL,
-                .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = 0,
-                .pQueueFamilyIndices   = NULL,
-                .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+                .view =
+                {
+                    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                    .pNext    = NULL,
+                    .flags    = 0,
+                    .image    = VK_NULL_HANDLE,
+                    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                    .format   = format,
+                    .components =
+                    {
+                        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    },
+                    .subresourceRange =
+                    {
+                        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel   = 0,
+                        .levelCount     = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount     = 1,
+                    },
+                },
+                .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             },
-            .view =
-            {
-                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .pNext    = NULL,
-                .flags    = 0,
-                .image    = VK_NULL_HANDLE,
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format   = format,
-                .components =
-                {
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-                },
-                .subresourceRange =
-                {
-                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel   = 0,
-                    .levelCount     = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount     = 1,
-                },
-            },
-            .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            .sampler = sampler,
         },
-        .sampler = sampler,
     };
 }
 
@@ -376,16 +379,10 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
             .stages    = VK_SHADER_STAGE_VERTEX_BIT,
             .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .per_frame = true,
-            .buffer_info =
+            .buffer =
             {
-                .size               = sizeof(VSBuffer),
-                .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
-                .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                                      VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                .parent = rs->buffer.host,
+                .size   = sizeof(VSBuffer),
             }
         };
         rs->data.vs_buffer = CreateShaderData(mem, rtk, &info);
@@ -515,6 +512,7 @@ static void LocalTranslate(View* view, Vec3<float32> translation)
     matrix = RotateX(matrix, view->rotation.x);
     matrix = RotateY(matrix, view->rotation.y);
     matrix = RotateZ(matrix, view->rotation.z);
+    matrix = Translate(matrix, translation);
 
     Vec3<float32> forward =
     {
@@ -657,6 +655,16 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
     // Wait for tasks to complete.
     for (uint32 i = 0; i < thread_count; ++i)
         Wait(thread_pool, Get(&mvp_matrix_update->tasks, i));
+}
+
+struct RecordRenderCommandState
+{
+
+};
+
+static void RecordRenderCommandsThread(void* data)
+{
+    CTK_UNUSED(data)
 }
 
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)

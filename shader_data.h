@@ -56,7 +56,7 @@ struct ShaderData
 struct ShaderDataSet
 {
     VkDescriptorSetLayout  layout;
-    Array<VkDescriptorSet> hnds;
+    Array<VkDescriptorSet> instances;
 };
 
 /// Utils
@@ -263,8 +263,8 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKConte
         .descriptorSetCount = instance_count,
         .pSetLayouts        = desc_set_alloc_layouts->data,
     };
-    InitArrayFull(&shader_data_set->hnds, mem, instance_count);
-    res = vkAllocateDescriptorSets(device, &allocate_info, shader_data_set->hnds.data);
+    InitArrayFull(&shader_data_set->instances, mem, instance_count);
+    res = vkAllocateDescriptorSets(device, &allocate_info, shader_data_set->instances.data);
     Validate(res, "vkAllocateDescriptorSets() failed");
 
     // Bind descriptor data.
@@ -275,7 +275,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKConte
 
     for (uint32 instance_index = 0; instance_index < instance_count; ++instance_index)
     {
-        VkDescriptorSet desc_set = Get(&shader_data_set->hnds, instance_index);
+        VkDescriptorSet instance_desc_set = Get(&shader_data_set->instances, instance_index);
         for (uint32 data_binding = 0; data_binding < datas.count; ++data_binding)
         {
             ShaderData* data = GetShaderData(Get(&datas, data_binding));
@@ -283,7 +283,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKConte
 
             VkWriteDescriptorSet* write = Push(writes);
             write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write->dstSet          = desc_set;
+            write->dstSet          = instance_desc_set;
             write->dstBinding      = data_binding;
             write->dstArrayElement = 0;
             write->descriptorType  = data->type;
@@ -320,7 +320,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKConte
 
 static VkDescriptorSet GetInstance(ShaderDataSetHnd shader_data_set_hnd, uint32 instance)
 {
-    return Get(&GetShaderDataSet(shader_data_set_hnd)->hnds, instance);
+    return Get(&GetShaderDataSet(shader_data_set_hnd)->instances, instance);
 }
 
 }

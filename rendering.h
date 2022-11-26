@@ -47,13 +47,13 @@ static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, RenderTarge
     return command_buffer;
 }
 
-static void BindPipeline(VkCommandBuffer command_buffer, Pipeline* pipeline)
+static void BindPipeline(VkCommandBuffer command_buffer, PipelineHnd pipeline_hnd)
 {
-    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->hnd);
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, GetPipeline(pipeline_hnd)->hnd);
 }
 
-static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd shader_data_set_hnd, Pipeline* pipeline,
-                              RTKContext* rtk, uint32 binding)
+static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd shader_data_set_hnd,
+                              PipelineHnd pipeline_hnd, RTKContext* rtk, uint32 binding)
 {
     VkDescriptorSet descriptor_sets[] =
     {
@@ -61,7 +61,7 @@ static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd s
     };
     vkCmdBindDescriptorSets(command_buffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            pipeline->layout,
+                            GetPipeline(pipeline_hnd)->layout,
                             binding, // First set
                             CTK_ARRAY_SIZE(descriptor_sets), descriptor_sets, // Descriptor Set
                             0, NULL); // Dynamic Offsets

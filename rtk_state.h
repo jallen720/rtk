@@ -11,17 +11,18 @@ namespace RTK
 
 /// Resource Definitions
 ////////////////////////////////////////////////////////////
-#define RTK_DEFINE_RESOURCE(TYPE) \
+#define RTK_RESOURCE_DEFINITION(TYPE) \
     struct TYPE; \
     using TYPE##Hnd = PoolHnd<TYPE>;
 
-RTK_DEFINE_RESOURCE(Buffer)
-RTK_DEFINE_RESOURCE(Image)
-RTK_DEFINE_RESOURCE(ShaderData)
-RTK_DEFINE_RESOURCE(ShaderDataSet)
-RTK_DEFINE_RESOURCE(MeshData)
-RTK_DEFINE_RESOURCE(Mesh)
-RTK_DEFINE_RESOURCE(RenderTarget)
+RTK_RESOURCE_DEFINITION(Buffer)
+RTK_RESOURCE_DEFINITION(Image)
+RTK_RESOURCE_DEFINITION(ShaderData)
+RTK_RESOURCE_DEFINITION(ShaderDataSet)
+RTK_RESOURCE_DEFINITION(MeshData)
+RTK_RESOURCE_DEFINITION(Mesh)
+RTK_RESOURCE_DEFINITION(RenderTarget)
+RTK_RESOURCE_DEFINITION(Pipeline)
 
 /// Data
 ////////////////////////////////////////////////////////////
@@ -34,6 +35,7 @@ struct RTKStateInfo
     uint32 max_mesh_datas;
     uint32 max_meshes;
     uint32 max_render_targets;
+    uint32 max_pipelines;
 };
 
 struct RTKState
@@ -45,6 +47,7 @@ struct RTKState
     Pool<MeshData>      mesh_datas;
     Pool<Mesh>          meshes;
     Pool<RenderTarget>  render_targets;
+    Pool<Pipeline>      pipelines;
 };
 
 /// Instance
@@ -55,83 +58,33 @@ static RTKState rtk_state;
 ////////////////////////////////////////////////////////////
 static void InitRTKState(Stack* mem, RTKStateInfo* info)
 {
-    InitPool(&rtk_state.buffers, mem, info->max_buffers);
-    InitPool(&rtk_state.images, mem, info->max_images);
-    InitPool(&rtk_state.shader_datas, mem, info->max_shader_datas);
+    InitPool(&rtk_state.buffers,          mem, info->max_buffers);
+    InitPool(&rtk_state.images,           mem, info->max_images);
+    InitPool(&rtk_state.shader_datas,     mem, info->max_shader_datas);
     InitPool(&rtk_state.shader_data_sets, mem, info->max_shader_data_sets);
-    InitPool(&rtk_state.mesh_datas, mem, info->max_mesh_datas);
-    InitPool(&rtk_state.meshes, mem, info->max_meshes);
-    InitPool(&rtk_state.render_targets, mem, info->max_render_targets);
+    InitPool(&rtk_state.mesh_datas,       mem, info->max_mesh_datas);
+    InitPool(&rtk_state.meshes,           mem, info->max_meshes);
+    InitPool(&rtk_state.render_targets,   mem, info->max_render_targets);
+    InitPool(&rtk_state.pipelines,        mem, info->max_pipelines);
 }
 
-static BufferHnd AllocateBuffer()
-{
-    return Allocate(&rtk_state.buffers);
-}
+#define RTK_RESOURCE_INTERFACE(TYPE, POOL_NAME) \
+    static TYPE##Hnd Allocate##TYPE() \
+    { \
+        return Allocate(&rtk_state.##POOL_NAME); \
+    } \
+    static TYPE* Get##TYPE(TYPE##Hnd hnd) \
+    { \
+        return GetData(&rtk_state.##POOL_NAME, hnd); \
+    }
 
-static Buffer* GetBuffer(BufferHnd hnd)
-{
-    return GetData(&rtk_state.buffers, hnd);
-}
-
-static ImageHnd AllocateImage()
-{
-    return Allocate(&rtk_state.images);
-}
-
-static Image* GetImage(ImageHnd hnd)
-{
-    return GetData(&rtk_state.images, hnd);
-}
-
-static ShaderDataHnd AllocateShaderData()
-{
-    return Allocate(&rtk_state.shader_datas);
-}
-
-static ShaderData* GetShaderData(ShaderDataHnd hnd)
-{
-    return GetData(&rtk_state.shader_datas, hnd);
-}
-
-static ShaderDataSetHnd AllocateShaderDataSet()
-{
-    return Allocate(&rtk_state.shader_data_sets);
-}
-
-static ShaderDataSet* GetShaderDataSet(ShaderDataSetHnd hnd)
-{
-    return GetData(&rtk_state.shader_data_sets, hnd);
-}
-
-static MeshDataHnd AllocateMeshData()
-{
-    return Allocate(&rtk_state.mesh_datas);
-}
-
-static MeshData* GetMeshData(MeshDataHnd hnd)
-{
-    return GetData(&rtk_state.mesh_datas, hnd);
-}
-
-static MeshHnd AllocateMesh()
-{
-    return Allocate(&rtk_state.meshes);
-}
-
-static Mesh* GetMesh(MeshHnd hnd)
-{
-    return GetData(&rtk_state.meshes, hnd);
-}
-
-static RenderTargetHnd AllocateRenderTarget()
-{
-    return Allocate(&rtk_state.render_targets);
-}
-
-static RenderTarget* GetRenderTarget(RenderTargetHnd hnd)
-{
-    return GetData(&rtk_state.render_targets, hnd);
-}
+RTK_RESOURCE_INTERFACE(Buffer, buffers)
+RTK_RESOURCE_INTERFACE(Image, images)
+RTK_RESOURCE_INTERFACE(ShaderData, shader_datas)
+RTK_RESOURCE_INTERFACE(ShaderDataSet, shader_data_sets)
+RTK_RESOURCE_INTERFACE(MeshData, mesh_datas)
+RTK_RESOURCE_INTERFACE(Mesh, meshes)
+RTK_RESOURCE_INTERFACE(RenderTarget, render_targets)
+RTK_RESOURCE_INTERFACE(Pipeline, pipelines)
 
 }

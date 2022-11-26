@@ -86,7 +86,7 @@ struct RenderState
     render_target;
     struct
     {
-        Pipeline main;
+        PipelineHnd main;
     }
     pipeline;
     struct
@@ -457,7 +457,7 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
         .shader_data_sets     = WRAP_ARRAY(shader_data_sets),
         .push_constant_ranges = WRAP_ARRAY(push_constant_ranges),
     };
-    InitPipeline(&rs->pipeline.main, temp_mem, rs->render_target.main, rtk, &pipeline_info);
+    rs->pipeline.main = CreatePipeline(temp_mem, rs->render_target.main, rtk, &pipeline_info);
 }
 
 static void InitMeshes(RenderState* rs)
@@ -658,23 +658,22 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
 
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
-    Pipeline* pipeline = &rs->pipeline.main;
     uint32 entity_region_count = game->entity_data.count / 4;
     uint32 entity_region_start = 0;
 
     static constexpr uint32 THREAD_INDEX = 0;
     VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rtk, rs->render_target.main, THREAD_INDEX);
-        BindPipeline(command_buffer, pipeline);
+        BindPipeline(command_buffer, rs->pipeline.main);
 
         // Bind per-pipeline shader data.
-        BindShaderDataSet(command_buffer, rs->data_set.entity_data, pipeline, rtk, 0);
+        BindShaderDataSet(command_buffer, rs->data_set.entity_data, rs->pipeline.main, rtk, 0);
 
         // Bind mesh data buffers.
         BindMeshData(command_buffer, rs->mesh.data);
 
         // Axis Cube Texture
         {
-            BindShaderDataSet(command_buffer, rs->data_set.axis_cube_texture, pipeline, rtk, 1);
+            BindShaderDataSet(command_buffer, rs->data_set.axis_cube_texture, rs->pipeline.main, rtk, 1);
 
             // Cube Mesh
             DrawMesh(command_buffer, rs->mesh.cube, entity_region_start, entity_region_count);
@@ -687,7 +686,7 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 
         // Dirt Block Texture
         {
-            BindShaderDataSet(command_buffer, rs->data_set.dirt_block_texture, pipeline, rtk, 1);
+            BindShaderDataSet(command_buffer, rs->data_set.dirt_block_texture, rs->pipeline.main, rtk, 1);
 
             // Cube Mesh
             DrawMesh(command_buffer, rs->mesh.cube, entity_region_start, entity_region_count);
@@ -779,6 +778,7 @@ void TestMain()
         .max_mesh_datas       = 1,
         .max_meshes           = 8,
         .max_render_targets   = 1,
+        .max_pipelines        = 1,
     };
     InitRTKState(mem, &state_info);
 

@@ -87,9 +87,12 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
     ++layout->attribute_location;
 }
 
-static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTargetHnd render_target_hnd, RTKContext* rtk,
-                         PipelineInfo* info)
+static PipelineHnd CreatePipeline(Stack temp_mem, RenderTargetHnd render_target_hnd, RTKContext* rtk,
+                                  PipelineInfo* info)
 {
+    PipelineHnd pipeline_hnd = AllocatePipeline();
+    Pipeline* pipeline = GetPipeline(pipeline_hnd);
+
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
     VkDevice device = rtk->device;
     VkExtent2D surface_extent = rtk->surface.capabilities.currentExtent;
@@ -184,6 +187,8 @@ static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTargetHnd ren
     };
     res = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline->hnd);
     Validate(res, "vkCreateGraphicsPipelines() failed");
+
+    return pipeline_hnd;
 }
 
 }

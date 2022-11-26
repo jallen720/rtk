@@ -111,8 +111,8 @@ static Type* GetBufferMem(ShaderDataHnd shader_data_hnd, uint32 instance)
     return (Type*)GetBuffer(shader_data, instance)->mapped_mem;
 }
 
-static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instance_index, BufferHnd image_data_buffer_hnd,
-                                   RTKContext* rtk)
+static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instance_index,
+                                   BufferHnd image_data_buffer_hnd, RTKContext* rtk)
 {
     ShaderData* shader_data = GetShaderData(shader_data_hnd);
     Buffer* image_data_buffer = GetBuffer(image_data_buffer_hnd);

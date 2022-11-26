@@ -21,6 +21,7 @@ RTK_DEFINE_RESOURCE(ShaderData)
 RTK_DEFINE_RESOURCE(ShaderDataSet)
 RTK_DEFINE_RESOURCE(MeshData)
 RTK_DEFINE_RESOURCE(Mesh)
+RTK_DEFINE_RESOURCE(RenderTarget)
 
 /// Data
 ////////////////////////////////////////////////////////////
@@ -32,6 +33,7 @@ struct RTKStateInfo
     uint32 max_shader_data_sets;
     uint32 max_mesh_datas;
     uint32 max_meshes;
+    uint32 max_render_targets;
 };
 
 struct RTKState
@@ -42,6 +44,7 @@ struct RTKState
     Pool<ShaderDataSet> shader_data_sets;
     Pool<MeshData>      mesh_datas;
     Pool<Mesh>          meshes;
+    Pool<RenderTarget>  render_targets;
 };
 
 /// Instance
@@ -58,6 +61,7 @@ static void InitRTKState(Stack* mem, RTKStateInfo* info)
     InitPool(&rtk_state.shader_data_sets, mem, info->max_shader_data_sets);
     InitPool(&rtk_state.mesh_datas, mem, info->max_mesh_datas);
     InitPool(&rtk_state.meshes, mem, info->max_meshes);
+    InitPool(&rtk_state.render_targets, mem, info->max_render_targets);
 }
 
 static BufferHnd AllocateBuffer()
@@ -118,6 +122,16 @@ static MeshHnd AllocateMesh()
 static Mesh* GetMesh(MeshHnd hnd)
 {
     return GetData(&rtk_state.meshes, hnd);
+}
+
+static RenderTargetHnd AllocateRenderTarget()
+{
+    return Allocate(&rtk_state.render_targets);
+}
+
+static RenderTarget* GetRenderTarget(RenderTargetHnd hnd)
+{
+    return GetData(&rtk_state.render_targets, hnd);
 }
 
 }

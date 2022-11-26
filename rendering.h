@@ -17,9 +17,10 @@ namespace RTK
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, RenderTarget* render_target,
+static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, RenderTargetHnd render_target_hnd,
                                                     uint32 render_thread_index)
 {
+    RenderTarget* render_target = GetRenderTarget(render_target_hnd);
     Frame* frame = rtk->frame;
     VkCommandBuffer command_buffer = Get(&frame->render_command_buffers, render_thread_index);
 
@@ -100,8 +101,9 @@ static void EndRecordingRenderCommands(VkCommandBuffer command_buffer)
     Validate(res, "vkEndCommandBuffer() failed");
 }
 
-static void SubmitRenderCommands(RTKContext* rtk, RenderTarget* render_target)
+static void SubmitRenderCommands(RTKContext* rtk, RenderTargetHnd render_target_hnd)
 {
+    RenderTarget* render_target = GetRenderTarget(render_target_hnd);
     Frame* frame = rtk->frame;
     VkResult res = VK_SUCCESS;
 

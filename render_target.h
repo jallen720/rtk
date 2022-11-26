@@ -22,6 +22,12 @@ struct RenderPassAttachments
     Optional<VkAttachmentReference> depth;
 };
 
+struct RenderTargetInfo
+{
+    bool   depth_testing;
+    uint32 color_attachment_count;
+};
+
 struct RenderTarget
 {
     VkRenderPass         render_pass;
@@ -218,17 +224,27 @@ static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp
     }
 }
 
-static void InitRenderTarget(RenderTarget* render_target, Stack* mem, Stack temp_mem, RTKContext* rtk,
-    bool depth_testing)
+/// Interface
+////////////////////////////////////////////////////////////
+static RenderTargetHnd CreateRenderTarget(Stack* mem, Stack temp_mem, RTKContext* rtk, RenderTargetInfo* info)
 {
-    InitRenderPass(render_target, temp_mem, rtk, depth_testing);
-
-    if (depth_testing)
+    RenderTargetHnd render_target_hnd = AllocateRenderTarget();
+    RenderTarget* render_target = GetRenderTarget(render_target_hnd);
+    InitRenderPass(render_target, temp_mem, rtk, info->depth_testing);
+    if (info->depth_testing)
         InitDepthImages(render_target, mem, rtk);
 
-    uint32 attachment_count = 1 + (depth_testing ? 1 : 0);
-    InitFramebuffers(render_target, mem, temp_mem, rtk, attachment_count, depth_testing);
-    InitArrayFull(&render_target->attachment_clear_values, mem, attachment_count);
+    uint32 depth_attachment_count = info->depth_testing ? 1 : 0;
+    uint32 total_attachment_count = info->color_attachment_count + depth_attachment_count;
+    InitFramebuffers(render_target, mem, temp_mem, rtk, total_attachment_count, info->depth_testing);
+    InitArray(&render_target->attachment_clear_values, mem, total_attachment_count);
+
+    return render_target_hnd;
+}
+
+static void PushClearValue(RenderTargetHnd render_target_hnd, VkClearValue clear_value)
+{
+    Push(&GetRenderTarget(render_target_hnd)->attachment_clear_values, clear_value);
 }
 
 }

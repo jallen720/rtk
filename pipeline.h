@@ -87,9 +87,10 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
     ++layout->attribute_location;
 }
 
-static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTarget* render_target, RTKContext* rtk,
+static void InitPipeline(Pipeline* pipeline, Stack temp_mem, RenderTargetHnd render_target_hnd, RTKContext* rtk,
                          PipelineInfo* info)
 {
+    RenderTarget* render_target = GetRenderTarget(render_target_hnd);
     VkDevice device = rtk->device;
     VkExtent2D surface_extent = rtk->surface.capabilities.currentExtent;
     VkResult res = VK_SUCCESS;

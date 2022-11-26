@@ -74,11 +74,21 @@ struct RenderState
     BufferHnd       host_buffer;
     BufferHnd       device_buffer;
     BufferHnd       staging_buffer;
-    RenderTarget    render_target;
     VertexLayout    vertex_layout;
-    Pipeline        pipeline;
     VkSampler       sampler;
     MVPMatrixUpdate mvp_matrix_update;
+
+    // Resources
+    struct
+    {
+        RenderTargetHnd main;
+    }
+    render_target;
+    struct
+    {
+        Pipeline main;
+    }
+    pipeline;
     struct
     {
         ShaderDataHnd vs_buffer;
@@ -222,11 +232,14 @@ static void InitGraphicsMem(RenderState* rs, RTKContext* rtk)
 
 static void InitRenderTargets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
 {
-    RenderTarget* rt = &rs->render_target;
-    static constexpr bool DEPTH_TESTING = true;
-    InitRenderTarget(rt, mem, temp_mem, rtk, DEPTH_TESTING);
-    Set(&rt->attachment_clear_values, 0, { 0.0f, 0.1f, 0.2f, 1.0f });
-    Set(&rt->attachment_clear_values, 1, { 1.0f });
+    RenderTargetInfo info =
+    {
+        .depth_testing          = true,
+        .color_attachment_count = 1,
+    };
+    rs->render_target.main = CreateRenderTarget(mem, temp_mem, rtk, &info);
+    PushClearValue(rs->render_target.main, { 0.0f, 0.1f, 0.2f, 1.0f });
+    PushClearValue(rs->render_target.main, { 1.0f });
 }
 
 static void InitVertexLayout(RenderState* rs, Stack* mem)
@@ -444,7 +457,7 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
         .shader_data_sets     = WRAP_ARRAY(shader_data_sets),
         .push_constant_ranges = WRAP_ARRAY(push_constant_ranges),
     };
-    InitPipeline(&rs->pipeline, temp_mem, &rs->render_target, rtk, &pipeline_info);
+    InitPipeline(&rs->pipeline.main, temp_mem, rs->render_target.main, rtk, &pipeline_info);
 }
 
 static void InitMeshes(RenderState* rs)
@@ -645,12 +658,12 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
 
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
-    Pipeline* pipeline = &rs->pipeline;
+    Pipeline* pipeline = &rs->pipeline.main;
     uint32 entity_region_count = game->entity_data.count / 4;
     uint32 entity_region_start = 0;
 
     static constexpr uint32 THREAD_INDEX = 0;
-    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rtk, &rs->render_target, THREAD_INDEX);
+    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rtk, rs->render_target.main, THREAD_INDEX);
         BindPipeline(command_buffer, pipeline);
 
         // Bind per-pipeline shader data.
@@ -765,6 +778,7 @@ void TestMain()
         .max_shader_data_sets = 8,
         .max_mesh_datas       = 1,
         .max_meshes           = 8,
+        .max_render_targets   = 1,
     };
     InitRTKState(mem, &state_info);
 
@@ -806,7 +820,7 @@ void TestMain()
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "SubmitRenderCommands()");
-            SubmitRenderCommands(rtk, &rs->render_target);
+            SubmitRenderCommands(rtk, rs->render_target.main);
             EndProfile(prof_mgr);
         }
         else

@@ -55,10 +55,9 @@ static void BindPipeline(VkCommandBuffer command_buffer, Pipeline* pipeline)
 static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd shader_data_set_hnd, Pipeline* pipeline,
                               RTKContext* rtk, uint32 binding)
 {
-    ShaderDataSet* shader_data_set = GetShaderDataSet(shader_data_set_hnd);
     VkDescriptorSet descriptor_sets[] =
     {
-        Get(&shader_data_set->hnds, rtk->frames.index)
+        GetInstance(shader_data_set_hnd, rtk->frames.index)
     };
     vkCmdBindDescriptorSets(command_buffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,

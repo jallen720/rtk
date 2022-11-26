@@ -312,4 +312,9 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKConte
     return shader_data_set_hnd;
 }
 
+static VkDescriptorSet GetInstance(ShaderDataSetHnd shader_data_set_hnd, uint32 instance)
+{
+    return Get(&GetShaderDataSet(shader_data_set_hnd)->hnds, instance);
+}
+
 }

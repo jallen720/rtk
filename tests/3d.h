@@ -71,14 +71,18 @@ struct MVPMatrixUpdate
 
 struct RenderState
 {
-    BufferHnd       host_buffer;
-    BufferHnd       device_buffer;
-    BufferHnd       staging_buffer;
     VertexLayout    vertex_layout;
     VkSampler       sampler;
     MVPMatrixUpdate mvp_matrix_update;
 
     // Resources
+    struct
+    {
+        BufferHnd host;
+        BufferHnd device;
+        BufferHnd staging;
+    }
+    buffer;
     struct
     {
         RenderTargetHnd main;
@@ -212,7 +216,7 @@ static void InitGraphicsMem(RenderState* rs, RTKContext* rtk)
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    rs->host_buffer = CreateBuffer(rtk, &host_buffer_info);
+    rs->buffer.host = CreateBuffer(rtk, &host_buffer_info);
 
     // BufferInfo device_buffer_info =
     // {
@@ -224,10 +228,10 @@ static void InitGraphicsMem(RenderState* rs, RTKContext* rtk)
     //                           VK_BUFFER_USAGE_TRANSFER_DST_BIT,
     //     .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     // };
-    // rs->device_buffer = CreateBuffer(rtk, &device_buffer_info);
-    rs->device_buffer.index = NULL_HND;
+    // rs->buffer.device = CreateBuffer(rtk, &device_buffer_info);
+    rs->buffer.device.index = NULL_HND;
 
-    rs->staging_buffer = CreateBuffer(rs->host_buffer, Megabyte(16));
+    rs->buffer.staging = CreateBuffer(rs->buffer.host, Megabyte(16));
 }
 
 static void InitRenderTargets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
@@ -353,11 +357,11 @@ static ShaderDataHnd CreateTexture(cstring image_data_path, RTKContext* rtk, Ren
     ShaderDataHnd shader_data_hnd = CreateShaderData(mem, rtk, &info);
 
     // Copy image data into staging buffer.
-    Clear(rs->staging_buffer);
-    Write(rs->staging_buffer, image_data.data, image_data.size);
+    Clear(rs->buffer.staging);
+    Write(rs->buffer.staging, image_data.data, image_data.size);
     uint32 image_count = GetShaderData(shader_data_hnd)->image_hnds.count;
     for (uint32 i = 0; i < image_count; ++i)
-        WriteToShaderDataImage(shader_data_hnd, i, rs->staging_buffer, rtk);
+        WriteToShaderDataImage(shader_data_hnd, i, rs->buffer.staging, rtk);
 
     DestroyImageData(&image_data);
 
@@ -464,7 +468,7 @@ static void InitMeshes(RenderState* rs)
 {
     MeshDataInfo mesh_data_info =
     {
-        .parent_buffer      = rs->host_buffer,
+        .parent_buffer      = rs->buffer.host,
         .vertex_buffer_size = Megabyte(1),
         .index_buffer_size  = Megabyte(1),
     };

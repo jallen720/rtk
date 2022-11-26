@@ -6,7 +6,7 @@
 #include "ctk2/profile.h"
 #include "stk2/stk.h"
 
-// #define RTK_ENABLE_VALIDATION
+#define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
@@ -62,18 +62,23 @@ struct UpdateMVPMatrixState
     EntityData* entity_data;
 };
 
-struct MVPMatrixUpdate
+template<typename StateType>
+struct ThreadPoolJob
 {
-    Array<BatchRange>           batch_ranges;
-    Array<UpdateMVPMatrixState> states;
-    Array<TaskHnd>              tasks;
+    Array<StateType> states;
+    Array<TaskHnd>   tasks;
 };
 
 struct RenderState
 {
-    VertexLayout    vertex_layout;
-    VkSampler       sampler;
-    MVPMatrixUpdate mvp_matrix_update;
+    VertexLayout vertex_layout;
+    VkSampler    sampler;
+
+    struct
+    {
+        ThreadPoolJob<UpdateMVPMatrixState> update_mvp_matrixes;
+    }
+    thread_pool_job;
 
     // Resources
     struct
@@ -481,13 +486,17 @@ static void InitMeshes(RenderState* rs)
     }
 }
 
-static void InitMVPMatrixUpdate(RenderState* rs, Stack* mem, ThreadPool* thread_pool)
+template<typename StateType>
+static void InitThreadPoolJob(ThreadPoolJob<StateType>* job, Stack* mem, uint32 thread_count)
+{
+    InitArrayFull(&job->states, mem, thread_count);
+    InitArrayFull(&job->tasks, mem, thread_count);
+}
+
+static void InitThreadPoolJobs(RenderState* rs, Stack* mem, ThreadPool* thread_pool)
 {
     uint32 thread_count = thread_pool->size;
-    MVPMatrixUpdate* mvp_matrix_update = &rs->mvp_matrix_update;
-    InitArrayFull(&mvp_matrix_update->batch_ranges, mem, thread_count);
-    InitArrayFull(&mvp_matrix_update->states, mem, thread_count);
-    InitArrayFull(&mvp_matrix_update->tasks, mem, thread_count);
+    InitThreadPoolJob(&rs->thread_pool_job.update_mvp_matrixes, mem, thread_count);
 }
 
 static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk,
@@ -501,7 +510,7 @@ static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKCont
     InitShaderDataSets(rs, mem, temp_mem, rtk);
     InitPipelines(rs, temp_mem, rtk);
     InitMeshes(rs);
-    InitMVPMatrixUpdate(rs, mem, thread_pool);
+    InitThreadPoolJobs(rs, mem, thread_pool);
 }
 
 /// Game Update
@@ -628,17 +637,16 @@ static void UpdateMVPMatrixesThread(void* data)
 
 static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, ThreadPool* thread_pool)
 {
-    MVPMatrixUpdate* mvp_matrix_update = &rs->mvp_matrix_update;
+    ThreadPoolJob<UpdateMVPMatrixState>* job = &rs->thread_pool_job.update_mvp_matrixes;
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
     auto frame_vs_buffer = GetBufferMem<VSBuffer>(rs->data.vs_buffer, rtk->frames.index);
     uint32 thread_count = thread_pool->size;
 
     // Initialize thread states.
-    CalculateBatchRanges(&mvp_matrix_update->batch_ranges, game->entity_data.count);
-    for (uint32 i = 0; i < thread_count; ++i)
+    for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
     {
-        UpdateMVPMatrixState* state = GetPtr(&mvp_matrix_update->states, i);
-        state->batch_range            = Get(&mvp_matrix_update->batch_ranges, i);
+        UpdateMVPMatrixState* state = GetPtr(&job->states, thread_index);
+        state->batch_range            = CalculateBatchRange(thread_index, thread_count, game->entity_data.count);
         state->view_projection_matrix = view_projection_matrix;
         state->frame_vs_buffer        = frame_vs_buffer;
         state->entity_data            = &game->entity_data;
@@ -647,24 +655,14 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
     // Submit tasks.
     for (uint32 i = 0; i < thread_count; ++i)
     {
-        UpdateMVPMatrixState* state = GetPtr(&mvp_matrix_update->states, i);
+        UpdateMVPMatrixState* state = GetPtr(&job->states, i);
         TaskHnd task = SubmitTask(thread_pool, state, UpdateMVPMatrixesThread);
-        Set(&mvp_matrix_update->tasks, i, task);
+        Set(&job->tasks, i, task);
     }
 
     // Wait for tasks to complete.
     for (uint32 i = 0; i < thread_count; ++i)
-        Wait(thread_pool, Get(&mvp_matrix_update->tasks, i));
-}
-
-struct RecordRenderCommandState
-{
-
-};
-
-static void RecordRenderCommandsThread(void* data)
-{
-    CTK_UNUSED(data)
+        Wait(thread_pool, Get(&job->tasks, i));
 }
 
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
@@ -687,11 +685,13 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
             BindShaderDataSet(command_buffer, rs->data_set.axis_cube_texture, rs->pipeline.main, rtk, 1);
 
             // Cube Mesh
-            DrawMesh(command_buffer, rs->mesh.cube, entity_region_start, entity_region_count);
+            for (uint32 i = 0; i < entity_region_count; ++i)
+                DrawMesh(command_buffer, rs->mesh.cube, entity_region_start + i, 1);
             entity_region_start += entity_region_count;
 
             // Quad Mesh
-            DrawMesh(command_buffer, rs->mesh.quad, entity_region_start, entity_region_count);
+            for (uint32 i = 0; i < entity_region_count; ++i)
+                DrawMesh(command_buffer, rs->mesh.quad, entity_region_start + i, 1);
             entity_region_start += entity_region_count;
         }
 
@@ -700,11 +700,13 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
             BindShaderDataSet(command_buffer, rs->data_set.dirt_block_texture, rs->pipeline.main, rtk, 1);
 
             // Cube Mesh
-            DrawMesh(command_buffer, rs->mesh.cube, entity_region_start, entity_region_count);
+            for (uint32 i = 0; i < entity_region_count; ++i)
+                DrawMesh(command_buffer, rs->mesh.cube, entity_region_start + i, 1);
             entity_region_start += entity_region_count;
 
             // Quad Mesh
-            DrawMesh(command_buffer, rs->mesh.quad, entity_region_start, entity_region_count);
+            for (uint32 i = 0; i < entity_region_count; ++i)
+                DrawMesh(command_buffer, rs->mesh.quad, entity_region_start + i, 1);
             entity_region_start += entity_region_count;
         }
     EndRecordingRenderCommands(command_buffer);

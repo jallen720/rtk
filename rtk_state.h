@@ -11,18 +11,23 @@ namespace RTK
 
 /// Resource Definitions
 ////////////////////////////////////////////////////////////
-#define RTK_RESOURCE_DEFINITION(TYPE) \
-    struct TYPE; \
-    using TYPE##Hnd = PoolHnd<TYPE>;
+struct Buffer;
+struct Image;
+struct ShaderData;
+struct ShaderDataSet;
+struct MeshData;
+struct Mesh;
+struct RenderTarget;
+struct Pipeline;
 
-RTK_RESOURCE_DEFINITION(Buffer)
-RTK_RESOURCE_DEFINITION(Image)
-RTK_RESOURCE_DEFINITION(ShaderData)
-RTK_RESOURCE_DEFINITION(ShaderDataSet)
-RTK_RESOURCE_DEFINITION(MeshData)
-RTK_RESOURCE_DEFINITION(Mesh)
-RTK_RESOURCE_DEFINITION(RenderTarget)
-RTK_RESOURCE_DEFINITION(Pipeline)
+using BufferHnd        = PoolHnd<Buffer>;
+using ImageHnd         = PoolHnd<Image>;
+using ShaderDataHnd    = PoolHnd<ShaderData>;
+using ShaderDataSetHnd = PoolHnd<ShaderDataSet>;
+using MeshDataHnd      = PoolHnd<MeshData>;
+using MeshHnd          = PoolHnd<Mesh>;
+using RenderTargetHnd  = PoolHnd<RenderTarget>;
+using PipelineHnd      = PoolHnd<Pipeline>;
 
 /// Data
 ////////////////////////////////////////////////////////////
@@ -68,23 +73,88 @@ static void InitRTKState(Stack* mem, RTKStateInfo* info)
     InitPool(&rtk_state.pipelines,        mem, info->max_pipelines);
 }
 
-#define RTK_RESOURCE_INTERFACE(TYPE, POOL_NAME) \
-    static TYPE##Hnd Allocate##TYPE() \
-    { \
-        return Allocate(&rtk_state.##POOL_NAME); \
-    } \
-    static TYPE* Get##TYPE(TYPE##Hnd hnd) \
-    { \
-        return GetData(&rtk_state.##POOL_NAME, hnd); \
-    }
+/// Allocate Functions
+////////////////////////////////////////////////////////////
+static BufferHnd AllocateBuffer()
+{
+    return Allocate(&rtk_state.buffers);
+}
 
-RTK_RESOURCE_INTERFACE(Buffer, buffers)
-RTK_RESOURCE_INTERFACE(Image, images)
-RTK_RESOURCE_INTERFACE(ShaderData, shader_datas)
-RTK_RESOURCE_INTERFACE(ShaderDataSet, shader_data_sets)
-RTK_RESOURCE_INTERFACE(MeshData, mesh_datas)
-RTK_RESOURCE_INTERFACE(Mesh, meshes)
-RTK_RESOURCE_INTERFACE(RenderTarget, render_targets)
-RTK_RESOURCE_INTERFACE(Pipeline, pipelines)
+static ImageHnd AllocateImage()
+{
+    return Allocate(&rtk_state.images);
+}
+
+static ShaderDataHnd AllocateShaderData()
+{
+    return Allocate(&rtk_state.shader_datas);
+}
+
+static ShaderDataSetHnd AllocateShaderDataSet()
+{
+    return Allocate(&rtk_state.shader_data_sets);
+}
+
+static MeshDataHnd AllocateMeshData()
+{
+    return Allocate(&rtk_state.mesh_datas);
+}
+
+static MeshHnd AllocateMesh()
+{
+    return Allocate(&rtk_state.meshes);
+}
+
+static RenderTargetHnd AllocateRenderTarget()
+{
+    return Allocate(&rtk_state.render_targets);
+}
+
+static PipelineHnd AllocatePipeline()
+{
+    return Allocate(&rtk_state.pipelines);
+}
+
+/// Get Functions
+////////////////////////////////////////////////////////////
+static Buffer* GetBuffer(BufferHnd hnd)
+{
+    return GetData(&rtk_state.buffers, hnd);
+}
+
+static Image* GetImage(ImageHnd hnd)
+{
+    return GetData(&rtk_state.images, hnd);
+}
+
+static ShaderData* GetShaderData(ShaderDataHnd hnd)
+{
+    return GetData(&rtk_state.shader_datas, hnd);
+}
+
+static ShaderDataSet* GetShaderDataSet(ShaderDataSetHnd hnd)
+{
+    return GetData(&rtk_state.shader_data_sets, hnd);
+}
+
+static MeshData* GetMeshData(MeshDataHnd hnd)
+{
+    return GetData(&rtk_state.mesh_datas, hnd);
+}
+
+static Mesh* GetMesh(MeshHnd hnd)
+{
+    return GetData(&rtk_state.meshes, hnd);
+}
+
+static RenderTarget* GetRenderTarget(RenderTargetHnd hnd)
+{
+    return GetData(&rtk_state.render_targets, hnd);
+}
+
+static Pipeline* GetPipeline(PipelineHnd hnd)
+{
+    return GetData(&rtk_state.pipelines, hnd);
+}
 
 }

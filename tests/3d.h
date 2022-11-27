@@ -6,7 +6,7 @@
 #include "ctk2/profile.h"
 #include "stk2/stk.h"
 
-#define RTK_ENABLE_VALIDATION
+// #define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
@@ -646,7 +646,7 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
     for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
     {
         UpdateMVPMatrixState* state = GetPtr(&job->states, thread_index);
-        state->batch_range            = CalculateBatchRange(thread_index, thread_count, game->entity_data.count);
+        state->batch_range            = GetBatchRange(thread_index, thread_count, game->entity_data.count);
         state->view_projection_matrix = view_projection_matrix;
         state->frame_vs_buffer        = frame_vs_buffer;
         state->entity_data            = &game->entity_data;
@@ -665,50 +665,33 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
         Wait(thread_pool, Get(&job->tasks, i));
 }
 
+static void RenderMesh(VkCommandBuffer command_buffer, MeshHnd mesh, BatchRange batch_range)
+{
+#if 0
+    DrawMesh(command_buffer, mesh, batch_range.start, batch_range.size);
+#else
+    for (uint32 i = 0; i < batch_range.size; ++i)
+        DrawMesh(command_buffer, mesh, batch_range.start + i, 1);
+#endif
+}
+
 static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
 {
-    uint32 entity_region_count = game->entity_data.count / 4;
-    uint32 entity_region_start = 0;
-
     static constexpr uint32 THREAD_INDEX = 0;
     VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rtk, rs->render_target.main, THREAD_INDEX);
         BindPipeline(command_buffer, rs->pipeline.main);
-
-        // Bind per-pipeline shader data.
+        BindMeshData(command_buffer, rs->mesh.data);
         BindShaderDataSet(command_buffer, rs->data_set.entity_data, rs->pipeline.main, rtk, 0);
 
-        // Bind mesh data buffers.
-        BindMeshData(command_buffer, rs->mesh.data);
-
         // Axis Cube Texture
-        {
-            BindShaderDataSet(command_buffer, rs->data_set.axis_cube_texture, rs->pipeline.main, rtk, 1);
-
-            // Cube Mesh
-            for (uint32 i = 0; i < entity_region_count; ++i)
-                DrawMesh(command_buffer, rs->mesh.cube, entity_region_start + i, 1);
-            entity_region_start += entity_region_count;
-
-            // Quad Mesh
-            for (uint32 i = 0; i < entity_region_count; ++i)
-                DrawMesh(command_buffer, rs->mesh.quad, entity_region_start + i, 1);
-            entity_region_start += entity_region_count;
-        }
+        BindShaderDataSet(command_buffer, rs->data_set.axis_cube_texture, rs->pipeline.main, rtk, 1);
+        RenderMesh(command_buffer, rs->mesh.cube, GetBatchRange(0, 4, game->entity_data.count));
+        RenderMesh(command_buffer, rs->mesh.quad, GetBatchRange(1, 4, game->entity_data.count));
 
         // Dirt Block Texture
-        {
-            BindShaderDataSet(command_buffer, rs->data_set.dirt_block_texture, rs->pipeline.main, rtk, 1);
-
-            // Cube Mesh
-            for (uint32 i = 0; i < entity_region_count; ++i)
-                DrawMesh(command_buffer, rs->mesh.cube, entity_region_start + i, 1);
-            entity_region_start += entity_region_count;
-
-            // Quad Mesh
-            for (uint32 i = 0; i < entity_region_count; ++i)
-                DrawMesh(command_buffer, rs->mesh.quad, entity_region_start + i, 1);
-            entity_region_start += entity_region_count;
-        }
+        BindShaderDataSet(command_buffer, rs->data_set.dirt_block_texture, rs->pipeline.main, rtk, 1);
+        RenderMesh(command_buffer, rs->mesh.cube, GetBatchRange(2, 4, game->entity_data.count));
+        RenderMesh(command_buffer, rs->mesh.quad, GetBatchRange(3, 4, game->entity_data.count));
     EndRecordingRenderCommands(command_buffer);
 }
 

@@ -57,104 +57,104 @@ struct RTKState
 
 /// Instance
 ////////////////////////////////////////////////////////////
-static RTKState rtk_state;
+static RTKState global_state;
 
 /// Interface
 ////////////////////////////////////////////////////////////
 static void InitRTKState(Stack* mem, RTKStateInfo* info)
 {
-    InitPool(&rtk_state.buffers,          mem, info->max_buffers);
-    InitPool(&rtk_state.images,           mem, info->max_images);
-    InitPool(&rtk_state.shader_datas,     mem, info->max_shader_datas);
-    InitPool(&rtk_state.shader_data_sets, mem, info->max_shader_data_sets);
-    InitPool(&rtk_state.mesh_datas,       mem, info->max_mesh_datas);
-    InitPool(&rtk_state.meshes,           mem, info->max_meshes);
-    InitPool(&rtk_state.render_targets,   mem, info->max_render_targets);
-    InitPool(&rtk_state.pipelines,        mem, info->max_pipelines);
+    InitPool(&global_state.buffers,          mem, info->max_buffers);
+    InitPool(&global_state.images,           mem, info->max_images);
+    InitPool(&global_state.shader_datas,     mem, info->max_shader_datas);
+    InitPool(&global_state.shader_data_sets, mem, info->max_shader_data_sets);
+    InitPool(&global_state.mesh_datas,       mem, info->max_mesh_datas);
+    InitPool(&global_state.meshes,           mem, info->max_meshes);
+    InitPool(&global_state.render_targets,   mem, info->max_render_targets);
+    InitPool(&global_state.pipelines,        mem, info->max_pipelines);
 }
 
 /// Allocate Functions
 ////////////////////////////////////////////////////////////
 static BufferHnd AllocateBuffer()
 {
-    return Allocate(&rtk_state.buffers);
+    return Allocate(&global_state.buffers);
 }
 
 static ImageHnd AllocateImage()
 {
-    return Allocate(&rtk_state.images);
+    return Allocate(&global_state.images);
 }
 
 static ShaderDataHnd AllocateShaderData()
 {
-    return Allocate(&rtk_state.shader_datas);
+    return Allocate(&global_state.shader_datas);
 }
 
 static ShaderDataSetHnd AllocateShaderDataSet()
 {
-    return Allocate(&rtk_state.shader_data_sets);
+    return Allocate(&global_state.shader_data_sets);
 }
 
 static MeshDataHnd AllocateMeshData()
 {
-    return Allocate(&rtk_state.mesh_datas);
+    return Allocate(&global_state.mesh_datas);
 }
 
 static MeshHnd AllocateMesh()
 {
-    return Allocate(&rtk_state.meshes);
+    return Allocate(&global_state.meshes);
 }
 
 static RenderTargetHnd AllocateRenderTarget()
 {
-    return Allocate(&rtk_state.render_targets);
+    return Allocate(&global_state.render_targets);
 }
 
 static PipelineHnd AllocatePipeline()
 {
-    return Allocate(&rtk_state.pipelines);
+    return Allocate(&global_state.pipelines);
 }
 
 /// Get Functions
 ////////////////////////////////////////////////////////////
 static Buffer* GetBuffer(BufferHnd hnd)
 {
-    return GetData(&rtk_state.buffers, hnd);
+    return GetData(&global_state.buffers, hnd);
 }
 
 static Image* GetImage(ImageHnd hnd)
 {
-    return GetData(&rtk_state.images, hnd);
+    return GetData(&global_state.images, hnd);
 }
 
 static ShaderData* GetShaderData(ShaderDataHnd hnd)
 {
-    return GetData(&rtk_state.shader_datas, hnd);
+    return GetData(&global_state.shader_datas, hnd);
 }
 
 static ShaderDataSet* GetShaderDataSet(ShaderDataSetHnd hnd)
 {
-    return GetData(&rtk_state.shader_data_sets, hnd);
+    return GetData(&global_state.shader_data_sets, hnd);
 }
 
 static MeshData* GetMeshData(MeshDataHnd hnd)
 {
-    return GetData(&rtk_state.mesh_datas, hnd);
+    return GetData(&global_state.mesh_datas, hnd);
 }
 
 static Mesh* GetMesh(MeshHnd hnd)
 {
-    return GetData(&rtk_state.meshes, hnd);
+    return GetData(&global_state.meshes, hnd);
 }
 
 static RenderTarget* GetRenderTarget(RenderTargetHnd hnd)
 {
-    return GetData(&rtk_state.render_targets, hnd);
+    return GetData(&global_state.render_targets, hnd);
 }
 
 static Pipeline* GetPipeline(PipelineHnd hnd)
 {
-    return GetData(&rtk_state.pipelines, hnd);
+    return GetData(&global_state.pipelines, hnd);
 }
 
 }

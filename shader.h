@@ -23,7 +23,7 @@ struct Shader
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static VkShaderModule LoadShaderModule(RTKContext* rtk, Stack temp_mem, cstring path)
+static VkShaderModule LoadShaderModule(Stack temp_mem, cstring path)
 {
     Array<uint32>* bytecode = ReadFile<uint32>(&temp_mem, path);
     VkShaderModuleCreateInfo info =
@@ -36,7 +36,7 @@ static VkShaderModule LoadShaderModule(RTKContext* rtk, Stack temp_mem, cstring 
     };
 
     VkShaderModule module = VK_NULL_HANDLE;
-    VkResult res = vkCreateShaderModule(rtk->device, &info, NULL, &module);
+    VkResult res = vkCreateShaderModule(global_ctx.device, &info, NULL, &module);
     Validate(res, "vkCreateShaderModule() failed");
 
     return module;

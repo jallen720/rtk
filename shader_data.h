@@ -73,7 +73,7 @@ static Image* GetImage(ShaderData* shader_data, uint32 instance)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ShaderDataHnd CreateShaderData(Stack* mem, RTKContext* rtk, ShaderDataInfo* info)
+static ShaderDataHnd CreateShaderData(Stack* mem, ShaderDataInfo* info)
 {
     ShaderDataHnd shader_data_hnd = AllocateShaderData();
     ShaderData* shader_data = GetShaderData(shader_data_hnd);
@@ -82,7 +82,7 @@ static ShaderDataHnd CreateShaderData(Stack* mem, RTKContext* rtk, ShaderDataInf
     shader_data->type      = info->type;
     shader_data->per_frame = info->per_frame;
 
-    uint32 instance_count = shader_data->per_frame ? rtk->frames.size : 1;
+    uint32 instance_count = shader_data->per_frame ? global_ctx.frames.size : 1;
 
     if (shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
         shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
@@ -97,7 +97,7 @@ static ShaderDataHnd CreateShaderData(Stack* mem, RTKContext* rtk, ShaderDataInf
 
         InitArray(&shader_data->image_hnds, mem, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
-            Push(&shader_data->image_hnds, CreateImage(rtk, &info->image.info));
+            Push(&shader_data->image_hnds, CreateImage(&info->image.info));
     }
     else
     {
@@ -118,14 +118,14 @@ static Type* GetBufferMem(ShaderDataHnd shader_data_hnd, uint32 instance)
 }
 
 static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instance_index,
-                                   BufferHnd image_data_buffer_hnd, RTKContext* rtk)
+                                   BufferHnd image_data_buffer_hnd)
 {
     ShaderData* shader_data = GetShaderData(shader_data_hnd);
     Buffer* image_data_buffer = GetBuffer(image_data_buffer_hnd);
     Image* image = GetImage(shader_data, instance_index);
 
     // Copy image data from buffer memory to image memory.
-    BeginTempCommandBuffer(rtk);
+    BeginTempCommandBuffer();
         // Transition image layout for use in shader.
         VkImageMemoryBarrier image_mem_barrier =
         {
@@ -146,7 +146,7 @@ static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instanc
                 .layerCount     = 1,
             },
         };
-        vkCmdPipelineBarrier(rtk->temp_command_buffer,
+        vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
                              VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
                              0, // Dependency Flags
@@ -177,7 +177,7 @@ static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instanc
             },
             .imageExtent = image->extent,
         };
-        vkCmdCopyBufferToImage(rtk->temp_command_buffer, image_data_buffer->hnd, image->hnd,
+        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, image_data_buffer->hnd, image->hnd,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.
@@ -200,7 +200,7 @@ static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instanc
                 .layerCount     = 1,
             },
         };
-        vkCmdPipelineBarrier(rtk->temp_command_buffer,
+        vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
                              0, // Dependency Flags
@@ -210,17 +210,17 @@ static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instanc
                              NULL, // Buffer Memory Barriers
                              1, // Image Memory Barrier Count
                              &image_mem_barrier2); // Image Memory Barriers
-    SubmitTempCommandBuffer(rtk);
+    SubmitTempCommandBuffer();
 }
 
-static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKContext* rtk, Array<ShaderDataHnd> datas)
+static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, Array<ShaderDataHnd> datas)
 {
     ShaderDataSetHnd shader_data_set_hnd = AllocateShaderDataSet();
     ShaderDataSet* shader_data_set = GetShaderDataSet(shader_data_set_hnd);
 
-    VkDevice device = rtk->device;
+    VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
-    uint32 instance_count = rtk->frames.size;
+    uint32 instance_count = global_ctx.frames.size;
 
     // Generate descriptor bindings.
     auto bindings = CreateArray<VkDescriptorSetLayoutBinding>(&temp_mem, datas.count);
@@ -259,7 +259,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, RTKConte
     {
         .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext              = NULL,
-        .descriptorPool     = rtk->descriptor_pool,
+        .descriptorPool     = global_ctx.descriptor_pool,
         .descriptorSetCount = instance_count,
         .pSetLayouts        = desc_set_alloc_layouts->data,
     };

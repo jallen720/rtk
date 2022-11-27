@@ -96,6 +96,10 @@ struct RTKContext
     VkDescriptorPool     descriptor_pool;
 };
 
+/// Instance
+////////////////////////////////////////////////////////////
+static RTKContext global_ctx;
+
 /// Internal
 ////////////////////////////////////////////////////////////
 static QueueFamilies FindQueueFamilies(Stack temp_mem, VkPhysicalDevice physical_device, Surface* surface)
@@ -173,7 +177,7 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(uint32 queue_family_index)
     return info;
 }
 
-static void InitInstance(RTKContext* rtk, RTKInfo* info)
+static void InitInstance(RTKInfo* info)
 {
     VkResult res = VK_SUCCESS;
 
@@ -229,17 +233,17 @@ static void InitInstance(RTKContext* rtk, RTKInfo* info)
     create_info.enabledLayerCount       = 0;
     create_info.ppEnabledLayerNames     = NULL;
 #endif
-    res = vkCreateInstance(&create_info, NULL, &rtk->instance);
+    res = vkCreateInstance(&create_info, NULL, &global_ctx.instance);
     Validate(res, "vkCreateInstance() failed");
 
 #ifdef RTK_ENABLE_VALIDATION
-    RTK_LOAD_INSTANCE_EXTENSION_FUNCTION(rtk->instance, vkCreateDebugUtilsMessengerEXT);
-    res = vkCreateDebugUtilsMessengerEXT(rtk->instance, &debug_msgr_info, NULL, &rtk->debug_messenger);
+    RTK_LOAD_INSTANCE_EXTENSION_FUNCTION(global_ctx.instance, vkCreateDebugUtilsMessengerEXT);
+    res = vkCreateDebugUtilsMessengerEXT(global_ctx.instance, &debug_msgr_info, NULL, &global_ctx.debug_messenger);
     Validate(res, "vkCreateDebugUtilsMessengerEXT() failed");
 #endif
 }
 
-static void InitSurface(RTKContext* rtk, Window* window)
+static void InitSurface(Window* window)
 {
     VkWin32SurfaceCreateInfoKHR info =
     {
@@ -247,30 +251,30 @@ static void InitSurface(RTKContext* rtk, Window* window)
         .hinstance = window->instance,
         .hwnd      = window->handle,
     };
-    VkResult res = vkCreateWin32SurfaceKHR(rtk->instance, &info, NULL, &rtk->surface.hnd);
+    VkResult res = vkCreateWin32SurfaceKHR(global_ctx.instance, &info, NULL, &global_ctx.surface.hnd);
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
-static void UsePhysicalDevice(RTKContext* rtk, uint32 index)
+static void UsePhysicalDevice(uint32 index)
 {
-    if (index >= rtk->physical_devices.count)
-        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, rtk->physical_devices.count - 1);
+    if (index >= global_ctx.physical_devices.count)
+        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, global_ctx.physical_devices.count - 1);
 
-    rtk->physical_device = GetPtr(&rtk->physical_devices, index);
+    global_ctx.physical_device = GetPtr(&global_ctx.physical_devices, index);
 }
 
-static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFeatures* required_features)
+static void LoadCapablePhysicalDevices(Stack temp_mem, DeviceFeatures* required_features)
 {
     // Get system physical devices and ensure there is enough space in the context's physical devices list.
-    Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_mem, rtk->instance);
-    if (vk_physical_devices->size > rtk->physical_devices.size)
+    Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_mem, global_ctx.instance);
+    if (vk_physical_devices->size > global_ctx.physical_devices.size)
     {
         CTK_FATAL("can't load physical devices: max device count is %u, system device count is %u",
-                  rtk->physical_devices.size, vk_physical_devices->size);
+                  global_ctx.physical_devices.size, vk_physical_devices->size);
     }
 
     // Reset context's physical device list to store new list.
-    rtk->physical_devices.count = 0;
+    global_ctx.physical_devices.count = 0;
 
     // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
     for (uint32 i = 0; i < vk_physical_devices->count; ++i)
@@ -281,7 +285,7 @@ static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFe
         PhysicalDevice physical_device =
         {
             .hnd                = vk_physical_device,
-            .queue_families     = FindQueueFamilies(temp_mem, vk_physical_device, &rtk->surface),
+            .queue_families     = FindQueueFamilies(temp_mem, vk_physical_device, &global_ctx.surface),
             .depth_image_format = FindDepthImageFormat(vk_physical_device),
         };
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
@@ -303,17 +307,17 @@ static void LoadCapablePhysicalDevices(RTKContext* rtk, Stack temp_mem, DeviceFe
         if (!HasRequiredFeatures(&physical_device, required_features))
             continue;
 
-        Push(&rtk->physical_devices, physical_device);
+        Push(&global_ctx.physical_devices, physical_device);
     }
 
     // Ensure atleast 1 capable physical device was loaded.
-    if (rtk->physical_devices.count == 0)
+    if (global_ctx.physical_devices.count == 0)
         CTK_FATAL("failed to load any capable physical devices");
 }
 
-static void InitDevice(RTKContext* rtk, DeviceFeatures* enabled_features)
+static void InitDevice(DeviceFeatures* enabled_features)
 {
-    QueueFamilies* queue_families = &rtk->physical_device->queue_families;
+    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
 
     // Add queue creation info for 1 queue in each queue family.
     FixedArray<VkDeviceQueueCreateInfo, 2> queue_infos = {};
@@ -337,21 +341,21 @@ static void InitDevice(RTKContext* rtk, DeviceFeatures* enabled_features)
         .ppEnabledExtensionNames = enabled_extensions,
         .pEnabledFeatures        = &enabled_features->as_struct,
     };
-    VkResult res = vkCreateDevice(rtk->physical_device->hnd, &create_info, NULL, &rtk->device);
+    VkResult res = vkCreateDevice(global_ctx.physical_device->hnd, &create_info, NULL, &global_ctx.device);
     Validate(res, "vkCreateDevice() failed");
 }
 
-static void InitQueues(RTKContext* rtk)
+static void InitQueues()
 {
-    QueueFamilies* queue_families = &rtk->physical_device->queue_families;
-    vkGetDeviceQueue(rtk->device, queue_families->graphics, 0, &rtk->graphics_queue);
-    vkGetDeviceQueue(rtk->device, queue_families->present, 0, &rtk->present_queue);
+    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
+    vkGetDeviceQueue(global_ctx.device, queue_families->graphics, 0, &global_ctx.graphics_queue);
+    vkGetDeviceQueue(global_ctx.device, queue_families->present, 0, &global_ctx.present_queue);
 }
 
-static void GetSurfaceInfo(RTKContext* rtk, Stack* mem)
+static void GetSurfaceInfo(Stack* mem)
 {
-    Surface* surface = &rtk->surface;
-    VkPhysicalDevice vk_physical_device = rtk->physical_device->hnd;
+    Surface* surface = &global_ctx.surface;
+    VkPhysicalDevice vk_physical_device = global_ctx.physical_device->hnd;
 
     VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, surface->hnd, &surface->capabilities);
     Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
@@ -360,9 +364,9 @@ static void GetSurfaceInfo(RTKContext* rtk, Stack* mem)
     LoadVkSurfacePresentModes(&surface->present_modes, mem, vk_physical_device, surface->hnd);
 }
 
-static void InitMainCommandState(RTKContext* rtk)
+static void InitMainCommandState()
 {
-    VkDevice device = rtk->device;
+    VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
 
     // Main Command Pool
@@ -370,28 +374,28 @@ static void InitMainCommandState(RTKContext* rtk)
     {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
+        .queueFamilyIndex = global_ctx.physical_device->queue_families.graphics,
     };
-    res = vkCreateCommandPool(device, &pool_info, NULL, &rtk->main_command_pool);
+    res = vkCreateCommandPool(device, &pool_info, NULL, &global_ctx.main_command_pool);
     Validate(res, "vkCreateCommandPool() failed");
 
     // Temp Command Buffer
     VkCommandBufferAllocateInfo allocate_info =
     {
         .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool        = rtk->main_command_pool,
+        .commandPool        = global_ctx.main_command_pool,
         .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
-    res = vkAllocateCommandBuffers(device, &allocate_info, &rtk->temp_command_buffer);
+    res = vkAllocateCommandBuffers(device, &allocate_info, &global_ctx.temp_command_buffer);
     Validate(res, "vkAllocateCommandBuffers() failed");
 }
 
-static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
+static void InitSwapchain(Stack* mem, Stack temp_mem)
 {
-    VkDevice device = rtk->device;
-    Surface* surface = &rtk->surface;
-    Swapchain* swapchain = &rtk->swapchain;
+    VkDevice device = global_ctx.device;
+    Surface* surface = &global_ctx.surface;
+    Swapchain* swapchain = &global_ctx.swapchain;
     VkResult res = VK_SUCCESS;
 
     // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
@@ -453,7 +457,7 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
     };
 
     // Determine image sharing mode based on queue family indexes.
-    QueueFamilies* queue_families = &rtk->physical_device->queue_families;
+    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
     if (queue_families->graphics != queue_families->present)
     {
         info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
@@ -509,18 +513,18 @@ static void InitSwapchain(RTKContext* rtk, Stack* mem, Stack temp_mem)
     }
 }
 
-static void InitRenderCommandPools(RTKContext* rtk, Stack* mem, uint32 render_thread_count)
+static void InitRenderCommandPools(Stack* mem, uint32 render_thread_count)
 {
-    InitArray(&rtk->render_command_pools, mem, render_thread_count);
+    InitArray(&global_ctx.render_command_pools, mem, render_thread_count);
     VkCommandPoolCreateInfo info =
     {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = rtk->physical_device->queue_families.graphics,
+        .queueFamilyIndex = global_ctx.physical_device->queue_families.graphics,
     };
     for (uint32 i = 0; i < render_thread_count; ++i)
     {
-        VkResult res = vkCreateCommandPool(rtk->device, &info, NULL, Push(&rtk->render_command_pools));
+        VkResult res = vkCreateCommandPool(global_ctx.device, &info, NULL, Push(&global_ctx.render_command_pools));
         Validate(res, "vkCreateCommandPool() failed");
     }
 }
@@ -555,16 +559,16 @@ static VkSemaphore CreateSemaphore(VkDevice device)
     return semaphore;
 }
 
-static void InitFrames(RTKContext* rtk, Stack* mem)
+static void InitFrames(Stack* mem)
 {
     VkResult res = VK_SUCCESS;
-    VkDevice device = rtk->device;
-    uint32 frame_count = rtk->swapchain.image_count + 1;
+    VkDevice device = global_ctx.device;
+    uint32 frame_count = global_ctx.swapchain.image_count + 1;
 
-    InitRingBuffer(&rtk->frames, mem, frame_count);
+    InitRingBuffer(&global_ctx.frames, mem, frame_count);
     for (uint32 i = 0; i < frame_count; ++i)
     {
-        Frame* frame = GetPtr(&rtk->frames, i);
+        Frame* frame = GetPtr(&global_ctx.frames, i);
 
         // Sync State
         frame->image_acquired  = CreateSemaphore(device);
@@ -576,7 +580,7 @@ static void InitFrames(RTKContext* rtk, Stack* mem)
             VkCommandBufferAllocateInfo allocate_info =
             {
                 .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .commandPool        = rtk->main_command_pool,
+                .commandPool        = global_ctx.main_command_pool,
                 .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                 .commandBufferCount = 1,
             };
@@ -585,13 +589,13 @@ static void InitFrames(RTKContext* rtk, Stack* mem)
         }
 
         // render_command_buffers
-        InitArray(&frame->render_command_buffers, mem, rtk->render_command_pools.count);
-        for (uint32 i = 0; i < rtk->render_command_pools.count; ++i)
+        InitArray(&frame->render_command_buffers, mem, global_ctx.render_command_pools.count);
+        for (uint32 i = 0; i < global_ctx.render_command_pools.count; ++i)
         {
             VkCommandBufferAllocateInfo allocate_info =
             {
                 .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .commandPool        = Get(&rtk->render_command_pools, i),
+                .commandPool        = Get(&global_ctx.render_command_pools, i),
                 .level              = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
                 .commandBufferCount = 1,
             };
@@ -601,7 +605,7 @@ static void InitFrames(RTKContext* rtk, Stack* mem)
     }
 }
 
-static void InitDescriptorPool(RTKContext* rtk, Array<VkDescriptorPoolSize>* descriptor_pool_sizes)
+static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_sizes)
 {
     // Count total descriptors from pool sizes.
     uint32 total_descriptors = 0;
@@ -616,40 +620,40 @@ static void InitDescriptorPool(RTKContext* rtk, Array<VkDescriptorPoolSize>* des
         .poolSizeCount = descriptor_pool_sizes->count,
         .pPoolSizes    = descriptor_pool_sizes->data,
     };
-    VkResult res = vkCreateDescriptorPool(rtk->device, &pool_info, NULL, &rtk->descriptor_pool);
+    VkResult res = vkCreateDescriptorPool(global_ctx.device, &pool_info, NULL, &global_ctx.descriptor_pool);
     Validate(res, "vkCreateDescriptorPool() failed");
 }
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRTKContext(RTKContext* rtk, Stack* mem, Stack temp_mem, Window* window, RTKInfo* info)
+static void InitContext(Stack* mem, Stack temp_mem, Window* window, RTKInfo* info)
 {
-    InitInstance(rtk, info);
-    InitSurface(rtk, window);
+    InitInstance(info);
+    InitSurface(window);
 
     // Initialize device state.
-    InitArray(&rtk->physical_devices, mem, info->max_physical_devices);
-    LoadCapablePhysicalDevices(rtk, temp_mem, &info->required_features);
-    UsePhysicalDevice(rtk, 0); // Default to first capable device found. Required by InitDevice().
-    InitDevice(rtk, &info->required_features);
-    InitQueues(rtk);
-    GetSurfaceInfo(rtk, mem);
-    InitMainCommandState(rtk);
+    InitArray(&global_ctx.physical_devices, mem, info->max_physical_devices);
+    LoadCapablePhysicalDevices(temp_mem, &info->required_features);
+    UsePhysicalDevice(0); // Default to first capable device found. Required by InitDevice().
+    InitDevice(&info->required_features);
+    InitQueues();
+    GetSurfaceInfo(mem);
+    InitMainCommandState();
 
     // Initialize rendering state.
-    InitSwapchain(rtk, mem, temp_mem);
-    InitRenderCommandPools(rtk, mem, info->render_thread_count);
-    InitFrames(rtk, mem);
-    InitDescriptorPool(rtk, &info->descriptor_pool_sizes);
+    InitSwapchain(mem, temp_mem);
+    InitRenderCommandPools(mem, info->render_thread_count);
+    InitFrames(mem);
+    InitDescriptorPool(&info->descriptor_pool_sizes);
 };
 
-static void NextFrame(RTKContext* rtk)
+static void NextFrame()
 {
-    VkDevice device = rtk->device;
+    VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
 
     // Get next frame and wait for it to be finished (if still in-progress) before proceeding.
-    Frame* frame = Next(&rtk->frames);
+    Frame* frame = Next(&global_ctx.frames);
 
     res = vkWaitForFences(device, 1, &frame->in_progress, VK_TRUE, UINT64_MAX);
     Validate(res, "vkWaitForFences() failed");
@@ -658,14 +662,14 @@ static void NextFrame(RTKContext* rtk)
     Validate(res, "vkResetFences() failed");
 
     // Once frame is ready, aquire next swapchain image's index.
-    res = vkAcquireNextImageKHR(rtk->device, rtk->swapchain.hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
+    res = vkAcquireNextImageKHR(device, global_ctx.swapchain.hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
                                 &frame->swapchain_image_index);
     Validate(res, "vkAcquireNextImageKHR() failed");
 
-    rtk->frame = frame;
+    global_ctx.frame = frame;
 }
 
-static void BeginTempCommandBuffer(RTKContext* rtk)
+static void BeginTempCommandBuffer()
 {
     VkCommandBufferBeginInfo info =
     {
@@ -674,12 +678,12 @@ static void BeginTempCommandBuffer(RTKContext* rtk)
         .flags            = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
         .pInheritanceInfo = NULL,
     };
-    vkBeginCommandBuffer(rtk->temp_command_buffer, &info);
+    vkBeginCommandBuffer(global_ctx.temp_command_buffer, &info);
 }
 
-static void SubmitTempCommandBuffer(RTKContext* rtk)
+static void SubmitTempCommandBuffer()
 {
-    vkEndCommandBuffer(rtk->temp_command_buffer);
+    vkEndCommandBuffer(global_ctx.temp_command_buffer);
 
     VkSubmitInfo submit_info =
     {
@@ -689,14 +693,14 @@ static void SubmitTempCommandBuffer(RTKContext* rtk)
         .pWaitSemaphores      = NULL,
         .pWaitDstStageMask    = NULL,
         .commandBufferCount   = 1,
-        .pCommandBuffers      = &rtk->temp_command_buffer,
+        .pCommandBuffers      = &global_ctx.temp_command_buffer,
         .signalSemaphoreCount = 0,
         .pSignalSemaphores    = NULL,
     };
-    VkResult res = vkQueueSubmit(rtk->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+    VkResult res = vkQueueSubmit(global_ctx.graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
     Validate(res, "vkQueueSubmit() failed");
 
-    vkQueueWaitIdle(rtk->graphics_queue);
+    vkQueueWaitIdle(global_ctx.graphics_queue);
 }
 
 }

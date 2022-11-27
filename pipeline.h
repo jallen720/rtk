@@ -87,15 +87,14 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count)
     ++layout->attribute_location;
 }
 
-static PipelineHnd CreatePipeline(Stack temp_mem, RenderTargetHnd render_target_hnd, RTKContext* rtk,
-                                  PipelineInfo* info)
+static PipelineHnd CreatePipeline(Stack temp_mem, RenderTargetHnd render_target_hnd, PipelineInfo* info)
 {
     PipelineHnd pipeline_hnd = AllocatePipeline();
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
 
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-    VkDevice device = rtk->device;
-    VkExtent2D surface_extent = rtk->surface.capabilities.currentExtent;
+    VkDevice device = global_ctx.device;
+    VkExtent2D surface_extent = global_ctx.surface.capabilities.currentExtent;
     VkResult res = VK_SUCCESS;
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
@@ -155,7 +154,7 @@ static PipelineHnd CreatePipeline(Stack temp_mem, RenderTargetHnd render_target_
     layout_create_info.pPushConstantRanges    = info->push_constant_ranges.data;
 
     VkPipelineLayout layout = VK_NULL_HANDLE;
-    res = vkCreatePipelineLayout(rtk->device, &layout_create_info, NULL, &pipeline->layout);
+    res = vkCreatePipelineLayout(global_ctx.device, &layout_create_info, NULL, &pipeline->layout);
     Validate(res, "vkCreatePipelineLayout() failed");
 
     // Pipeline

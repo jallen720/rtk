@@ -72,14 +72,14 @@ static VkAttachmentReference* GetDepthAttachment(RenderPassAttachments* attachme
     return attachments->depth.exists ? &attachments->depth.value : NULL;
 }
 
-static void InitRenderPass(RenderTarget* render_target, Stack temp_mem, RTKContext* rtk, bool depth_testing)
+static void InitRenderPass(RenderTarget* render_target, Stack temp_mem, bool depth_testing)
 {
     RenderPassAttachments attachments = {};
     InitRenderPassAttachments(&attachments, &temp_mem, 1, depth_testing);
     PushColorAttachment(&attachments,
     {
         .flags          = 0,
-        .format         = rtk->swapchain.image_format,
+        .format         = global_ctx.swapchain.image_format,
         .samples        = VK_SAMPLE_COUNT_1_BIT,
 
         .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -96,7 +96,7 @@ static void InitRenderPass(RenderTarget* render_target, Stack temp_mem, RTKConte
         SetDepthAttachment(&attachments,
         {
             .flags          = 0,
-            .format         = rtk->physical_device->depth_image_format,
+            .format         = global_ctx.physical_device->depth_image_format,
             .samples        = VK_SAMPLE_COUNT_1_BIT,
 
             .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
@@ -128,14 +128,14 @@ static void InitRenderPass(RenderTarget* render_target, Stack temp_mem, RTKConte
         .dependencyCount = 0,
         .pDependencies   = NULL,
     };
-    VkResult res = vkCreateRenderPass(rtk->device, &create_info, NULL, &render_target->render_pass);
+    VkResult res = vkCreateRenderPass(global_ctx.device, &create_info, NULL, &render_target->render_pass);
     Validate(res, "vkCreateRenderPass() failed");
 }
 
-static void InitDepthImages(RenderTarget* render_target, Stack* mem, RTKContext* rtk)
+static void InitDepthImages(RenderTarget* render_target, Stack* mem)
 {
-    Swapchain* swapchain = &rtk->swapchain;
-    VkFormat depth_image_format = rtk->physical_device->depth_image_format;
+    Swapchain* swapchain = &global_ctx.swapchain;
+    VkFormat depth_image_format = global_ctx.physical_device->depth_image_format;
     InitArray(&render_target->depth_images, mem, swapchain->image_count);
     ImageInfo depth_image_info =
     {
@@ -190,16 +190,16 @@ static void InitDepthImages(RenderTarget* render_target, Stack* mem, RTKContext*
     };
 
     for (uint32 i = 0; i < swapchain->image_count; ++i)
-        Push(&render_target->depth_images, CreateImage(rtk, &depth_image_info));
+        Push(&render_target->depth_images, CreateImage(&depth_image_info));
 }
 
-static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp_mem, RTKContext* rtk,
-                             uint32 attachment_count, bool depth_testing)
+static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp_mem, uint32 attachment_count,
+                             bool depth_testing)
 {
-    Swapchain* swapchain = &rtk->swapchain;
-    InitArray(&render_target->framebuffers, mem, rtk->swapchain.image_count);
+    Swapchain* swapchain = &global_ctx.swapchain;
+    InitArray(&render_target->framebuffers, mem, global_ctx.swapchain.image_count);
     auto attachments = CreateArray<VkImageView>(&temp_mem, attachment_count);
-    for (uint32 i = 0; i < rtk->swapchain.image_count; ++i)
+    for (uint32 i = 0; i < global_ctx.swapchain.image_count; ++i)
     {
         Push(attachments, Get(&swapchain->image_views, i));
 
@@ -216,7 +216,7 @@ static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp
             .height          = swapchain->extent.height,
             .layers          = 1,
         };
-        VkResult res = vkCreateFramebuffer(rtk->device, &info, NULL, Push(&render_target->framebuffers));
+        VkResult res = vkCreateFramebuffer(global_ctx.device, &info, NULL, Push(&render_target->framebuffers));
         Validate(res, "vkCreateFramebuffer() failed");
 
         // Clear attachments for next iteration.
@@ -226,17 +226,17 @@ static void InitFramebuffers(RenderTarget* render_target, Stack* mem, Stack temp
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static RenderTargetHnd CreateRenderTarget(Stack* mem, Stack temp_mem, RTKContext* rtk, RenderTargetInfo* info)
+static RenderTargetHnd CreateRenderTarget(Stack* mem, Stack temp_mem, RenderTargetInfo* info)
 {
     RenderTargetHnd render_target_hnd = AllocateRenderTarget();
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-    InitRenderPass(render_target, temp_mem, rtk, info->depth_testing);
+    InitRenderPass(render_target, temp_mem, info->depth_testing);
     if (info->depth_testing)
-        InitDepthImages(render_target, mem, rtk);
+        InitDepthImages(render_target, mem);
 
     uint32 depth_attachment_count = info->depth_testing ? 1 : 0;
     uint32 total_attachment_count = info->color_attachment_count + depth_attachment_count;
-    InitFramebuffers(render_target, mem, temp_mem, rtk, total_attachment_count, info->depth_testing);
+    InitFramebuffers(render_target, mem, temp_mem, total_attachment_count, info->depth_testing);
     InitArray(&render_target->attachment_clear_values, mem, total_attachment_count);
 
     return render_target_hnd;

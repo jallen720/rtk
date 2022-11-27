@@ -49,11 +49,11 @@ struct Image
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static VkDeviceMemory AllocateDeviceMemory(RTKContext* rtk, VkMemoryRequirements mem_requirements,
+static VkDeviceMemory AllocateDeviceMemory(VkMemoryRequirements mem_requirements,
                                            VkMemoryPropertyFlags mem_property_flags)
 {
     // Find memory type index in memory properties based on memory property flags.
-    VkPhysicalDeviceMemoryProperties* mem_properties = &rtk->physical_device->mem_properties;
+    VkPhysicalDeviceMemoryProperties* mem_properties = &global_ctx.physical_device->mem_properties;
     uint32 mem_type_index = UINT32_MAX;
     for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
     {
@@ -80,7 +80,7 @@ static VkDeviceMemory AllocateDeviceMemory(RTKContext* rtk, VkMemoryRequirements
         .memoryTypeIndex = mem_type_index,
     };
     VkDeviceMemory mem = VK_NULL_HANDLE;
-    VkResult res = vkAllocateMemory(rtk->device, &info, NULL, &mem);
+    VkResult res = vkAllocateMemory(global_ctx.device, &info, NULL, &mem);
     Validate(res, "vkAllocateMemory() failed");
 
     return mem;
@@ -88,12 +88,12 @@ static VkDeviceMemory AllocateDeviceMemory(RTKContext* rtk, VkMemoryRequirements
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static BufferHnd CreateBuffer(RTKContext* rtk, BufferInfo* info)
+static BufferHnd CreateBuffer(BufferInfo* info)
 {
     BufferHnd buffer_hnd = AllocateBuffer();
     Buffer* buffer = GetBuffer(buffer_hnd);
 
-    VkDevice device = rtk->device;
+    VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
 
     VkBufferCreateInfo create_info =
@@ -112,7 +112,7 @@ static BufferHnd CreateBuffer(RTKContext* rtk, BufferInfo* info)
     VkMemoryRequirements mem_requirements = {};
     vkGetBufferMemoryRequirements(device, buffer->hnd, &mem_requirements);
 
-    buffer->mem = AllocateDeviceMemory(rtk, mem_requirements, info->mem_property_flags);
+    buffer->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags);
     res = vkBindBufferMemory(device, buffer->hnd, buffer->mem, 0);
     Validate(res, "vkBindBufferMemory() failed");
 
@@ -173,12 +173,12 @@ static void Clear(BufferHnd buffer_hnd)
     GetBuffer(buffer_hnd)->index = 0;
 }
 
-static ImageHnd CreateImage(RTKContext* rtk, ImageInfo* info)
+static ImageHnd CreateImage(ImageInfo* info)
 {
     ImageHnd image_hnd = AllocateImage();
     Image* image = GetImage(image_hnd);
 
-    VkDevice device = rtk->device;
+    VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
 
     res = vkCreateImage(device, &info->image, NULL, &image->hnd);
@@ -188,7 +188,7 @@ static ImageHnd CreateImage(RTKContext* rtk, ImageInfo* info)
     VkMemoryRequirements mem_requirements = {};
     vkGetImageMemoryRequirements(device, image->hnd, &mem_requirements);
 
-    image->mem = AllocateDeviceMemory(rtk, mem_requirements, info->mem_property_flags);
+    image->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags);
     res = vkBindImageMemory(device, image->hnd, image->mem, 0);
     Validate(res, "vkBindImageMemory() failed");
 

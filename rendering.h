@@ -17,11 +17,10 @@ namespace RTK
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static VkCommandBuffer BeginRecordingRenderCommands(RTKContext* rtk, RenderTargetHnd render_target_hnd,
-                                                    uint32 render_thread_index)
+static VkCommandBuffer BeginRecordingRenderCommands(RenderTargetHnd render_target_hnd, uint32 render_thread_index)
 {
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-    Frame* frame = rtk->frame;
+    Frame* frame = global_ctx.frame;
     VkCommandBuffer command_buffer = Get(&frame->render_command_buffers, render_thread_index);
 
     VkCommandBufferInheritanceInfo inheritance_info =
@@ -53,11 +52,11 @@ static void BindPipeline(VkCommandBuffer command_buffer, PipelineHnd pipeline_hn
 }
 
 static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd shader_data_set_hnd,
-                              PipelineHnd pipeline_hnd, RTKContext* rtk, uint32 binding)
+                              PipelineHnd pipeline_hnd, uint32 binding)
 {
     VkDescriptorSet descriptor_sets[] =
     {
-        GetInstance(shader_data_set_hnd, rtk->frames.index)
+        GetInstance(shader_data_set_hnd, global_ctx.frames.index)
     };
     vkCmdBindDescriptorSets(command_buffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -100,10 +99,10 @@ static void EndRecordingRenderCommands(VkCommandBuffer command_buffer)
     Validate(res, "vkEndCommandBuffer() failed");
 }
 
-static void SubmitRenderCommands(RTKContext* rtk, RenderTargetHnd render_target_hnd)
+static void SubmitRenderCommands(RenderTargetHnd render_target_hnd)
 {
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-    Frame* frame = rtk->frame;
+    Frame* frame = global_ctx.frame;
     VkResult res = VK_SUCCESS;
 
     // Record current frame's primary command buffer, including render command buffers.
@@ -129,7 +128,7 @@ static void SubmitRenderCommands(RTKContext* rtk, RenderTargetHnd render_target_
         .renderArea =
         {
             .offset = { 0, 0 },
-            .extent = rtk->swapchain.extent,
+            .extent = global_ctx.swapchain.extent,
         },
         .clearValueCount = render_target->attachment_clear_values.count,
         .pClearValues    = render_target->attachment_clear_values.data,
@@ -158,7 +157,7 @@ static void SubmitRenderCommands(RTKContext* rtk, RenderTargetHnd render_target_
         .signalSemaphoreCount = 1,
         .pSignalSemaphores    = &frame->render_finished,
     };
-    res = vkQueueSubmit(rtk->graphics_queue, 1, &submit_info, frame->in_progress);
+    res = vkQueueSubmit(global_ctx.graphics_queue, 1, &submit_info, frame->in_progress);
     Validate(res, "vkQueueSubmit() failed");
 
     // Queue swapchain image for presentation.
@@ -169,14 +168,14 @@ static void SubmitRenderCommands(RTKContext* rtk, RenderTargetHnd render_target_
         .waitSemaphoreCount = 1,
         .pWaitSemaphores    = &frame->render_finished,
         .swapchainCount     = 1,
-        .pSwapchains        = &rtk->swapchain.hnd,
+        .pSwapchains        = &global_ctx.swapchain.hnd,
         .pImageIndices      = &frame->swapchain_image_index,
         .pResults           = NULL,
     };
-    res = vkQueuePresentKHR(rtk->present_queue, &present_info);
+    res = vkQueuePresentKHR(global_ctx.present_queue, &present_info);
     Validate(res, "vkQueuePresentKHR() failed");
 
-    vkDeviceWaitIdle(rtk->device);
+    vkDeviceWaitIdle(global_ctx.device);
 }
 
 }

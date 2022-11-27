@@ -143,19 +143,19 @@ static constexpr uint32 RENDER_THREAD_COUNT = 4;
 
 /// RTK
 ////////////////////////////////////////////////////////////
-static void SelectPhysicalDevice(RTKContext* rtk)
+static void SelectPhysicalDevice()
 {
     // Use first discrete device if any are available.
-    for (uint32 i = 0; i < rtk->physical_devices.count; ++i)
+    for (uint32 i = 0; i < RTK::global_ctx.physical_devices.count; ++i)
     {
-        if (GetPtr(&rtk->physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        if (GetPtr(&RTK::global_ctx.physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
         {
-            UsePhysicalDevice(rtk, i);
+            UsePhysicalDevice(i);
             break;
         }
     }
 
-    LogPhysicalDevice(rtk->physical_device, "selected physical device");
+    LogPhysicalDevice(RTK::global_ctx.physical_device, "selected physical device");
 }
 
 /// Game
@@ -218,7 +218,7 @@ static Transform* GetTransformPtr(EntityData* entity_data, uint32 index)
 
 /// Render State
 ////////////////////////////////////////////////////////////
-static void InitBuffers(RenderState* rs, RTKContext* rtk)
+static void InitBuffers(RenderState* rs)
 {
     BufferInfo host_buffer_info =
     {
@@ -231,7 +231,7 @@ static void InitBuffers(RenderState* rs, RTKContext* rtk)
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    rs->buffer.host = CreateBuffer(rtk, &host_buffer_info);
+    rs->buffer.host = CreateBuffer(&host_buffer_info);
 
     BufferInfo device_buffer_info =
     {
@@ -243,19 +243,19 @@ static void InitBuffers(RenderState* rs, RTKContext* rtk)
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    rs->buffer.device = CreateBuffer(rtk, &device_buffer_info);
+    rs->buffer.device = CreateBuffer(&device_buffer_info);
 
     rs->buffer.staging = CreateBuffer(rs->buffer.host, Megabyte(16));
 }
 
-static void InitRenderTargets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
+static void InitRenderTargets(RenderState* rs, Stack* mem, Stack temp_mem)
 {
     RenderTargetInfo info =
     {
         .depth_testing          = true,
         .color_attachment_count = 1,
     };
-    rs->render_target.main = CreateRenderTarget(mem, temp_mem, rtk, &info);
+    rs->render_target.main = CreateRenderTarget(mem, temp_mem, &info);
     PushClearValue(rs->render_target.main, { 0.0f, 0.1f, 0.2f, 1.0f });
     PushClearValue(rs->render_target.main, { 1.0f });
 }
@@ -273,7 +273,7 @@ static void InitVertexLayout(RenderState* rs, Stack* mem)
     PushAttribute(vertex_layout, 2); // UV
 }
 
-static void InitSampler(RenderState* rs, RTKContext* rtk)
+static void InitSampler(RenderState* rs)
 {
     VkSamplerCreateInfo info =
     {
@@ -288,7 +288,7 @@ static void InitSampler(RenderState* rs, RTKContext* rtk)
         .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
         .mipLodBias              = 0.0f,
         .anisotropyEnable        = VK_FALSE,
-        .maxAnisotropy           = rtk->physical_device->properties.limits.maxSamplerAnisotropy,
+        .maxAnisotropy           = RTK::global_ctx.physical_device->properties.limits.maxSamplerAnisotropy,
         .compareEnable           = VK_FALSE,
         .compareOp               = VK_COMPARE_OP_ALWAYS,
         .minLod                  = 0.0f,
@@ -296,7 +296,7 @@ static void InitSampler(RenderState* rs, RTKContext* rtk)
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    VkResult res = vkCreateSampler(rtk->device, &info, NULL, &rs->sampler);
+    VkResult res = vkCreateSampler(RTK::global_ctx.device, &info, NULL, &rs->sampler);
     Validate(res, "vkCreateSampler() failed");
 }
 
@@ -365,27 +365,27 @@ static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, Ima
     };
 }
 
-static ShaderDataHnd CreateTexture(cstring image_data_path, RTKContext* rtk, RenderState* rs, Stack* mem)
+static ShaderDataHnd CreateTexture(cstring image_data_path, RenderState* rs, Stack* mem)
 {
     ImageData image_data = {};
     LoadImageData(&image_data, image_data_path);
 
-    ShaderDataInfo info = DefaultTextureInfo(rtk->swapchain.image_format, rs->sampler, &image_data);
-    ShaderDataHnd shader_data_hnd = CreateShaderData(mem, rtk, &info);
+    ShaderDataInfo info = DefaultTextureInfo(RTK::global_ctx.swapchain.image_format, rs->sampler, &image_data);
+    ShaderDataHnd shader_data_hnd = CreateShaderData(mem, &info);
 
     // Copy image data into staging buffer.
     Clear(rs->buffer.staging);
     Write(rs->buffer.staging, image_data.data, image_data.size);
     uint32 image_count = GetShaderData(shader_data_hnd)->image_hnds.count;
     for (uint32 i = 0; i < image_count; ++i)
-        WriteToShaderDataImage(shader_data_hnd, i, rs->buffer.staging, rtk);
+        WriteToShaderDataImage(shader_data_hnd, i, rs->buffer.staging);
 
     DestroyImageData(&image_data);
 
     return shader_data_hnd;
 }
 
-static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
+static void InitShaderDatas(RenderState* rs, Stack* mem)
 {
     // vs_buffer
     {
@@ -400,14 +400,14 @@ static void InitShaderDatas(RenderState* rs, Stack* mem, RTKContext* rtk)
                 .size   = sizeof(VSBuffer),
             }
         };
-        rs->data.vs_buffer = CreateShaderData(mem, rtk, &info);
+        rs->data.vs_buffer = CreateShaderData(mem, &info);
     }
 
-    rs->data.axis_cube_texture = CreateTexture("images/axis_cube.png", rtk, rs, mem);
-    rs->data.dirt_block_texture = CreateTexture("images/dirt_block.png", rtk, rs, mem);
+    rs->data.axis_cube_texture = CreateTexture("images/axis_cube.png", rs, mem);
+    rs->data.dirt_block_texture = CreateTexture("images/dirt_block.png", rs, mem);
 }
 
-static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk)
+static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem)
 {
     // data_set.vs_buffer
     {
@@ -415,7 +415,7 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
         {
             rs->data.vs_buffer,
         };
-        rs->data_set.entity_data = CreateShaderDataSet(mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        rs->data_set.entity_data = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
     }
 
     // data_set.axis_cube_texture
@@ -424,7 +424,7 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
         {
             rs->data.axis_cube_texture,
         };
-        rs->data_set.axis_cube_texture = CreateShaderDataSet(mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        rs->data_set.axis_cube_texture = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
     }
 
     // data_set.dirt_block_texture
@@ -433,21 +433,21 @@ static void InitShaderDataSets(RenderState* rs, Stack* mem, Stack temp_mem, RTKC
         {
             rs->data.dirt_block_texture,
         };
-        rs->data_set.dirt_block_texture = CreateShaderDataSet(mem, temp_mem, rtk, WRAP_ARRAY(datas));
+        rs->data_set.dirt_block_texture = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
     }
 }
 
-static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
+static void InitPipelines(RenderState* rs, Stack temp_mem)
 {
     // Pipeline info arrays.
     Shader shaders[] =
     {
         {
-            .module = LoadShaderModule(rtk, temp_mem, "shaders/bin/3d.vert.spv"),
+            .module = LoadShaderModule(temp_mem, "shaders/bin/3d.vert.spv"),
             .stage  = VK_SHADER_STAGE_VERTEX_BIT
         },
         {
-            .module = LoadShaderModule(rtk, temp_mem, "shaders/bin/3d.frag.spv"),
+            .module = LoadShaderModule(temp_mem, "shaders/bin/3d.frag.spv"),
             .stage  = VK_SHADER_STAGE_FRAGMENT_BIT
         },
     };
@@ -472,7 +472,7 @@ static void InitPipelines(RenderState* rs, Stack temp_mem, RTKContext* rtk)
         .shader_data_sets     = WRAP_ARRAY(shader_data_sets),
         .push_constant_ranges = WRAP_ARRAY(push_constant_ranges),
     };
-    rs->pipeline.main = CreatePipeline(temp_mem, rs->render_target.main, rtk, &pipeline_info);
+    rs->pipeline.main = CreatePipeline(temp_mem, rs->render_target.main, &pipeline_info);
 }
 
 static void InitMeshes(RenderState* rs)
@@ -509,16 +509,16 @@ static void InitThreadPoolJobs(RenderState* rs, Stack* mem, ThreadPool* thread_p
     InitThreadPoolJob(&rs->thread_pool_job.record_render_commands, mem, RENDER_THREAD_COUNT);
 }
 
-static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk,
+static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem,
                             ThreadPool* thread_pool)
 {
-    InitBuffers(rs, rtk);
-    InitRenderTargets(rs, mem, temp_mem, rtk);
+    InitBuffers(rs);
+    InitRenderTargets(rs, mem, temp_mem);
     InitVertexLayout(rs, mem);
-    InitSampler(rs, rtk);
-    InitShaderDatas(rs, mem, rtk);
-    InitShaderDataSets(rs, mem, temp_mem, rtk);
-    InitPipelines(rs, temp_mem, rtk);
+    InitSampler(rs);
+    InitShaderDatas(rs, mem);
+    InitShaderDataSets(rs, mem, temp_mem);
+    InitPipelines(rs, temp_mem);
     InitMeshes(rs);
     InitThreadPoolJobs(rs, mem, thread_pool);
 }
@@ -645,11 +645,11 @@ static void UpdateMVPMatrixesThread(void* data)
     }
 }
 
-static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, ThreadPool* thread_pool)
+static void UpdateMVPMatrixes(RenderState* rs, Game* game, ThreadPool* thread_pool)
 {
     ThreadPoolJob<UpdateMVPMatrixesState>* job = &rs->thread_pool_job.update_mvp_matrixes;
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    auto frame_vs_buffer = GetBufferMem<VSBuffer>(rs->data.vs_buffer, rtk->frames.index);
+    auto frame_vs_buffer = GetBufferMem<VSBuffer>(rs->data.vs_buffer, RTK::global_ctx.frames.index);
     uint32 thread_count = thread_pool->size;
 
     // Initialize thread states and submit tasks.
@@ -673,18 +673,17 @@ static void RecordRenderCommandsThread(void* data)
 {
     auto state = (RecordRenderCommandsState*)data;
     RenderState* rs = state->rs;
-    RTKContext* rtk = state->rtk;
 
-    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rtk, rs->render_target.main, state->thread_index);
+    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rs->render_target.main, state->thread_index);
         BindPipeline(command_buffer, rs->pipeline.main);
         BindMeshData(command_buffer, rs->mesh.data);
-        BindShaderDataSet(command_buffer, rs->data_set.entity_data, rs->pipeline.main, rtk, 0);
-        BindShaderDataSet(command_buffer, state->texture, rs->pipeline.main, rtk, 1);
+        BindShaderDataSet(command_buffer, rs->data_set.entity_data, rs->pipeline.main, 0);
+        BindShaderDataSet(command_buffer, state->texture, rs->pipeline.main, 1);
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
     EndRecordingRenderCommands(command_buffer);
 }
 
-static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, ThreadPool* thread_pool)
+static void RecordRenderCommands(Game* game, RenderState* rs, ThreadPool* thread_pool)
 {
     ThreadPoolJob<RecordRenderCommandsState>* job = &rs->thread_pool_job.record_render_commands;
 
@@ -711,7 +710,6 @@ static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, T
         {
             uint32 thread_index = (texture_index * MESH_COUNT) + mesh_index;
             RecordRenderCommandsState* state = GetPtr(&job->states, thread_index);
-            state->rtk          = rtk;
             state->rs           = rs;
             state->thread_index = thread_index;
             state->texture      = textures[texture_index];
@@ -794,8 +792,7 @@ void TestMain()
         .render_thread_count   = RENDER_THREAD_COUNT,
         .descriptor_pool_sizes = WRAP_ARRAY(descriptor_pool_sizes),
     };
-    auto rtk = Allocate<RTKContext>(mem, 1);
-    InitRTKContext(rtk, mem, *temp_mem, window, &rtk_info);
+    InitContext(mem, *temp_mem, window, &rtk_info);
 
     RTKStateInfo state_info =
     {
@@ -815,7 +812,7 @@ void TestMain()
     InitGame(game);
 
     auto rs = Allocate<RenderState>(mem, 1);
-    InitRenderState(rs, mem, *temp_mem, rtk, thread_pool);
+    InitRenderState(rs, mem, *temp_mem, thread_pool);
 
     auto prof_mgr = Allocate<ProfileManager>(mem, 1);
     InitProfileManager(prof_mgr, mem, 64);
@@ -832,7 +829,7 @@ void TestMain()
         if (IsActive(window))
         {
             StartProfile(prof_mgr, "NextFrame()");
-            NextFrame(rtk);
+            NextFrame();
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "UpdateGame()");
@@ -840,15 +837,15 @@ void TestMain()
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "UpdateMVPMatrixes()");
-            UpdateMVPMatrixes(rs, game, rtk, thread_pool);
+            UpdateMVPMatrixes(rs, game, thread_pool);
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "RecordRenderCommands()");
-            RecordRenderCommands(game, rs, rtk, thread_pool);
+            RecordRenderCommands(game, rs, thread_pool);
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "SubmitRenderCommands()");
-            SubmitRenderCommands(rtk, rs->render_target.main);
+            SubmitRenderCommands(rs->render_target.main);
             EndProfile(prof_mgr);
         }
         else

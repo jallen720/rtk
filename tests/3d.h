@@ -54,7 +54,7 @@ struct VSBuffer
     Matrix mvp_matrixes[MAX_ENTITIES];
 };
 
-struct UpdateMVPMatrixState
+struct UpdateMVPMatrixesState
 {
     BatchRange  batch_range;
     Matrix      view_projection_matrix;
@@ -76,7 +76,7 @@ struct RenderState
 
     struct
     {
-        ThreadPoolJob<UpdateMVPMatrixState> update_mvp_matrixes;
+        ThreadPoolJob<UpdateMVPMatrixesState> update_mvp_matrixes;
     }
     thread_pool_job;
 
@@ -614,7 +614,7 @@ static Matrix CreateViewProjectionMatrix(View* view)
 
 static void UpdateMVPMatrixesThread(void* data)
 {
-    auto state = (UpdateMVPMatrixState*)data;
+    auto state = (UpdateMVPMatrixesState*)data;
     BatchRange  batch_range            = state->batch_range;
     Matrix      view_projection_matrix = state->view_projection_matrix;
     VSBuffer*   frame_vs_buffer        = state->frame_vs_buffer;
@@ -637,27 +637,21 @@ static void UpdateMVPMatrixesThread(void* data)
 
 static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, ThreadPool* thread_pool)
 {
-    ThreadPoolJob<UpdateMVPMatrixState>* job = &rs->thread_pool_job.update_mvp_matrixes;
+    ThreadPoolJob<UpdateMVPMatrixesState>* job = &rs->thread_pool_job.update_mvp_matrixes;
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
     auto frame_vs_buffer = GetBufferMem<VSBuffer>(rs->data.vs_buffer, rtk->frames.index);
     uint32 thread_count = thread_pool->size;
 
-    // Initialize thread states.
+    // Initialize thread states and submit tasks.
     for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
     {
-        UpdateMVPMatrixState* state = GetPtr(&job->states, thread_index);
+        UpdateMVPMatrixesState* state = GetPtr(&job->states, thread_index);
         state->batch_range            = GetBatchRange(thread_index, thread_count, game->entity_data.count);
         state->view_projection_matrix = view_projection_matrix;
         state->frame_vs_buffer        = frame_vs_buffer;
         state->entity_data            = &game->entity_data;
-    }
 
-    // Submit tasks.
-    for (uint32 i = 0; i < thread_count; ++i)
-    {
-        UpdateMVPMatrixState* state = GetPtr(&job->states, i);
-        TaskHnd task = SubmitTask(thread_pool, state, UpdateMVPMatrixesThread);
-        Set(&job->tasks, i, task);
+        Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, UpdateMVPMatrixesThread));
     }
 
     // Wait for tasks to complete.

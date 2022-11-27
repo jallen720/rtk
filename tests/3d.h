@@ -43,10 +43,9 @@ struct EntityData
 
 struct Game
 {
-    Mouse        mouse;
-    View         view;
-    EntityData   entity_data;
-    FrameMetrics frame_metrics;
+    Mouse      mouse;
+    View       view;
+    EntityData entity_data;
 };
 
 struct VSBuffer
@@ -200,10 +199,6 @@ static void InitGame(Game* game)
             .rotation = { 0, 0, 0 },
         };
     }
-
-    // FrameMetrics
-    static constexpr float64 FPS_UPDATE_FREQUENCY = 0.0;
-    InitFrameMetrics(&game->frame_metrics, FPS_UPDATE_FREQUENCY);
 }
 
 static void ValidateIndex(EntityData* entity_data, uint32 index)
@@ -864,7 +859,5 @@ void TestMain()
         EndProfile(prof_mgr);
         PrintProfiles(prof_mgr);
         ClearProfiles(prof_mgr);
-        if (Tick(&game->frame_metrics))
-            PrintLine("FPS: %.2f", game->frame_metrics.fps);
     }
 }

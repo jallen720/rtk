@@ -141,23 +141,6 @@ struct Vertex
 
 static constexpr uint32 RENDER_THREAD_COUNT = 4;
 
-/// RTK
-////////////////////////////////////////////////////////////
-static void SelectPhysicalDevice()
-{
-    // Use first discrete device if any are available.
-    for (uint32 i = 0; i < RTK::global_ctx.physical_devices.count; ++i)
-    {
-        if (GetPtr(&RTK::global_ctx.physical_devices, i)->properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
-        {
-            UsePhysicalDevice(i);
-            break;
-        }
-    }
-
-    LogPhysicalDevice(RTK::global_ctx.physical_device, "selected physical device");
-}
-
 /// Game
 ////////////////////////////////////////////////////////////
 static uint32 PushEntity(EntityData* entity_data)

@@ -62,6 +62,18 @@ struct UpdateMVPMatrixesState
     EntityData* entity_data;
 };
 
+struct RenderState;
+
+struct RecordRenderCommandsState
+{
+    RTKContext*      rtk;
+    RenderState*     rs;
+    uint32           thread_index;
+    ShaderDataSetHnd texture;
+    BatchRange       batch_range;
+    MeshHnd          mesh;
+};
+
 template<typename StateType>
 struct ThreadPoolJob
 {
@@ -76,7 +88,8 @@ struct RenderState
 
     struct
     {
-        ThreadPoolJob<UpdateMVPMatrixesState> update_mvp_matrixes;
+        ThreadPoolJob<UpdateMVPMatrixesState>    update_mvp_matrixes;
+        ThreadPoolJob<RecordRenderCommandsState> record_render_commands;
     }
     thread_pool_job;
 
@@ -126,6 +139,8 @@ struct Vertex
     Vec3<float32> position;
     Vec2<float32> uv;
 };
+
+static constexpr uint32 RENDER_THREAD_COUNT = 4;
 
 /// RTK
 ////////////////////////////////////////////////////////////
@@ -495,8 +510,8 @@ static void InitThreadPoolJob(ThreadPoolJob<StateType>* job, Stack* mem, uint32 
 
 static void InitThreadPoolJobs(RenderState* rs, Stack* mem, ThreadPool* thread_pool)
 {
-    uint32 thread_count = thread_pool->size;
-    InitThreadPoolJob(&rs->thread_pool_job.update_mvp_matrixes, mem, thread_count);
+    InitThreadPoolJob(&rs->thread_pool_job.update_mvp_matrixes, mem, thread_pool->size);
+    InitThreadPoolJob(&rs->thread_pool_job.record_render_commands, mem, RENDER_THREAD_COUNT);
 }
 
 static void InitRenderState(RenderState* rs, Stack* mem, Stack temp_mem, RTKContext* rtk,
@@ -659,34 +674,62 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, RTKContext* rtk, Thre
         Wait(thread_pool, Get(&job->tasks, i));
 }
 
-static void RenderMesh(VkCommandBuffer command_buffer, MeshHnd mesh, BatchRange batch_range)
+static void RecordRenderCommandsThread(void* data)
 {
-#if 0
-    DrawMesh(command_buffer, mesh, batch_range.start, batch_range.size);
-#else
-    for (uint32 i = 0; i < batch_range.size; ++i)
-        DrawMesh(command_buffer, mesh, batch_range.start + i, 1);
-#endif
-}
+    auto state = (RecordRenderCommandsState*)data;
+    RenderState* rs = state->rs;
+    RTKContext* rtk = state->rtk;
 
-static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk)
-{
-    static constexpr uint32 THREAD_INDEX = 0;
-    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rtk, rs->render_target.main, THREAD_INDEX);
+    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rtk, rs->render_target.main, state->thread_index);
         BindPipeline(command_buffer, rs->pipeline.main);
         BindMeshData(command_buffer, rs->mesh.data);
         BindShaderDataSet(command_buffer, rs->data_set.entity_data, rs->pipeline.main, rtk, 0);
-
-        // Axis Cube Texture
-        BindShaderDataSet(command_buffer, rs->data_set.axis_cube_texture, rs->pipeline.main, rtk, 1);
-        RenderMesh(command_buffer, rs->mesh.cube, GetBatchRange(0, 4, game->entity_data.count));
-        RenderMesh(command_buffer, rs->mesh.quad, GetBatchRange(1, 4, game->entity_data.count));
-
-        // Dirt Block Texture
-        BindShaderDataSet(command_buffer, rs->data_set.dirt_block_texture, rs->pipeline.main, rtk, 1);
-        RenderMesh(command_buffer, rs->mesh.cube, GetBatchRange(2, 4, game->entity_data.count));
-        RenderMesh(command_buffer, rs->mesh.quad, GetBatchRange(3, 4, game->entity_data.count));
+        BindShaderDataSet(command_buffer, state->texture, rs->pipeline.main, rtk, 1);
+        DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
     EndRecordingRenderCommands(command_buffer);
+}
+
+static void RecordRenderCommands(Game* game, RenderState* rs, RTKContext* rtk, ThreadPool* thread_pool)
+{
+    ThreadPoolJob<RecordRenderCommandsState>* job = &rs->thread_pool_job.record_render_commands;
+
+    // Initialize thread states and submit tasks.
+    static ShaderDataSetHnd textures[] =
+    {
+        rs->data_set.axis_cube_texture,
+        rs->data_set.dirt_block_texture,
+    };
+    static MeshHnd meshes[] =
+    {
+        rs->mesh.cube,
+        rs->mesh.quad,
+    };
+    static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(textures);
+    static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(meshes);
+    static constexpr uint32 THREAD_COUNT = TEXTURE_COUNT * MESH_COUNT;
+    static_assert(THREAD_COUNT <= RENDER_THREAD_COUNT);
+    uint32 entity_count = game->entity_data.count;
+
+    for (uint32 texture_index = 0; texture_index < TEXTURE_COUNT; ++texture_index)
+    {
+        for (uint32 mesh_index = 0; mesh_index < MESH_COUNT; ++mesh_index)
+        {
+            uint32 thread_index = (texture_index * MESH_COUNT) + mesh_index;
+            RecordRenderCommandsState* state = GetPtr(&job->states, thread_index);
+            state->rtk          = rtk;
+            state->rs           = rs;
+            state->thread_index = thread_index;
+            state->texture      = textures[texture_index];
+            state->mesh         = meshes[mesh_index];
+            state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, entity_count);
+
+            Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));
+        }
+    }
+
+    // Wait for tasks to complete.
+    for (uint32 i = 0; i < THREAD_COUNT; ++i)
+        Wait(thread_pool, Get(&job->tasks, i));
 }
 
 void TestMain()
@@ -753,7 +796,7 @@ void TestMain()
             },
         },
         .max_physical_devices  = 8,
-        .render_thread_count   = 1,
+        .render_thread_count   = RENDER_THREAD_COUNT,
         .descriptor_pool_sizes = WRAP_ARRAY(descriptor_pool_sizes),
     };
     auto rtk = Allocate<RTKContext>(mem, 1);
@@ -806,7 +849,7 @@ void TestMain()
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "RecordRenderCommands()");
-            RecordRenderCommands(game, rs, rtk);
+            RecordRenderCommands(game, rs, rtk, thread_pool);
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "SubmitRenderCommands()");

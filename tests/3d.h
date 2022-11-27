@@ -65,7 +65,7 @@ struct RenderState;
 
 struct RecordRenderCommandsState
 {
-    RTKContext*      rtk;
+    Context*         rtk;
     RenderState*     rs;
     uint32           thread_index;
     ShaderDataSetHnd texture;
@@ -735,7 +735,7 @@ void TestMain()
     auto thread_pool = Allocate<ThreadPool>(mem, 1);
     InitThreadPool(thread_pool, mem, 8);
 
-    // Init RTK Context + State
+    // Init RTK Context + Resources
     VkDescriptorPoolSize descriptor_pool_sizes[] =
     {
         { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
@@ -750,19 +750,22 @@ void TestMain()
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
         { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
     };
-    RTKInfo rtk_info =
+    ContextInfo context_info =
     {
-        .application_name = "RTK Test",
+        .instance_info =
+        {
+            .application_name = "RTK Test",
 #ifdef RTK_ENABLE_VALIDATION
-        .debug_callback         = DefaultDebugCallback,
-        .debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                  // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-        .debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                  VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+            .debug_callback         = DefaultDebugCallback,
+            .debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                      // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+            .debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                      VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                      VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 #endif
+        },
         .required_features =
         {
             .as_struct =
@@ -775,9 +778,9 @@ void TestMain()
         .render_thread_count   = RENDER_THREAD_COUNT,
         .descriptor_pool_sizes = WRAP_ARRAY(descriptor_pool_sizes),
     };
-    InitContext(mem, *temp_mem, window, &rtk_info);
+    InitContext(mem, *temp_mem, window, &context_info);
 
-    RTKStateInfo state_info =
+    ResourcesInfo resources_info =
     {
         .max_buffers          = 16,
         .max_images           = 8,
@@ -788,7 +791,7 @@ void TestMain()
         .max_render_targets   = 1,
         .max_pipelines        = 1,
     };
-    InitRTKState(mem, &state_info);
+    InitResources(mem, &resources_info);
 
     // Init Game
     auto game = Allocate<Game>(mem, 1);

@@ -31,7 +31,7 @@ using PipelineHnd      = PoolHnd<Pipeline>;
 
 /// Data
 ////////////////////////////////////////////////////////////
-struct RTKStateInfo
+struct ResourcesInfo
 {
     uint32 max_buffers;
     uint32 max_images;
@@ -43,7 +43,7 @@ struct RTKStateInfo
     uint32 max_pipelines;
 };
 
-struct RTKState
+struct Resources
 {
     Pool<Buffer>        buffers;
     Pool<Image>         images;
@@ -57,104 +57,104 @@ struct RTKState
 
 /// Instance
 ////////////////////////////////////////////////////////////
-static RTKState global_state;
+static Resources global_resources;
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRTKState(Stack* mem, RTKStateInfo* info)
+static void InitResources(Stack* mem, ResourcesInfo* info)
 {
-    InitPool(&global_state.buffers,          mem, info->max_buffers);
-    InitPool(&global_state.images,           mem, info->max_images);
-    InitPool(&global_state.shader_datas,     mem, info->max_shader_datas);
-    InitPool(&global_state.shader_data_sets, mem, info->max_shader_data_sets);
-    InitPool(&global_state.mesh_datas,       mem, info->max_mesh_datas);
-    InitPool(&global_state.meshes,           mem, info->max_meshes);
-    InitPool(&global_state.render_targets,   mem, info->max_render_targets);
-    InitPool(&global_state.pipelines,        mem, info->max_pipelines);
+    InitPool(&global_resources.buffers,          mem, info->max_buffers);
+    InitPool(&global_resources.images,           mem, info->max_images);
+    InitPool(&global_resources.shader_datas,     mem, info->max_shader_datas);
+    InitPool(&global_resources.shader_data_sets, mem, info->max_shader_data_sets);
+    InitPool(&global_resources.mesh_datas,       mem, info->max_mesh_datas);
+    InitPool(&global_resources.meshes,           mem, info->max_meshes);
+    InitPool(&global_resources.render_targets,   mem, info->max_render_targets);
+    InitPool(&global_resources.pipelines,        mem, info->max_pipelines);
 }
 
 /// Allocate Functions
 ////////////////////////////////////////////////////////////
 static BufferHnd AllocateBuffer()
 {
-    return Allocate(&global_state.buffers);
+    return Allocate(&global_resources.buffers);
 }
 
 static ImageHnd AllocateImage()
 {
-    return Allocate(&global_state.images);
+    return Allocate(&global_resources.images);
 }
 
 static ShaderDataHnd AllocateShaderData()
 {
-    return Allocate(&global_state.shader_datas);
+    return Allocate(&global_resources.shader_datas);
 }
 
 static ShaderDataSetHnd AllocateShaderDataSet()
 {
-    return Allocate(&global_state.shader_data_sets);
+    return Allocate(&global_resources.shader_data_sets);
 }
 
 static MeshDataHnd AllocateMeshData()
 {
-    return Allocate(&global_state.mesh_datas);
+    return Allocate(&global_resources.mesh_datas);
 }
 
 static MeshHnd AllocateMesh()
 {
-    return Allocate(&global_state.meshes);
+    return Allocate(&global_resources.meshes);
 }
 
 static RenderTargetHnd AllocateRenderTarget()
 {
-    return Allocate(&global_state.render_targets);
+    return Allocate(&global_resources.render_targets);
 }
 
 static PipelineHnd AllocatePipeline()
 {
-    return Allocate(&global_state.pipelines);
+    return Allocate(&global_resources.pipelines);
 }
 
 /// Get Functions
 ////////////////////////////////////////////////////////////
 static Buffer* GetBuffer(BufferHnd hnd)
 {
-    return GetData(&global_state.buffers, hnd);
+    return GetData(&global_resources.buffers, hnd);
 }
 
 static Image* GetImage(ImageHnd hnd)
 {
-    return GetData(&global_state.images, hnd);
+    return GetData(&global_resources.images, hnd);
 }
 
 static ShaderData* GetShaderData(ShaderDataHnd hnd)
 {
-    return GetData(&global_state.shader_datas, hnd);
+    return GetData(&global_resources.shader_datas, hnd);
 }
 
 static ShaderDataSet* GetShaderDataSet(ShaderDataSetHnd hnd)
 {
-    return GetData(&global_state.shader_data_sets, hnd);
+    return GetData(&global_resources.shader_data_sets, hnd);
 }
 
 static MeshData* GetMeshData(MeshDataHnd hnd)
 {
-    return GetData(&global_state.mesh_datas, hnd);
+    return GetData(&global_resources.mesh_datas, hnd);
 }
 
 static Mesh* GetMesh(MeshHnd hnd)
 {
-    return GetData(&global_state.meshes, hnd);
+    return GetData(&global_resources.meshes, hnd);
 }
 
 static RenderTarget* GetRenderTarget(RenderTargetHnd hnd)
 {
-    return GetData(&global_state.render_targets, hnd);
+    return GetData(&global_resources.render_targets, hnd);
 }
 
 static Pipeline* GetPipeline(PipelineHnd hnd)
 {
-    return GetData(&global_state.pipelines, hnd);
+    return GetData(&global_resources.pipelines, hnd);
 }
 
 }

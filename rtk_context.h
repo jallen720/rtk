@@ -30,16 +30,21 @@ namespace RTK
 ////////////////////////////////////////////////////////////
 static constexpr uint32 UNSET_INDEX = UINT32_MAX;
 
-struct RTKInfo
+struct InstanceInfo
 {
     cstring                             application_name;
     DebugCallback                       debug_callback;
     VkDebugUtilsMessageSeverityFlagsEXT debug_message_severity;
     VkDebugUtilsMessageTypeFlagsEXT     debug_message_type;
-    DeviceFeatures                      required_features;
-    uint32                              max_physical_devices;
-    uint32                              render_thread_count;
-    Array<VkDescriptorPoolSize>         descriptor_pool_sizes;
+};
+
+struct ContextInfo
+{
+    InstanceInfo                instance_info;
+    DeviceFeatures              required_features;
+    uint32                      max_physical_devices;
+    uint32                      render_thread_count;
+    Array<VkDescriptorPoolSize> descriptor_pool_sizes;
 };
 
 struct Surface
@@ -72,7 +77,7 @@ struct Frame
     uint32                 swapchain_image_index;
 };
 
-struct RTKContext
+struct Context
 {
     // Instance State
     VkInstance               instance;
@@ -98,7 +103,7 @@ struct RTKContext
 
 /// Instance
 ////////////////////////////////////////////////////////////
-static RTKContext global_ctx;
+static Context global_ctx;
 
 /// Internal
 ////////////////////////////////////////////////////////////
@@ -177,7 +182,7 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(uint32 queue_family_index)
     return info;
 }
 
-static void InitInstance(RTKInfo* info)
+static void InitInstance(InstanceInfo* info)
 {
     VkResult res = VK_SUCCESS;
 
@@ -255,14 +260,6 @@ static void InitSurface(Window* window)
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
-static void UsePhysicalDevice(uint32 index)
-{
-    if (index >= global_ctx.physical_devices.count)
-        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, global_ctx.physical_devices.count - 1);
-
-    global_ctx.physical_device = GetPtr(&global_ctx.physical_devices, index);
-}
-
 static void LoadCapablePhysicalDevices(Stack temp_mem, DeviceFeatures* required_features)
 {
     // Get system physical devices and ensure there is enough space in the context's physical devices list.
@@ -313,6 +310,14 @@ static void LoadCapablePhysicalDevices(Stack temp_mem, DeviceFeatures* required_
     // Ensure atleast 1 capable physical device was loaded.
     if (global_ctx.physical_devices.count == 0)
         CTK_FATAL("failed to load any capable physical devices");
+}
+
+static void UsePhysicalDevice(uint32 index)
+{
+    if (index >= global_ctx.physical_devices.count)
+        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, global_ctx.physical_devices.count - 1);
+
+    global_ctx.physical_device = GetPtr(&global_ctx.physical_devices, index);
 }
 
 static void InitDevice(DeviceFeatures* enabled_features)
@@ -626,9 +631,9 @@ static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_size
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitContext(Stack* mem, Stack temp_mem, Window* window, RTKInfo* info)
+static void InitContext(Stack* mem, Stack temp_mem, Window* window, ContextInfo* info)
 {
-    InitInstance(info);
+    InitInstance(&info->instance_info);
     InitSurface(window);
 
     // Initialize device state.

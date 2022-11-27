@@ -81,7 +81,7 @@
     <ClInclude Include="mesh_data.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="rtk_state.h">
+    <ClInclude Include="rtk_resources.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

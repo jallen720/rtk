@@ -2,7 +2,7 @@
 
 #include "ctk2/ctk.h"
 #include "rtk/vulkan.h"
-#include "rtk/rtk_state.h"
+#include "rtk/rtk_resources.h"
 #include "rtk/memory.h"
 
 using namespace CTK;

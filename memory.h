@@ -2,7 +2,7 @@
 
 #include "rtk/vulkan.h"
 #include "rtk/rtk_context.h"
-#include "rtk/rtk_state.h"
+#include "rtk/rtk_resources.h"
 #include "rtk/debug.h"
 #include "rtk/device.h"
 #include "ctk2/ctk.h"

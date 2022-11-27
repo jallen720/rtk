@@ -53,7 +53,7 @@ struct VSBuffer
     Matrix mvp_matrixes[MAX_ENTITIES];
 };
 
-struct UpdateMVPMatrixesState
+struct MVPMatrixState
 {
     BatchRange  batch_range;
     Matrix      view_projection_matrix;
@@ -63,9 +63,8 @@ struct UpdateMVPMatrixesState
 
 struct RenderState;
 
-struct RecordRenderCommandsState
+struct RenderCommandState
 {
-    Context*         rtk;
     RenderState*     rs;
     uint32           thread_index;
     ShaderDataSetHnd texture;
@@ -87,8 +86,8 @@ struct RenderState
 
     struct
     {
-        ThreadPoolJob<UpdateMVPMatrixesState>    update_mvp_matrixes;
-        ThreadPoolJob<RecordRenderCommandsState> record_render_commands;
+        ThreadPoolJob<MVPMatrixState>     update_mvp_matrixes;
+        ThreadPoolJob<RenderCommandState> record_render_commands;
     }
     thread_pool_job;
 
@@ -607,7 +606,7 @@ static Matrix CreateViewProjectionMatrix(View* view)
 
 static void UpdateMVPMatrixesThread(void* data)
 {
-    auto state = (UpdateMVPMatrixesState*)data;
+    auto state = (MVPMatrixState*)data;
     BatchRange  batch_range            = state->batch_range;
     Matrix      view_projection_matrix = state->view_projection_matrix;
     VSBuffer*   frame_vs_buffer        = state->frame_vs_buffer;
@@ -630,7 +629,7 @@ static void UpdateMVPMatrixesThread(void* data)
 
 static void UpdateMVPMatrixes(RenderState* rs, Game* game, ThreadPool* thread_pool)
 {
-    ThreadPoolJob<UpdateMVPMatrixesState>* job = &rs->thread_pool_job.update_mvp_matrixes;
+    ThreadPoolJob<MVPMatrixState>* job = &rs->thread_pool_job.update_mvp_matrixes;
     Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
     auto frame_vs_buffer = GetBufferMem<VSBuffer>(rs->data.vs_buffer, RTK::global_ctx.frames.index);
     uint32 thread_count = thread_pool->size;
@@ -638,7 +637,7 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, ThreadPool* thread_po
     // Initialize thread states and submit tasks.
     for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
     {
-        UpdateMVPMatrixesState* state = GetPtr(&job->states, thread_index);
+        MVPMatrixState* state = GetPtr(&job->states, thread_index);
         state->batch_range            = GetBatchRange(thread_index, thread_count, game->entity_data.count);
         state->view_projection_matrix = view_projection_matrix;
         state->frame_vs_buffer        = frame_vs_buffer;
@@ -654,7 +653,7 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, ThreadPool* thread_po
 
 static void RecordRenderCommandsThread(void* data)
 {
-    auto state = (RecordRenderCommandsState*)data;
+    auto state = (RenderCommandState*)data;
     RenderState* rs = state->rs;
 
     VkCommandBuffer command_buffer = BeginRecordingRenderCommands(rs->render_target.main, state->thread_index);
@@ -668,7 +667,7 @@ static void RecordRenderCommandsThread(void* data)
 
 static void RecordRenderCommands(Game* game, RenderState* rs, ThreadPool* thread_pool)
 {
-    ThreadPoolJob<RecordRenderCommandsState>* job = &rs->thread_pool_job.record_render_commands;
+    ThreadPoolJob<RenderCommandState>* job = &rs->thread_pool_job.record_render_commands;
 
     // Initialize thread states and submit tasks.
     static ShaderDataSetHnd textures[] =
@@ -692,7 +691,7 @@ static void RecordRenderCommands(Game* game, RenderState* rs, ThreadPool* thread
         for (uint32 mesh_index = 0; mesh_index < MESH_COUNT; ++mesh_index)
         {
             uint32 thread_index = (texture_index * MESH_COUNT) + mesh_index;
-            RecordRenderCommandsState* state = GetPtr(&job->states, thread_index);
+            RenderCommandState* state = GetPtr(&job->states, thread_index);
             state->rs           = rs;
             state->thread_index = thread_index;
             state->texture      = textures[texture_index];

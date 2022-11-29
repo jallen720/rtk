@@ -17,7 +17,7 @@ static constexpr uint32 WINDOW_WIDTH = 1080;
 static constexpr uint32 WINDOW_HEIGHT = 720;
 static constexpr float32 WINDOW_ASPECT_RATIO = (float32)WINDOW_WIDTH / WINDOW_WIDTH;
 
-struct NDCCoordinates
+struct NDCoordinates
 {
     float32 x;
     float32 y;
@@ -27,13 +27,43 @@ struct NDCCoordinates
 
 struct VSBuffer
 {
-    NDCCoordinates ndc_coordinates[MAX_ENTITIES];
+    NDCoordinates nd_coordinates[MAX_ENTITIES];
+};
+
+struct FSBuffer
+{
+    Vec2<uint32> sprite_coords[MAX_ENTITIES];
 };
 
 struct Game
 {
-    uint32 _;
+    Mouse        mouse;
+    VertexLayout vertex_layout;
 };
+
+struct Vertex
+{
+    Vec2<float32> position;
+    Vec2<uint32>  uv;
+};
+
+static void InitVertexLayout(Game* game, Stack* mem)
+{
+    VertexLayout* vertex_layout = &game->vertex_layout;
+
+    // Init pipeline vertex layout.
+    InitArray(&vertex_layout->bindings, mem, 1);
+    PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
+
+    InitArray(&vertex_layout->attributes, mem, 2);
+    PushAttribute(vertex_layout, 2); // Position
+    PushAttribute(vertex_layout, 2); // UV
+}
+
+static void InitGame(Game* game, Stack* mem)
+{
+    InitVertexLayout(game, mem);
+}
 
 static void Controls(Window* window)
 {
@@ -46,8 +76,8 @@ static void Controls(Window* window)
 
 static void UpdateGame(Game* game, Window* window)
 {
-    CTK_UNUSED(game);
     Controls(window);
+    UpdateMouse(&game->mouse, window);
 }
 
 void TestMain()
@@ -72,7 +102,6 @@ void TestMain()
     };
     auto window = Allocate<Window>(mem, 1);
     InitWindow(window, &window_info);
-
 
     // Init RTK Context + Resources
     VkDescriptorPoolSize descriptor_pool_sizes[] =
@@ -136,6 +165,7 @@ void TestMain()
     InitProfileManager(prof_mgr, mem, 64);
 
     auto game = Allocate<Game>(mem, 1);
+    InitGame(game, mem);
 
     // Run game.
     while (1)

@@ -473,7 +473,7 @@ static void InitMeshes(RenderState* rs)
     }
 
     {
-        #include "rtk/meshes/quad.h"
+        #include "rtk/meshes/axis_quad.h"
         rs->mesh.quad = CreateMesh(rs->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
     }
 }

@@ -3,7 +3,7 @@
 #include "ctk2/ctk.h"
 #include "rtk/vulkan.h"
 #include "rtk/resources.h"
-#include "rtk/memory.h"
+#include "rtk/buffer.h"
 
 using namespace CTK;
 

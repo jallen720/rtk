@@ -437,21 +437,21 @@ static void InitPipelines(RenderState* rs, Stack temp_mem)
         rs->data_set.entity_data,
         rs->data_set.axis_cube_texture,
     };
-    VkPushConstantRange push_constant_ranges[] =
-    {
-        {
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-            .offset     = 0,
-            .size       = sizeof(uint32)
-        },
-    };
+    // VkPushConstantRange push_constant_ranges[] =
+    // {
+    //     {
+    //         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+    //         .offset     = 0,
+    //         .size       = sizeof(uint32)
+    //     },
+    // };
 
     PipelineInfo pipeline_info =
     {
         .vertex_layout        = &rs->vertex_layout,
         .shaders              = WRAP_ARRAY(shaders),
         .shader_data_sets     = WRAP_ARRAY(shader_data_sets),
-        .push_constant_ranges = WRAP_ARRAY(push_constant_ranges),
+        // .push_constant_ranges = WRAP_ARRAY(push_constant_ranges),
     };
     rs->pipeline.main = CreatePipeline(temp_mem, rs->render_target.main, &pipeline_info);
 }

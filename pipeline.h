@@ -143,13 +143,17 @@ static PipelineHnd CreatePipeline(Stack temp_mem, RenderTargetHnd render_target_
     VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
 
     // Pipeline Layout
-    auto descriptor_set_layouts = CreateArray<VkDescriptorSetLayout>(&temp_mem, info->shader_data_sets.count);
-    for (uint32 i = 0; i < info->shader_data_sets.count; ++i)
-        Push(descriptor_set_layouts, GetShaderDataSet(Get(&info->shader_data_sets, i))->layout);
+    Array<VkDescriptorSetLayout> descriptor_set_layouts = {};
+    if (info->shader_data_sets.count > 0)
+    {
+        InitArray(&descriptor_set_layouts, &temp_mem, info->shader_data_sets.count);
+        for (uint32 i = 0; i < info->shader_data_sets.count; ++i)
+            Push(&descriptor_set_layouts, GetShaderDataSet(Get(&info->shader_data_sets, i))->layout);
+    }
 
     VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
-    layout_create_info.setLayoutCount         = descriptor_set_layouts->count;
-    layout_create_info.pSetLayouts            = descriptor_set_layouts->data;
+    layout_create_info.setLayoutCount         = descriptor_set_layouts.count;
+    layout_create_info.pSetLayouts            = descriptor_set_layouts.data;
     layout_create_info.pushConstantRangeCount = info->push_constant_ranges.count;
     layout_create_info.pPushConstantRanges    = info->push_constant_ranges.data;
 

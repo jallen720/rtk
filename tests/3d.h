@@ -106,11 +106,6 @@ struct RenderState
     render_target;
     struct
     {
-        PipelineHnd main;
-    }
-    pipeline;
-    struct
-    {
         ShaderDataHnd vs_buffer;
         ShaderDataHnd axis_cube_texture;
         ShaderDataHnd dirt_block_texture;
@@ -123,6 +118,11 @@ struct RenderState
         ShaderDataSetHnd dirt_block_texture;
     }
     data_set;
+    struct
+    {
+        PipelineHnd main;
+    }
+    pipeline;
     struct
     {
         MeshDataHnd data;

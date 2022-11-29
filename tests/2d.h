@@ -39,6 +39,7 @@ struct Game
 {
     Mouse        mouse;
     VertexLayout vertex_layout;
+    VkSampler    sampler;
 };
 
 struct Vertex
@@ -58,6 +59,32 @@ static void InitVertexLayout(Game* game, Stack* mem)
     InitArray(&vertex_layout->attributes, mem, 2);
     PushAttribute(vertex_layout, 2); // Position
     PushAttribute(vertex_layout, 2); // UV
+}
+
+static void InitSampler(Game* game)
+{
+    VkSamplerCreateInfo info =
+    {
+        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext                   = NULL,
+        .flags                   = 0,
+        .magFilter               = VK_FILTER_NEAREST,
+        .minFilter               = VK_FILTER_NEAREST,
+        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .mipLodBias              = 0.0f,
+        .anisotropyEnable        = VK_FALSE,
+        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+        .compareEnable           = VK_FALSE,
+        .compareOp               = VK_COMPARE_OP_ALWAYS,
+        .minLod                  = 0.0f,
+        .maxLod                  = 0.0f,
+        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+    };
+    game->sampler = CreateSampler(&info);
 }
 
 static void InitGame(Game* game, Stack* mem)

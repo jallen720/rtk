@@ -652,6 +652,11 @@ static void InitContext(Stack* mem, Stack temp_mem, Window* window, ContextInfo*
     InitDescriptorPool(&info->descriptor_pool_sizes);
 };
 
+static PhysicalDevice* GetPhysicalDevice()
+{
+    return global_ctx.physical_device;
+}
+
 static void NextFrame()
 {
     VkDevice device = global_ctx.device;

@@ -270,7 +270,7 @@ static void InitSampler(RenderState* rs)
         .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
         .mipLodBias              = 0.0f,
         .anisotropyEnable        = VK_FALSE,
-        .maxAnisotropy           = RTK::global_ctx.physical_device->properties.limits.maxSamplerAnisotropy,
+        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
         .compareEnable           = VK_FALSE,
         .compareOp               = VK_COMPARE_OP_ALWAYS,
         .minLod                  = 0.0f,
@@ -278,8 +278,7 @@ static void InitSampler(RenderState* rs)
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    VkResult res = vkCreateSampler(RTK::global_ctx.device, &info, NULL, &rs->sampler);
-    Validate(res, "vkCreateSampler() failed");
+    rs->sampler = CreateSampler(&info);
 }
 
 static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, ImageData* image_data)

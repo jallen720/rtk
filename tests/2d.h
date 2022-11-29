@@ -40,6 +40,41 @@ struct Game
     Mouse        mouse;
     VertexLayout vertex_layout;
     VkSampler    sampler;
+
+    struct
+    {
+        BufferHnd host;
+        BufferHnd device;
+        BufferHnd staging;
+    }
+    buffer;
+    struct
+    {
+        RenderTargetHnd main;
+    }
+    render_target;
+    // struct
+    // {
+    //     ShaderDataHnd axis_cube_texture;
+    // }
+    // data;
+    // struct
+    // {
+    //     ShaderDataSetHnd entity_data;
+    //     ShaderDataSetHnd axis_cube_texture;
+    // }
+    // data_set;
+    struct
+    {
+        PipelineHnd main;
+    }
+    pipeline;
+    struct
+    {
+        MeshDataHnd data;
+        MeshHnd     quad;
+    }
+    mesh;
 };
 
 struct Vertex
@@ -87,9 +122,154 @@ static void InitSampler(Game* game)
     game->sampler = CreateSampler(&info);
 }
 
-static void InitGame(Game* game, Stack* mem)
+static void InitBuffers(Game* game)
+{
+    BufferInfo host_buffer_info =
+    {
+        .size               = Megabyte(128),
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    };
+    game->buffer.host = CreateBuffer(&host_buffer_info);
+
+    BufferInfo device_buffer_info =
+    {
+        .size               = Megabyte(256),
+        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    game->buffer.device = CreateBuffer(&device_buffer_info);
+
+    game->buffer.staging = CreateBuffer(game->buffer.host, Megabyte(16));
+}
+
+static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem)
+{
+    RenderTargetInfo info =
+    {
+        .depth_testing          = true,
+        .color_attachment_count = 1,
+    };
+    game->render_target.main = CreateRenderTarget(mem, temp_mem, &info);
+    PushClearValue(game->render_target.main, { 0.0f, 0.1f, 0.2f, 1.0f });
+    PushClearValue(game->render_target.main, { 1.0f });
+}
+
+// static void InitShaderDatas(Game* game, Stack* mem)
+// {
+//     // vs_buffer
+//     {
+//         ShaderDataInfo info =
+//         {
+//             .stages    = VK_SHADER_STAGE_VERTEX_BIT,
+//             .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+//             .per_frame = true,
+//             .buffer =
+//             {
+//                 .parent = game->buffer.host,
+//                 .size   = sizeof(VSBuffer),
+//             }
+//         };
+//         game->data.vs_buffer = CreateShaderData(mem, &info);
+//     }
+
+//     game->data.axis_cube_texture = CreateTexture("images/axis_cube.png", game, mem);
+// }
+
+// static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem)
+// {
+//     // data_set.vs_buffer
+//     {
+//         ShaderDataHnd datas[] =
+//         {
+//             game->data.vs_buffer,
+//         };
+//         game->data_set.entity_data = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
+//     }
+
+//     // data_set.axis_cube_texture
+//     {
+//         ShaderDataHnd datas[] =
+//         {
+//             game->data.axis_cube_texture,
+//         };
+//         game->data_set.axis_cube_texture = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
+//     }
+// }
+
+static void InitPipelines(Game* game, Stack temp_mem)
+{
+    // Pipeline info arrays.
+    Shader shaders[] =
+    {
+        {
+            .module = LoadShaderModule(temp_mem, "shaders/bin/2d.vert.spv"),
+            .stage  = VK_SHADER_STAGE_VERTEX_BIT
+        },
+        {
+            .module = LoadShaderModule(temp_mem, "shaders/bin/2d.frag.spv"),
+            .stage  = VK_SHADER_STAGE_FRAGMENT_BIT
+        },
+    };
+    // ShaderDataSetHnd shader_data_sets[] =
+    // {
+    //     game->data_set.entity_data,
+    //     game->data_set.axis_cube_texture,
+    // };
+    // VkPushConstantRange push_constant_ranges[] =
+    // {
+    //     {
+    //         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+    //         .offset     = 0,
+    //         .size       = sizeof(uint32)
+    //     },
+    // };
+
+    PipelineInfo pipeline_info =
+    {
+        .vertex_layout        = &game->vertex_layout,
+        .shaders              = WRAP_ARRAY(shaders),
+        // .shader_data_sets     = WRAP_ARRAY(shader_data_sets),
+        // .push_constant_ranges = WRAP_ARRAY(push_constant_ranges),
+    };
+    game->pipeline.main = CreatePipeline(temp_mem, game->render_target.main, &pipeline_info);
+}
+
+static void InitMeshes(Game* game)
+{
+    MeshDataInfo mesh_data_info =
+    {
+        .parent_buffer      = game->buffer.host,
+        .vertex_buffer_size = Kilobyte(1),
+        .index_buffer_size  = Kilobyte(1),
+    };
+    game->mesh.data = CreateMeshData(&mesh_data_info);
+
+    {
+        #include "rtk/meshes/quad_2d.h"
+        game->mesh.quad = CreateMesh(game->mesh.data, WRAP_ARRAY(vertexes), WRAP_ARRAY(indexes));
+    }
+}
+
+static void InitGame(Game* game, Stack* mem, Stack temp_mem)
 {
     InitVertexLayout(game, mem);
+    InitSampler(game);
+    InitBuffers(game);
+    InitRenderTargets(game, mem, temp_mem);
+    // InitShaderDatas(game, mem);
+    // InitShaderDataSets(game, mem, temp_mem);
+    InitPipelines(game, temp_mem);
+    InitMeshes(game);
 }
 
 static void Controls(Window* window)
@@ -192,7 +372,7 @@ void TestMain()
     InitProfileManager(prof_mgr, mem, 64);
 
     auto game = Allocate<Game>(mem, 1);
-    InitGame(game, mem);
+    InitGame(game, mem, temp_mem);
 
     // Run game.
     while (1)
@@ -215,15 +395,15 @@ void TestMain()
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "UpdateMVPMatrixes()");
-            UpdateMVPMatrixes(rs, game, thread_pool);
+            UpdateMVPMatrixes(game, thread_pool);
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "RecordRenderCommands()");
-            RecordRenderCommands(game, rs, thread_pool);
+            RecordRenderCommands(game, thread_pool);
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "SubmitRenderCommands()");
-            SubmitRenderCommands(rs->render_target.main);
+            SubmitRenderCommands(game->render_target.main);
             EndProfile(prof_mgr);
 #endif
         }

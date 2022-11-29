@@ -1,8 +1,8 @@
 #pragma once
 
 #include "rtk/vulkan.h"
-#include "rtk/rtk_context.h"
-#include "rtk/rtk_resources.h"
+#include "rtk/context.h"
+#include "rtk/resources.h"
 #include "rtk/memory.h"
 #include "ctk2/ctk.h"
 #include "ctk2/memory.h"

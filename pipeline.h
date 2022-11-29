@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rtk/vulkan.h"
-#include "rtk/rtk_context.h"
+#include "rtk/context.h"
 #include "rtk/shader.h"
 #include "rtk/shader_data.h"
 #include "rtk/render_target.h"

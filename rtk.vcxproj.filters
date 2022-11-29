@@ -60,9 +60,6 @@
     <ClInclude Include="shader_data.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="tests\defs.h">
-      <Filter>Source Files\tests</Filter>
-    </ClInclude>
     <ClInclude Include="pipeline_defaults.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -83,6 +80,12 @@
     </ClInclude>
     <ClInclude Include="rtk_resources.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\defs_2d.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\defs_3d.h">
+      <Filter>Source Files\tests</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

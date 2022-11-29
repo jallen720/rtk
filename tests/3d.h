@@ -10,7 +10,7 @@
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
-#include "rtk/tests/defs.h"
+#include "rtk/tests/defs_3d.h"
 
 using namespace CTK;
 using namespace STK;
@@ -753,7 +753,7 @@ void TestMain()
     {
         .instance_info =
         {
-            .application_name = "RTK Test",
+            .application_name = "RTK 3D Test",
 #ifdef RTK_ENABLE_VALIDATION
             .debug_callback         = DefaultDebugCallback,
             .debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |

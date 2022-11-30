@@ -23,6 +23,14 @@ static constexpr VkColorComponentFlags COLOR_COMPONENT_RGBA = VK_COLOR_COMPONENT
 
 #include "rtk/pipeline_defaults.h"
 
+enum AttributeType
+{
+    ATTRIBUTE_TYPE_UINT32,
+    ATTRIBUTE_TYPE_SINT32,
+    ATTRIBUTE_TYPE_FLOAT32,
+    ATTRIBUTE_TYPE_COUNT,
+};
+
 struct VertexLayout
 {
     Array<VkVertexInputBindingDescription>   bindings;
@@ -58,27 +66,37 @@ static void PushBinding(VertexLayout* layout, VkVertexInputRate input_rate)
     layout->attribute_location = 0; // Reset attribute location for new binding.
 }
 
-static void PushAttribute(VertexLayout* layout, uint32 field_count)
+static void PushAttribute(VertexLayout* layout, uint32 field_count, AttributeType attribute_type)
 {
     static constexpr VkFormat FORMATS[] =
     {
+        VK_FORMAT_R32_UINT,
+        VK_FORMAT_R32_SINT,
         VK_FORMAT_R32_SFLOAT,
+        VK_FORMAT_R32G32_UINT,
+        VK_FORMAT_R32G32_SINT,
         VK_FORMAT_R32G32_SFLOAT,
+        VK_FORMAT_R32G32B32_UINT,
+        VK_FORMAT_R32G32B32_SINT,
         VK_FORMAT_R32G32B32_SFLOAT,
+        VK_FORMAT_R32G32B32A32_UINT,
+        VK_FORMAT_R32G32B32A32_SINT,
         VK_FORMAT_R32G32B32A32_SFLOAT,
     };
 
     CTK_ASSERT(layout->bindings.count > 0);
     CTK_ASSERT(field_count >= 1 && field_count <= 4);
+    CTK_ASSERT(attribute_type < ATTRIBUTE_TYPE_COUNT);
 
     uint32 current_binding_index = layout->bindings.count - 1;
     VkVertexInputBindingDescription* current_binding = GetPtr(&layout->bindings, current_binding_index);
 
+    uint32 format_index = ((field_count - 1) * (uint32)ATTRIBUTE_TYPE_COUNT) + (uint32)attribute_type;
     Push(&layout->attributes,
     {
         .location = layout->attribute_location,
         .binding  = current_binding_index,
-        .format   = FORMATS[field_count - 1],
+        .format   = FORMATS[format_index],
         .offset   = current_binding->stride,
     });
 

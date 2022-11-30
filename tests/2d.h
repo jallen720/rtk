@@ -93,8 +93,8 @@ static void InitVertexLayout(Game* game, Stack* mem)
     PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
 
     InitArray(&vertex_layout->attributes, mem, 2);
-    PushAttribute(vertex_layout, 2); // Position
-    PushAttribute(vertex_layout, 2); // UV
+    PushAttribute(vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // Position
+    PushAttribute(vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // UV
 }
 
 static void InitSampler(Game* game)

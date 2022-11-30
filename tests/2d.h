@@ -118,7 +118,7 @@ static void InitSampler(Game* game)
         .minLod                  = 0.0f,
         .maxLod                  = 0.0f,
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-        .unnormalizedCoordinates = VK_FALSE,
+        .unnormalizedCoordinates = VK_TRUE,
     };
     game->sampler = CreateSampler(&info);
 }

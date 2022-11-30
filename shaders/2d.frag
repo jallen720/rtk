@@ -8,5 +8,5 @@ layout (set = 0, binding = 0) uniform sampler2D texture_sampler;
 
 void main()
 {
-    out_color = texture(texture_sampler, in_vert_uv);
+    out_color = textureLod(texture_sampler, ivec2(in_vert_uv), 0);
 }

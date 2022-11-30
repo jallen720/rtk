@@ -53,17 +53,18 @@ struct Game
         RenderTargetHnd main;
     }
     render_target;
-    // struct
-    // {
-    //     ShaderDataHnd axis_cube_texture;
-    // }
-    // data;
-    // struct
-    // {
-    //     ShaderDataSetHnd entity_data;
-    //     ShaderDataSetHnd axis_cube_texture;
-    // }
-    // data_set;
+    struct
+    {
+        // ShaderDataHnd vs_buffer;
+        ShaderDataHnd axis_cube_texture;
+    }
+    data;
+    struct
+    {
+        // ShaderDataSetHnd entity_data;
+        ShaderDataSetHnd axis_cube_texture;
+    }
+    data_set;
     struct
     {
         PipelineHnd main;
@@ -80,7 +81,7 @@ struct Game
 struct Vertex
 {
     Vec2<float32> position;
-    Vec2<uint32>  uv;
+    Vec2<float32> uv;
 };
 
 static void InitVertexLayout(Game* game, Stack* mem)
@@ -164,47 +165,132 @@ static void InitRenderTargets(Game* game, Stack* mem, Stack temp_mem)
     PushClearValue(game->render_target.main, { 1.0f });
 }
 
-// static void InitShaderDatas(Game* game, Stack* mem)
-// {
-//     // vs_buffer
-//     {
-//         ShaderDataInfo info =
-//         {
-//             .stages    = VK_SHADER_STAGE_VERTEX_BIT,
-//             .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-//             .per_frame = true,
-//             .buffer =
-//             {
-//                 .parent = game->buffer.host,
-//                 .size   = sizeof(VSBuffer),
-//             }
-//         };
-//         game->data.vs_buffer = CreateShaderData(mem, &info);
-//     }
+static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, ImageData* image_data)
+{
+    return
+    {
+        .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .per_frame = false,
+        .image =
+        {
+            .info =
+            {
+                .image =
+                {
+                    .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                    .pNext     = NULL,
+                    .flags     = 0,
+                    .imageType = VK_IMAGE_TYPE_2D,
+                    .format    = format,
+                    .extent =
+                    {
+                        .width  = (uint32)image_data->width,
+                        .height = (uint32)image_data->height,
+                        .depth  = 1
+                    },
+                    .mipLevels             = 1,
+                    .arrayLayers           = 1,
+                    .samples               = VK_SAMPLE_COUNT_1_BIT,
+                    .tiling                = VK_IMAGE_TILING_OPTIMAL,
+                    .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+                    .queueFamilyIndexCount = 0,
+                    .pQueueFamilyIndices   = NULL,
+                    .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+                },
+                .view =
+                {
+                    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                    .pNext    = NULL,
+                    .flags    = 0,
+                    .image    = VK_NULL_HANDLE,
+                    .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                    .format   = format,
+                    .components =
+                    {
+                        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    },
+                    .subresourceRange =
+                    {
+                        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel   = 0,
+                        .levelCount     = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount     = 1,
+                    },
+                },
+                .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            },
+            .sampler = sampler,
+        },
+    };
+}
 
-//     game->data.axis_cube_texture = CreateTexture("images/axis_cube.png", game, mem);
-// }
+static ShaderDataHnd CreateTexture(cstring image_data_path, BufferHnd staging_buffer, VkSampler sampler, Stack* mem)
+{
+    ImageData image_data = {};
+    LoadImageData(&image_data, image_data_path);
 
-// static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem)
-// {
-//     // data_set.vs_buffer
-//     {
-//         ShaderDataHnd datas[] =
-//         {
-//             game->data.vs_buffer,
-//         };
-//         game->data_set.entity_data = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
-//     }
+    ShaderDataInfo info = DefaultTextureInfo(GetSwapchain()->image_format, sampler, &image_data);
+    ShaderDataHnd shader_data_hnd = CreateShaderData(mem, &info);
 
-//     // data_set.axis_cube_texture
-//     {
-//         ShaderDataHnd datas[] =
-//         {
-//             game->data.axis_cube_texture,
-//         };
-//         game->data_set.axis_cube_texture = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
-//     }
-// }
+    // Copy image data into staging buffer.
+    Clear(staging_buffer);
+    Write(staging_buffer, image_data.data, image_data.size);
+    uint32 image_count = GetShaderData(shader_data_hnd)->image_hnds.count;
+    for (uint32 i = 0; i < image_count; ++i)
+        WriteToShaderDataImage(shader_data_hnd, i, staging_buffer);
+
+    DestroyImageData(&image_data);
+
+    return shader_data_hnd;
+}
+
+static void InitShaderDatas(Game* game, Stack* mem)
+{
+    // // vs_buffer
+    // {
+    //     ShaderDataInfo info =
+    //     {
+    //         .stages    = VK_SHADER_STAGE_VERTEX_BIT,
+    //         .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+    //         .per_frame = true,
+    //         .buffer =
+    //         {
+    //             .parent = game->buffer.host,
+    //             .size   = sizeof(VSBuffer),
+    //         }
+    //     };
+    //     game->data.vs_buffer = CreateShaderData(mem, &info);
+    // }
+
+    game->data.axis_cube_texture = CreateTexture("images/axis_cube.png", game->buffer.staging, game->sampler, mem);
+}
+
+static void InitShaderDataSets(Game* game, Stack* mem, Stack temp_mem)
+{
+    // // data_set.vs_buffer
+    // {
+    //     ShaderDataHnd datas[] =
+    //     {
+    //         game->data.vs_buffer,
+    //     };
+    //     game->data_set.entity_data = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
+    // }
+
+    // data_set.axis_cube_texture
+    {
+        ShaderDataHnd datas[] =
+        {
+            game->data.axis_cube_texture,
+        };
+        game->data_set.axis_cube_texture = CreateShaderDataSet(mem, temp_mem, WRAP_ARRAY(datas));
+    }
+}
 
 static void InitPipelines(Game* game, Stack temp_mem)
 {
@@ -220,11 +306,11 @@ static void InitPipelines(Game* game, Stack temp_mem)
             .stage  = VK_SHADER_STAGE_FRAGMENT_BIT
         },
     };
-    // ShaderDataSetHnd shader_data_sets[] =
-    // {
-    //     game->data_set.entity_data,
-    //     game->data_set.axis_cube_texture,
-    // };
+    ShaderDataSetHnd shader_data_sets[] =
+    {
+        // game->data_set.entity_data,
+        game->data_set.axis_cube_texture,
+    };
     // VkPushConstantRange push_constant_ranges[] =
     // {
     //     {
@@ -238,7 +324,7 @@ static void InitPipelines(Game* game, Stack temp_mem)
     {
         .vertex_layout        = &game->vertex_layout,
         .shaders              = WRAP_ARRAY(shaders),
-        // .shader_data_sets     = WRAP_ARRAY(shader_data_sets),
+        .shader_data_sets     = WRAP_ARRAY(shader_data_sets),
         // .push_constant_ranges = WRAP_ARRAY(push_constant_ranges),
     };
     game->pipeline.main = CreatePipeline(temp_mem, game->render_target.main, &pipeline_info);
@@ -266,8 +352,8 @@ static void InitGame(Game* game, Stack* mem, Stack temp_mem)
     InitSampler(game);
     InitBuffers(game);
     InitRenderTargets(game, mem, temp_mem);
-    // InitShaderDatas(game, mem);
-    // InitShaderDataSets(game, mem, temp_mem);
+    InitShaderDatas(game, mem);
+    InitShaderDataSets(game, mem, temp_mem);
     InitPipelines(game, temp_mem);
     InitMeshes(game);
 }
@@ -285,6 +371,22 @@ static void UpdateGame(Game* game, Window* window)
 {
     Controls(window);
     UpdateMouse(&game->mouse, window);
+}
+
+static void RecordRenderCommands(Game* game)
+{
+    static constexpr uint32 THREAD_INDEX = 0;
+    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(game->render_target.main, THREAD_INDEX);
+        BindPipeline(command_buffer, game->pipeline.main);
+        BindMeshData(command_buffer, game->mesh.data);
+
+        // Bind descriptor sets using incrementing index.
+        uint32 binding_index = 0;
+        // BindShaderDataSet(command_buffer, game->data_set.entity_data, game->pipeline.main, binding_index++);
+        BindShaderDataSet(command_buffer, game->data_set.axis_cube_texture, game->pipeline.main, binding_index++);
+
+        DrawMesh(command_buffer, game->mesh.quad, 0, 1);
+    EndRecordingRenderCommands(command_buffer);
 }
 
 void TestMain()
@@ -385,27 +487,25 @@ void TestMain()
 
         if (IsActive(window))
         {
-#if 1
             StartProfile(prof_mgr, "UpdateGame()");
             UpdateGame(game, window);
             EndProfile(prof_mgr);
-#else
+
             StartProfile(prof_mgr, "NextFrame()");
             NextFrame();
             EndProfile(prof_mgr);
 
-            StartProfile(prof_mgr, "UpdateMVPMatrixes()");
-            UpdateMVPMatrixes(game, thread_pool);
-            EndProfile(prof_mgr);
+            // StartProfile(prof_mgr, "UpdateMVPMatrixes()");
+            // UpdateMVPMatrixes(game, thread_pool);
+            // EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "RecordRenderCommands()");
-            RecordRenderCommands(game, thread_pool);
+            RecordRenderCommands(game);
             EndProfile(prof_mgr);
 
             StartProfile(prof_mgr, "SubmitRenderCommands()");
             SubmitRenderCommands(game->render_target.main);
             EndProfile(prof_mgr);
-#endif
         }
         else
         {

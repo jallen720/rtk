@@ -657,6 +657,11 @@ static PhysicalDevice* GetPhysicalDevice()
     return global_ctx.physical_device;
 }
 
+static Swapchain* GetSwapchain()
+{
+    return &global_ctx.swapchain;
+}
+
 static void NextFrame()
 {
     VkDevice device = global_ctx.device;

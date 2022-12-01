@@ -1,9 +1,9 @@
 Vertex vertexes[] =
 {
-    { .position = { 0.0f, 0.0f  }, .uv = { 8,  24 } },
-    { .position = { 0.0f, -1.0f }, .uv = { 8,  8  } },
-    { .position = { 1.0f, -1.0f }, .uv = { 24, 8  } },
-    { .position = { 1.0f, 0.0f  }, .uv = { 24, 24 } },
+    { .position = { 0.0f, 0.0f  }, .uv = { 0,  32 } },
+    { .position = { 0.0f, 1.0f }, .uv = { 0,  0 } },
+    { .position = { 1.0f, 1.0f }, .uv = { 64, 0 } },
+    { .position = { 1.0f, 0.0f  }, .uv = { 64, 32 } },
 };
 
 uint32 indexes[] =

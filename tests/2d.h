@@ -17,24 +17,6 @@ static constexpr uint32 WINDOW_WIDTH = 1080;
 static constexpr uint32 WINDOW_HEIGHT = 720;
 static constexpr float32 WINDOW_ASPECT_RATIO = (float32)WINDOW_WIDTH / WINDOW_WIDTH;
 
-struct NDCoordinates
-{
-    float32 x;
-    float32 y;
-    float32 width;
-    float32 height;
-};
-
-struct VSBuffer
-{
-    NDCoordinates nd_coordinates[MAX_ENTITIES];
-};
-
-struct FSBuffer
-{
-    Vec2<uint32> sprite_coords[MAX_ENTITIES];
-};
-
 struct Game
 {
     Mouse        mouse;
@@ -82,6 +64,14 @@ struct Vertex
 {
     Vec2<float32> position;
     Vec2<float32> uv;
+};
+
+struct Sprite
+{
+    uint32 x;
+    uint32 y;
+    uint32 width;
+    uint32 height;
 };
 
 static void InitVertexLayout(Game* game, Stack* mem)

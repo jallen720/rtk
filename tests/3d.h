@@ -351,7 +351,7 @@ static ShaderDataHnd CreateTexture(cstring image_data_path, RenderState* rs, Sta
     ImageData image_data = {};
     LoadImageData(&image_data, image_data_path);
 
-    ShaderDataInfo info = DefaultTextureInfo(RTK::global_ctx.swapchain.image_format, rs->sampler, &image_data);
+    ShaderDataInfo info = DefaultTextureInfo(GetSwapchain()->image_format, rs->sampler, &image_data);
     ShaderDataHnd shader_data_hnd = CreateShaderData(mem, &info);
 
     // Copy image data into staging buffer.

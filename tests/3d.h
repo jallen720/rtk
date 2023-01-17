@@ -145,7 +145,9 @@ static constexpr uint32 RENDER_THREAD_COUNT = 4;
 static uint32 PushEntity(EntityData* entity_data)
 {
     if (entity_data->count == MAX_ENTITIES)
+    {
         CTK_FATAL("can't push another entity: entity count (%u) at max (%u)", entity_data->count, MAX_ENTITIES);
+    }
 
     uint32 new_entity = entity_data->count;
     ++entity_data->count;
@@ -359,7 +361,9 @@ static ShaderDataHnd CreateTexture(cstring image_data_path, RenderState* rs, Sta
     Write(rs->buffer.staging, image_data.data, image_data.size);
     uint32 image_count = GetShaderData(shader_data_hnd)->image_hnds.count;
     for (uint32 i = 0; i < image_count; ++i)
+    {
         WriteToShaderDataImage(shader_data_hnd, i, rs->buffer.staging);
+    }
 
     DestroyImageData(&image_data);
 
@@ -541,12 +545,12 @@ static void ViewControls(Game* game, Window* window)
     float32 translation_speed = BASE_TRANSLATION_SPEED * mod;
     Vec3<float32> translation = {};
 
-    if (KeyDown(window, Key::W)) translation.z += translation_speed;
-    if (KeyDown(window, Key::S)) translation.z -= translation_speed;
-    if (KeyDown(window, Key::D)) translation.x += translation_speed;
-    if (KeyDown(window, Key::A)) translation.x -= translation_speed;
-    if (KeyDown(window, Key::E)) translation.y += translation_speed;
-    if (KeyDown(window, Key::Q)) translation.y -= translation_speed;
+    if (KeyDown(window, Key::W)) { translation.z += translation_speed; }
+    if (KeyDown(window, Key::S)) { translation.z -= translation_speed; }
+    if (KeyDown(window, Key::D)) { translation.x += translation_speed; }
+    if (KeyDown(window, Key::A)) { translation.x -= translation_speed; }
+    if (KeyDown(window, Key::E)) { translation.y += translation_speed; }
+    if (KeyDown(window, Key::Q)) { translation.y -= translation_speed; }
 
     LocalTranslate(view, translation);
 
@@ -577,7 +581,9 @@ static void UpdateGame(Game* game, Window* window)
 
     Controls(game, window);
     if (!window->open)
+    {
         return; // Controls closed window.
+    }
 }
 
 /// RenderState Update
@@ -647,7 +653,9 @@ static void UpdateMVPMatrixes(RenderState* rs, Game* game, ThreadPool* thread_po
 
     // Wait for tasks to complete.
     for (uint32 i = 0; i < thread_count; ++i)
+    {
         Wait(thread_pool, Get(&job->tasks, i));
+    }
 }
 
 static void RecordRenderCommandsThread(void* data)
@@ -703,10 +711,12 @@ static void RecordRenderCommands(Game* game, RenderState* rs, ThreadPool* thread
 
     // Wait for tasks to complete.
     for (uint32 i = 0; i < THREAD_COUNT; ++i)
+    {
         Wait(thread_pool, Get(&job->tasks, i));
+    }
 }
 
-void TestMain()
+static void TestMain()
 {
     Stack* mem = CreateStack(Megabyte(8));
     Stack* temp_mem = CreateStack(mem, Megabyte(1));
@@ -808,7 +818,9 @@ void TestMain()
 
         ProcessEvents(window);
         if (!window->open)
+        {
             break; // Quit event closed window.
+        }
 
         if (IsActive(window))
         {

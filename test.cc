@@ -1,6 +1,5 @@
-#include "ctk2/ctk.h"
+#include "ctk3/ctk3.h"
 #include "rtk/tests/3d.h"
-// #include "rtk/tests/2d.h"
 
 sint32 main()
 {

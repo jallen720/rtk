@@ -1,7 +1,8 @@
 #pragma once
 
 #include "rtk/vulkan.h"
-#include "ctk2/ctk.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/pair.h"
 
 using namespace CTK;
 
@@ -21,9 +22,9 @@ using DebugCallback = VKAPI_ATTR VkBool32 (VKAPI_CALL*)(VkDebugUtilsMessageSever
 
 struct VkResultInfo
 {
-    VkResult result;
-    cstring  name;
-    cstring  message;
+    VkResult    result;
+    const char* name;
+    const char* message;
 };
 
 /// Interface
@@ -177,7 +178,9 @@ static void PrintResult(VkResult result)
     {
         res_info = VK_RESULT_DEBUG_INFOS + i;
         if (res_info->result == result)
+        {
             break;
+        }
     }
 
     if (!res_info)
@@ -186,15 +189,21 @@ static void PrintResult(VkResult result)
     }
 
     if (res_info->result == 0)
+    {
         PrintInfo("vulkan function returned %s: %s", res_info->name, res_info->message);
+    }
     else if (res_info->result > 0)
+    {
         PrintWarning("vulkan function returned %s: %s", res_info->name, res_info->message);
+    }
     else
+    {
         PrintError("vulkan function returned %s: %s", res_info->name, res_info->message);
+    }
 }
 
 template<typename ...Args>
-static void Validate(VkResult result, cstring fail_message, Args... args)
+static void Validate(VkResult result, const char* fail_message, Args... args)
 {
     if (result != VK_SUCCESS)
     {
@@ -210,7 +219,7 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
 {
     CTK_UNUSED(message_type_flags)
     CTK_UNUSED(user_data)
-    cstring message_id = callback_data->pMessageIdName ? callback_data->pMessageIdName : "";
+    const char* message_id = callback_data->pMessageIdName ? callback_data->pMessageIdName : "";
     if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT & message_severity_flag_bit)
     {
         CTK_FATAL("%s\n", callback_data->pMessage);
@@ -227,21 +236,23 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
     return VK_FALSE;
 }
 
-static cstring VkPresentModeName(VkPresentModeKHR present_mode)
+static const char* VkPresentModeName(VkPresentModeKHR present_mode)
 {
-    static constexpr Pair<VkPresentModeKHR, cstring> NAMES[] =
+    static constexpr Pair<VkPresentModeKHR, const char*> NAMES[] =
     {
-        CTK_ENUM_NAME_PAIR(VK_PRESENT_MODE_IMMEDIATE_KHR),
-        CTK_ENUM_NAME_PAIR(VK_PRESENT_MODE_MAILBOX_KHR),
-        CTK_ENUM_NAME_PAIR(VK_PRESENT_MODE_FIFO_KHR),
-        CTK_ENUM_NAME_PAIR(VK_PRESENT_MODE_FIFO_RELAXED_KHR),
-        CTK_ENUM_NAME_PAIR(VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR),
-        CTK_ENUM_NAME_PAIR(VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR),
+        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_IMMEDIATE_KHR),
+        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_MAILBOX_KHR),
+        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_FIFO_KHR),
+        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_FIFO_RELAXED_KHR),
+        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR),
+        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR),
     };
 
-    cstring name = NULL;
+    const char* name = NULL;
     if (!FindValue(NAMES, CTK_ARRAY_SIZE(NAMES), present_mode, &name))
+    {
         CTK_FATAL("can't find name for present mode %u", present_mode);
+    }
 
     return name;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "rtk/vulkan.h"
-#include "ctk2/ctk.h"
+#include "ctk3/ctk3.h"
 
 using namespace CTK;
 
@@ -39,13 +39,17 @@ struct PhysicalDevice
 static bool HasRequiredFeatures(PhysicalDevice* physical_device, DeviceFeatures* required_features)
 {
     for (uint32 i = 0; i < MAX_DEVICE_FEATURES; ++i)
+    {
         if (required_features->as_array[i] == VK_TRUE && physical_device->features.as_array[i] == VK_FALSE)
+        {
             return false;
+        }
+    }
 
     return true;
 }
 
-static void LogPhysicalDevice(PhysicalDevice* physical_device, cstring message)
+static void LogPhysicalDevice(PhysicalDevice* physical_device, const char* message)
 {
     VkPhysicalDeviceType type = physical_device->properties.deviceType;
     VkFormat depth_image_format = physical_device->depth_image_format;

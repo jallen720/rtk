@@ -6,9 +6,9 @@
 #include "rtk/resources.h"
 #include "rtk/buffer.h"
 #include "rtk/image.h"
-#include "ctk2/ctk.h"
-#include "ctk2/memory.h"
-#include "ctk2/containers.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/stack.h"
+#include "ctk3/array.h"
 
 using namespace CTK;
 
@@ -75,7 +75,7 @@ static Image* GetImage(ShaderData* shader_data, uint32 instance)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ShaderDataHnd CreateShaderData(Stack* mem, ShaderDataInfo* info)
+static ShaderDataHnd CreateShaderData(Stack* perm_stack, ShaderDataInfo* info)
 {
     ShaderDataHnd shader_data_hnd = AllocateShaderData();
     ShaderData* shader_data = GetShaderData(shader_data_hnd);
@@ -89,17 +89,21 @@ static ShaderDataHnd CreateShaderData(Stack* mem, ShaderDataInfo* info)
     if (shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
         shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
     {
-        InitArray(&shader_data->buffer_hnds, mem, instance_count);
+        InitArray(&shader_data->buffer_hnds, perm_stack, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
+        {
             Push(&shader_data->buffer_hnds, CreateBuffer(info->buffer.parent, info->buffer.size));
+        }
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
         shader_data->sampler = info->image.sampler;
 
-        InitArray(&shader_data->image_hnds, mem, instance_count);
+        InitArray(&shader_data->image_hnds, perm_stack, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
+        {
             Push(&shader_data->image_hnds, CreateImage(&info->image.info));
+        }
     }
     else
     {
@@ -215,7 +219,7 @@ static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instanc
     SubmitTempCommandBuffer();
 }
 
-static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, Array<ShaderDataHnd> datas)
+static ShaderDataSetHnd CreateShaderDataSet(Stack* perm_stack, Stack temp_mem, Array<ShaderDataHnd> datas)
 {
     ShaderDataSetHnd shader_data_set_hnd = AllocateShaderDataSet();
     ShaderDataSet* shader_data_set = GetShaderDataSet(shader_data_set_hnd);
@@ -254,7 +258,9 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, Array<Sh
     // Duplicate layouts for allocation.
     auto desc_set_alloc_layouts = CreateArray<VkDescriptorSetLayout>(&temp_mem, instance_count);
     for (uint32 i = 0; i < instance_count; ++i)
+    {
         Push(desc_set_alloc_layouts, shader_data_set->layout);
+    }
 
     // Allocate descriptor sets.
     VkDescriptorSetAllocateInfo allocate_info =
@@ -265,7 +271,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* mem, Stack temp_mem, Array<Sh
         .descriptorSetCount = instance_count,
         .pSetLayouts        = desc_set_alloc_layouts->data,
     };
-    InitArrayFull(&shader_data_set->instances, mem, instance_count);
+    InitArrayFull(&shader_data_set->instances, perm_stack, instance_count);
     res = vkAllocateDescriptorSets(device, &allocate_info, shader_data_set->instances.data);
     Validate(res, "vkAllocateDescriptorSets() failed");
 

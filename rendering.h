@@ -7,8 +7,8 @@
 #include "rtk/pipeline.h"
 #include "rtk/shader_data.h"
 #include "rtk/mesh_data.h"
-#include "ctk2/ctk.h"
-#include "ctk2/containers.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/array.h"
 
 using namespace CTK;
 

@@ -2,9 +2,9 @@
 
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
-#include "ctk2/ctk.h"
-#include "ctk2/memory.h"
-#include "ctk2/containers.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/stack.h"
+#include "ctk3/array.h"
 
 using namespace CTK;
 
@@ -14,7 +14,7 @@ namespace RTK
 /// Interface
 ////////////////////////////////////////////////////////////
 template<typename Type, typename VkFunc, typename... Args>
-static Array<Type>* GetVkArray(Stack* mem, VkFunc vk_func, Args... args)
+static Array<Type>* GetVkArray(Stack* stack, VkFunc vk_func, Args... args)
 {
     VkResult res = VK_SUCCESS;
 
@@ -22,7 +22,7 @@ static Array<Type>* GetVkArray(Stack* mem, VkFunc vk_func, Args... args)
     res = vk_func(args..., &count, NULL);
     Validate(res, "failed to get vulkan array count");
 
-    auto array = CreateArrayFull<Type>(mem, count);
+    auto array = CreateArrayFull<Type>(stack, count);
     res = vk_func(args..., &array->count, array->data);
     Validate(res, "failed to get vulkan array values");
 
@@ -30,7 +30,7 @@ static Array<Type>* GetVkArray(Stack* mem, VkFunc vk_func, Args... args)
 }
 
 template<typename Type, typename VkFunc, typename... Args>
-static void LoadVkArray(Array<Type>* array, Stack* mem, VkFunc vk_func, Args... args)
+static void LoadVkArray(Array<Type>* array, Stack* stack, VkFunc vk_func, Args... args)
 {
     VkResult res = VK_SUCCESS;
 
@@ -38,48 +38,49 @@ static void LoadVkArray(Array<Type>* array, Stack* mem, VkFunc vk_func, Args... 
     res = vk_func(args..., &count, NULL);
     Validate(res, "failed to get vulkan array count");
 
-    InitArrayFull(array, mem, count);
+    InitArrayFull(array, stack, count);
     res = vk_func(args..., &array->count, array->data);
     Validate(res, "failed to get vulkan array values");
 }
 
 template<typename Type, typename VkFunc, typename... Args>
-static Array<Type>* GetVkArrayUnchecked(Stack* mem, VkFunc vk_func, Args... args)
+static Array<Type>* GetVkArrayUnchecked(Stack* stack, VkFunc vk_func, Args... args)
 {
     uint32 count = 0;
     vk_func(args..., &count, NULL);
 
-    auto array = CreateArrayFull<Type>(mem, count);
+    auto array = CreateArrayFull<Type>(stack, count);
     vk_func(args..., &array->count, array->data);
 
     return array;
 }
 
-static Array<VkImage>* GetVkSwapchainImages(Stack* mem, VkDevice device, VkSwapchainKHR swapchain)
+static Array<VkImage>* GetVkSwapchainImages(Stack* stack, VkDevice device, VkSwapchainKHR swapchain)
 {
-    return GetVkArray<VkImage>(mem, vkGetSwapchainImagesKHR, device, swapchain);
+    return GetVkArray<VkImage>(stack, vkGetSwapchainImagesKHR, device, swapchain);
 }
 
-static Array<VkQueueFamilyProperties>* GetVkQueueFamilyProperties(Stack* mem, VkPhysicalDevice physical_device)
+static Array<VkQueueFamilyProperties>* GetVkQueueFamilyProperties(Stack* stack, VkPhysicalDevice physical_device)
 {
-    return GetVkArrayUnchecked<VkQueueFamilyProperties>(mem, vkGetPhysicalDeviceQueueFamilyProperties, physical_device);
+    return GetVkArrayUnchecked<VkQueueFamilyProperties>(stack, vkGetPhysicalDeviceQueueFamilyProperties,
+                                                        physical_device);
 }
 
-static Array<VkPhysicalDevice>* GetVkPhysicalDevices(Stack* mem, VkInstance instance)
+static Array<VkPhysicalDevice>* GetVkPhysicalDevices(Stack* stack, VkInstance instance)
 {
-    return GetVkArray<VkPhysicalDevice>(mem, vkEnumeratePhysicalDevices, instance);
+    return GetVkArray<VkPhysicalDevice>(stack, vkEnumeratePhysicalDevices, instance);
 }
 
-static void LoadVkSurfaceFormats(Array<VkSurfaceFormatKHR>* array, Stack* mem, VkPhysicalDevice physical_device,
+static void LoadVkSurfaceFormats(Array<VkSurfaceFormatKHR>* array, Stack* stack, VkPhysicalDevice physical_device,
                                  VkSurfaceKHR surface)
 {
-    return LoadVkArray(array, mem, vkGetPhysicalDeviceSurfaceFormatsKHR, physical_device, surface);
+    return LoadVkArray(array, stack, vkGetPhysicalDeviceSurfaceFormatsKHR, physical_device, surface);
 }
 
-static void LoadVkSurfacePresentModes(Array<VkPresentModeKHR>* array, Stack* mem, VkPhysicalDevice physical_device,
+static void LoadVkSurfacePresentModes(Array<VkPresentModeKHR>* array, Stack* stack, VkPhysicalDevice physical_device,
                                       VkSurfaceKHR surface)
 {
-    return LoadVkArray(array, mem, vkGetPhysicalDeviceSurfacePresentModesKHR, physical_device, surface);
+    return LoadVkArray(array, stack, vkGetPhysicalDeviceSurfacePresentModesKHR, physical_device, surface);
 }
 
 }

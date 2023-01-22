@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ctk2/ctk.h"
+#include "ctk3/ctk3.h"
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/context.h"
@@ -22,7 +22,9 @@ AllocateDeviceMemory(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlag
     {
         // Ensure memory type at mem_properties->memoryTypes[i] is supported by mem_requirements.
         if ((mem_requirements.memoryTypeBits & (1 << i)) == 0)
+        {
             continue;
+        }
 
         // Check if memory at index has all property flags.
         if ((mem_properties->memoryTypes[i].propertyFlags & mem_property_flags) == mem_property_flags)
@@ -33,7 +35,9 @@ AllocateDeviceMemory(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlag
     }
 
     if (mem_type_index == UINT32_MAX)
+    {
         CTK_FATAL("failed to find memory type that satisfies memory requirements");
+    }
 
     // Allocate memory using selected memory type index.
     VkMemoryAllocateInfo info =

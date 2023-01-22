@@ -4,15 +4,15 @@
 #include "rtk/debug.h"
 #include "rtk/vk_array.h"
 #include "rtk/device.h"
-#include "ctk2/ctk.h"
-#include "ctk2/memory.h"
-#include "ctk2/containers.h"
-#include "ctk2/file.h"
-#include "ctk2/multithreading.h"
-#include "stk2/stk.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/stack.h"
+#include "ctk3/array.h"
+#include "ctk3/ring_buffer.h"
+#include "ctk3/file.h"
+#include "ctk3/thread_pool.h"
+#include "ctk3/window.h"
 
 using namespace CTK;
-using namespace STK;
 
 /// Macros
 ////////////////////////////////////////////////////////////
@@ -32,7 +32,7 @@ static constexpr uint32 UNSET_INDEX = UINT32_MAX;
 
 struct InstanceInfo
 {
-    cstring                             application_name;
+    const char*                         application_name;
     DebugCallback                       debug_callback;
     VkDebugUtilsMessageSeverityFlagsEXT debug_message_severity;
     VkDebugUtilsMessageTypeFlagsEXT     debug_message_type;
@@ -107,14 +107,14 @@ static Context global_ctx;
 
 /// Internal
 ////////////////////////////////////////////////////////////
-static QueueFamilies FindQueueFamilies(Stack temp_mem, VkPhysicalDevice physical_device, Surface* surface)
+static QueueFamilies FindQueueFamilies(Stack temp_stack, VkPhysicalDevice physical_device, Surface* surface)
 {
     QueueFamilies queue_families =
     {
         .graphics = UNSET_INDEX,
         .present  = UNSET_INDEX,
     };
-    Array<VkQueueFamilyProperties>* queue_family_properties = GetVkQueueFamilyProperties(&temp_mem, physical_device);
+    Array<VkQueueFamilyProperties>* queue_family_properties = GetVkQueueFamilyProperties(&temp_stack, physical_device);
 
     // Find first graphics queue family.
     for (uint32 queue_family_index = 0; queue_family_index < queue_family_properties->count; ++queue_family_index)
@@ -161,7 +161,9 @@ static VkFormat FindDepthImageFormat(VkPhysicalDevice physical_device)
         VkFormatProperties format_properties = {};
         vkGetPhysicalDeviceFormatProperties(physical_device, depth_image_format, &format_properties);
         if (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+        {
             return depth_image_format;
+        }
     }
 
     return VK_FORMAT_UNDEFINED;
@@ -210,7 +212,7 @@ static void InitInstance(InstanceInfo* info)
         .apiVersion         = VK_API_VERSION_1_0,
     };
 
-    cstring extensions[] =
+    const char* extensions[] =
     {
         VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
         VK_KHR_SURFACE_EXTENSION_NAME,
@@ -220,7 +222,7 @@ static void InitInstance(InstanceInfo* info)
     };
 
 #ifdef RTK_ENABLE_VALIDATION
-    cstring validation_layer = "VK_LAYER_KHRONOS_validation";
+    const char* validation_layer = "VK_LAYER_KHRONOS_validation";
 #endif
 
     VkInstanceCreateInfo create_info = {};
@@ -248,8 +250,9 @@ static void InitInstance(InstanceInfo* info)
 #endif
 }
 
-static void InitSurface(Window* window)
+static void InitSurface()
 {
+    Window* window = GetWindow();
     VkWin32SurfaceCreateInfoKHR info =
     {
         .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
@@ -260,10 +263,10 @@ static void InitSurface(Window* window)
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
-static void LoadCapablePhysicalDevices(Stack temp_mem, DeviceFeatures* required_features)
+static void LoadCapablePhysicalDevices(Stack temp_stack, DeviceFeatures* required_features)
 {
     // Get system physical devices and ensure there is enough space in the context's physical devices list.
-    Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_mem, global_ctx.instance);
+    Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_stack, global_ctx.instance);
     if (vk_physical_devices->size > global_ctx.physical_devices.size)
     {
         CTK_FATAL("can't load physical devices: max device count is %u, system device count is %u",
@@ -282,7 +285,7 @@ static void LoadCapablePhysicalDevices(Stack temp_mem, DeviceFeatures* required_
         PhysicalDevice physical_device =
         {
             .hnd                = vk_physical_device,
-            .queue_families     = FindQueueFamilies(temp_mem, vk_physical_device, &global_ctx.surface),
+            .queue_families     = FindQueueFamilies(temp_stack, vk_physical_device, &global_ctx.surface),
             .depth_image_format = FindDepthImageFormat(vk_physical_device),
         };
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
@@ -298,24 +301,32 @@ static void LoadCapablePhysicalDevices(Stack temp_mem, DeviceFeatures* required_
 
         // Depth image format required.
         if (physical_device.depth_image_format == VK_FORMAT_UNDEFINED)
+        {
             continue;
+        }
 
         // All required features must be supported.
         if (!HasRequiredFeatures(&physical_device, required_features))
+        {
             continue;
+        }
 
         Push(&global_ctx.physical_devices, physical_device);
     }
 
     // Ensure atleast 1 capable physical device was loaded.
     if (global_ctx.physical_devices.count == 0)
+    {
         CTK_FATAL("failed to load any capable physical devices");
+    }
 }
 
 static void UsePhysicalDevice(uint32 index)
 {
     if (index >= global_ctx.physical_devices.count)
+    {
         CTK_FATAL("physical device index %u is out of bounds: max is %u", index, global_ctx.physical_devices.count - 1);
+    }
 
     global_ctx.physical_device = GetPtr(&global_ctx.physical_devices, index);
 }
@@ -330,10 +341,12 @@ static void InitDevice(DeviceFeatures* enabled_features)
 
     // Don't create separate queues if present and graphics queue families are the same.
     if (queue_families->present != queue_families->graphics)
+    {
         Push(&queue_infos, GetSingleQueueInfo(queue_families->present));
+    }
 
     // Create device, specifying enabled extensions and features.
-    cstring enabled_extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    const char* enabled_extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     VkDeviceCreateInfo create_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -357,7 +370,7 @@ static void InitQueues()
     vkGetDeviceQueue(global_ctx.device, queue_families->present, 0, &global_ctx.present_queue);
 }
 
-static void GetSurfaceInfo(Stack* mem)
+static void GetSurfaceInfo(Stack* perm_stack)
 {
     Surface* surface = &global_ctx.surface;
     VkPhysicalDevice vk_physical_device = global_ctx.physical_device->hnd;
@@ -365,8 +378,8 @@ static void GetSurfaceInfo(Stack* mem)
     VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, surface->hnd, &surface->capabilities);
     Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
 
-    LoadVkSurfaceFormats(&surface->formats, mem, vk_physical_device, surface->hnd);
-    LoadVkSurfacePresentModes(&surface->present_modes, mem, vk_physical_device, surface->hnd);
+    LoadVkSurfaceFormats(&surface->formats, perm_stack, vk_physical_device, surface->hnd);
+    LoadVkSurfacePresentModes(&surface->present_modes, perm_stack, vk_physical_device, surface->hnd);
 }
 
 static void InitMainCommandState()
@@ -396,7 +409,7 @@ static void InitMainCommandState()
     Validate(res, "vkAllocateCommandBuffers() failed");
 }
 
-static void InitSwapchain(Stack* mem, Stack temp_mem)
+static void InitSwapchain(Stack* perm_stack, Stack temp_stack)
 {
     VkDevice device = global_ctx.device;
     Surface* surface = &global_ctx.surface;
@@ -484,9 +497,9 @@ static void InitSwapchain(Stack* mem, Stack temp_mem)
     swapchain->extent = surface->capabilities.currentExtent;
 
     // Create swapchain image views.
-    Array<VkImage>* swapchain_images = GetVkSwapchainImages(&temp_mem, device, swapchain->hnd);
+    Array<VkImage>* swapchain_images = GetVkSwapchainImages(&temp_stack, device, swapchain->hnd);
     swapchain->image_count = swapchain_images->count;
-    InitArrayFull(&swapchain->image_views, mem, swapchain->image_count);
+    InitArrayFull(&swapchain->image_views, perm_stack, swapchain->image_count);
 
     for (uint32 i = 0; i < swapchain_images->count; ++i)
     {
@@ -518,9 +531,9 @@ static void InitSwapchain(Stack* mem, Stack temp_mem)
     }
 }
 
-static void InitRenderCommandPools(Stack* mem, uint32 render_thread_count)
+static void InitRenderCommandPools(Stack* perm_stack, uint32 render_thread_count)
 {
-    InitArray(&global_ctx.render_command_pools, mem, render_thread_count);
+    InitArray(&global_ctx.render_command_pools, perm_stack, render_thread_count);
     VkCommandPoolCreateInfo info =
     {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -564,13 +577,13 @@ static VkSemaphore CreateSemaphore(VkDevice device)
     return semaphore;
 }
 
-static void InitFrames(Stack* mem)
+static void InitFrames(Stack* perm_stack)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = global_ctx.device;
     uint32 frame_count = global_ctx.swapchain.image_count + 1;
 
-    InitRingBuffer(&global_ctx.frames, mem, frame_count);
+    InitRingBuffer(&global_ctx.frames, perm_stack, frame_count);
     for (uint32 i = 0; i < frame_count; ++i)
     {
         Frame* frame = GetPtr(&global_ctx.frames, i);
@@ -594,7 +607,7 @@ static void InitFrames(Stack* mem)
         }
 
         // render_command_buffers
-        InitArray(&frame->render_command_buffers, mem, global_ctx.render_command_pools.count);
+        InitArray(&frame->render_command_buffers, perm_stack, global_ctx.render_command_pools.count);
         for (uint32 i = 0; i < global_ctx.render_command_pools.count; ++i)
         {
             VkCommandBufferAllocateInfo allocate_info =
@@ -615,7 +628,9 @@ static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_size
     // Count total descriptors from pool sizes.
     uint32 total_descriptors = 0;
     for (uint32 i = 0; i < descriptor_pool_sizes->count; ++i)
+    {
         total_descriptors += GetPtr(descriptor_pool_sizes, i)->descriptorCount;
+    }
 
     VkDescriptorPoolCreateInfo pool_info =
     {
@@ -631,24 +646,24 @@ static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_size
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitContext(Stack* mem, Stack temp_mem, Window* window, ContextInfo* info)
+static void InitContext(Stack* perm_stack, Stack temp_stack, ContextInfo* info)
 {
     InitInstance(&info->instance_info);
-    InitSurface(window);
+    InitSurface();
 
     // Initialize device state.
-    InitArray(&global_ctx.physical_devices, mem, info->max_physical_devices);
-    LoadCapablePhysicalDevices(temp_mem, &info->required_features);
+    InitArray(&global_ctx.physical_devices, perm_stack, info->max_physical_devices);
+    LoadCapablePhysicalDevices(temp_stack, &info->required_features);
     UsePhysicalDevice(0); // Default to first capable device found. Required by InitDevice().
     InitDevice(&info->required_features);
     InitQueues();
-    GetSurfaceInfo(mem);
+    GetSurfaceInfo(perm_stack);
     InitMainCommandState();
 
     // Initialize rendering state.
-    InitSwapchain(mem, temp_mem);
-    InitRenderCommandPools(mem, info->render_thread_count);
-    InitFrames(mem);
+    InitSwapchain(perm_stack, temp_stack);
+    InitRenderCommandPools(perm_stack, info->render_thread_count);
+    InitFrames(perm_stack);
     InitDescriptorPool(&info->descriptor_pool_sizes);
 };
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ctk2/ctk.h"
+#include "ctk3/ctk3.h"
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/context.h"
@@ -43,11 +43,13 @@ struct Image
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void LoadImageData(ImageData* image_data, cstring path)
+static void LoadImageData(ImageData* image_data, const char* path)
 {
     image_data->data = stbi_load(path, &image_data->width, &image_data->height, &image_data->channel_count, 0);
     if (image_data->data == NULL)
+    {
         CTK_FATAL("failed to open image file from path '%s'", path);
+    }
 
     image_data->size = image_data->width * image_data->height * image_data->channel_count;
 }

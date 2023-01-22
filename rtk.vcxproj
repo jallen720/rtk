@@ -127,7 +127,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <TreatSpecificWarningsAsErrors>4100;4715</TreatSpecificWarningsAsErrors>
@@ -157,9 +157,7 @@
     <ClInclude Include="rtk_resources.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="shader_data.h" />
-    <ClInclude Include="tests\2d.h" />
     <ClInclude Include="tests\3d.h" />
-    <ClInclude Include="tests\defs_2d.h" />
     <ClInclude Include="tests\defs_3d.h" />
     <ClInclude Include="tests\shared.h" />
     <ClInclude Include="vk_array.h" />

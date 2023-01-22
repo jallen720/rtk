@@ -1,11 +1,10 @@
 #pragma once
 
-#include "ctk2/ctk.h"
-#include "ctk2/math.h"
-#include "stk2/stk.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/math.h"
+#include "ctk3/window.h"
 
 using namespace CTK;
-using namespace STK;
 
 /// Data
 ////////////////////////////////////////////////////////////
@@ -18,9 +17,9 @@ struct Mouse
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void UpdateMouse(Mouse* mouse, Window* window)
+static void UpdateMouse(Mouse* mouse)
 {
-    mouse->position = GetMousePosition(window);
+    mouse->position = GetMousePosition();
     mouse->delta = mouse->position - mouse->last_position;
     mouse->last_position = mouse->position;
 }

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ctk2/ctk.h"
-#include "ctk2/memory.h"
-#include "ctk2/pool.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/stack.h"
+#include "ctk3/pool.h"
 
 using namespace CTK;
 
@@ -61,16 +61,16 @@ static Resources global_resources;
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitResources(Stack* mem, ResourcesInfo* info)
+static void InitResources(Stack* perm_stack, ResourcesInfo* info)
 {
-    InitPool(&global_resources.buffers,          mem, info->max_buffers);
-    InitPool(&global_resources.images,           mem, info->max_images);
-    InitPool(&global_resources.shader_datas,     mem, info->max_shader_datas);
-    InitPool(&global_resources.shader_data_sets, mem, info->max_shader_data_sets);
-    InitPool(&global_resources.mesh_datas,       mem, info->max_mesh_datas);
-    InitPool(&global_resources.meshes,           mem, info->max_meshes);
-    InitPool(&global_resources.render_targets,   mem, info->max_render_targets);
-    InitPool(&global_resources.pipelines,        mem, info->max_pipelines);
+    InitPool(&global_resources.buffers,          perm_stack, info->max_buffers);
+    InitPool(&global_resources.images,           perm_stack, info->max_images);
+    InitPool(&global_resources.shader_datas,     perm_stack, info->max_shader_datas);
+    InitPool(&global_resources.shader_data_sets, perm_stack, info->max_shader_data_sets);
+    InitPool(&global_resources.mesh_datas,       perm_stack, info->max_mesh_datas);
+    InitPool(&global_resources.meshes,           perm_stack, info->max_meshes);
+    InitPool(&global_resources.render_targets,   perm_stack, info->max_render_targets);
+    InitPool(&global_resources.pipelines,        perm_stack, info->max_pipelines);
 }
 
 /// Allocate Functions

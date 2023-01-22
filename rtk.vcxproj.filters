@@ -39,9 +39,6 @@
     <ClInclude Include="rtk_context.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="tests\2d.h">
-      <Filter>Source Files\tests</Filter>
-    </ClInclude>
     <ClInclude Include="tests\3d.h">
       <Filter>Source Files\tests</Filter>
     </ClInclude>
@@ -80,9 +77,6 @@
     </ClInclude>
     <ClInclude Include="rtk_resources.h">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tests\defs_2d.h">
-      <Filter>Source Files\tests</Filter>
     </ClInclude>
     <ClInclude Include="tests\defs_3d.h">
       <Filter>Source Files\tests</Filter>

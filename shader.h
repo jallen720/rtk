@@ -3,10 +3,10 @@
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/context.h"
-#include "ctk2/ctk.h"
-#include "ctk2/memory.h"
-#include "ctk2/containers.h"
-#include "ctk2/file.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/stack.h"
+#include "ctk3/array.h"
+#include "ctk3/file.h"
 
 using namespace CTK;
 
@@ -23,9 +23,9 @@ struct Shader
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static VkShaderModule LoadShaderModule(Stack temp_mem, cstring path)
+static VkShaderModule LoadShaderModule(Stack temp_stack, const char* path)
 {
-    Array<uint32>* bytecode = ReadFile<uint32>(&temp_mem, path);
+    Array<uint32>* bytecode = ReadFile<uint32>(&temp_stack, path);
     VkShaderModuleCreateInfo info =
     {
         .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,

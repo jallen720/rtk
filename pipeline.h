@@ -5,9 +5,9 @@
 #include "rtk/shader.h"
 #include "rtk/shader_data.h"
 #include "rtk/render_target.h"
-#include "ctk2/ctk.h"
-#include "ctk2/memory.h"
-#include "ctk2/containers.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/stack.h"
+#include "ctk3/array.h"
 
 using namespace CTK;
 
@@ -105,7 +105,7 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count, AttributeTyp
     ++layout->attribute_location;
 }
 
-static PipelineHnd CreatePipeline(Stack temp_mem, RenderTargetHnd render_target_hnd, PipelineInfo* info)
+static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_target_hnd, PipelineInfo* info)
 {
     PipelineHnd pipeline_hnd = AllocatePipeline();
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
@@ -164,9 +164,11 @@ static PipelineHnd CreatePipeline(Stack temp_mem, RenderTargetHnd render_target_
     Array<VkDescriptorSetLayout> descriptor_set_layouts = {};
     if (info->shader_data_sets.count > 0)
     {
-        InitArray(&descriptor_set_layouts, &temp_mem, info->shader_data_sets.count);
+        InitArray(&descriptor_set_layouts, &temp_stack, info->shader_data_sets.count);
         for (uint32 i = 0; i < info->shader_data_sets.count; ++i)
+        {
             Push(&descriptor_set_layouts, GetShaderDataSet(Get(&info->shader_data_sets, i))->layout);
+        }
     }
 
     VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
@@ -180,9 +182,11 @@ static PipelineHnd CreatePipeline(Stack temp_mem, RenderTargetHnd render_target_
     Validate(res, "vkCreatePipelineLayout() failed");
 
     // Pipeline
-    auto shader_stages = CreateArray<VkPipelineShaderStageCreateInfo>(&temp_mem, info->shaders.count);
+    auto shader_stages = CreateArray<VkPipelineShaderStageCreateInfo>(&temp_stack, info->shaders.count);
     for (uint32 i = 0; i < info->shaders.count; ++i)
+    {
         Push(shader_stages, DefaultShaderStageCreateInfo(GetPtr(&info->shaders, i)));
+    }
 
     VkGraphicsPipelineCreateInfo create_info =
     {

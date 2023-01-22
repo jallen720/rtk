@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ctk2/ctk.h"
+#include "ctk3/ctk3.h"
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/context.h"
@@ -66,7 +66,9 @@ static BufferHnd CreateBuffer(BufferInfo* info)
 
     // Map host visible buffer memory.
     if (info->mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+    {
         vkMapMemory(device, buffer->mem, 0, buffer->size, 0, (void**)&buffer->mapped_mem);
+    }
 
     // Buffers allocated directly from device memory manage the entire region of memory.
     buffer->offset = 0;
@@ -102,7 +104,9 @@ static void Write(BufferHnd buffer_hnd, void* data, VkDeviceSize data_size)
 {
     Buffer* buffer = GetBuffer(buffer_hnd);
     if (buffer->mapped_mem == NULL)
+    {
         CTK_FATAL("can't write to buffer: buffer is not host visible (mapped_mem == NULL)");
+    }
 
     if (buffer->index + data_size > buffer->size)
     {

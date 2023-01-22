@@ -392,7 +392,7 @@ static void InitShaderDatas(RenderState* render_state, Stack* perm_stack)
         render_state->data.vs_buffer = CreateShaderData(perm_stack, &info);
     }
 
-    render_state->data.axis_cube_texture = CreateTexture("images/axis_cube.png", render_state, perm_stack);
+    render_state->data.axis_cube_texture  = CreateTexture("images/axis_cube.png", render_state, perm_stack);
     render_state->data.dirt_block_texture = CreateTexture("images/dirt_block.png", render_state, perm_stack);
 }
 
@@ -709,7 +709,7 @@ static void RecordRenderCommands(Game* game, RenderState* render_state, ThreadPo
         {
             uint32 thread_index = (texture_index * MESH_COUNT) + mesh_index;
             RenderCommandState* state = GetPtr(&job->states, thread_index);
-            state->render_state           = render_state;
+            state->render_state = render_state;
             state->thread_index = thread_index;
             state->texture      = textures[texture_index];
             state->mesh         = meshes[mesh_index];

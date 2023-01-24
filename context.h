@@ -114,13 +114,14 @@ static QueueFamilies FindQueueFamilies(Stack temp_stack, VkPhysicalDevice physic
         .graphics = UNSET_INDEX,
         .present  = UNSET_INDEX,
     };
-    Array<VkQueueFamilyProperties>* queue_family_properties = GetVkQueueFamilyProperties(&temp_stack, physical_device);
+    Array<VkQueueFamilyProperties> queue_family_properties = {};
+    LoadVkQueueFamilyProperties(&queue_family_properties, &temp_stack, physical_device);
 
     // Find first graphics queue family.
-    for (uint32 queue_family_index = 0; queue_family_index < queue_family_properties->count; ++queue_family_index)
+    for (uint32 queue_family_index = 0; queue_family_index < queue_family_properties.count; ++queue_family_index)
     {
         // Check if queue supports graphics operations.
-        if (GetPtr(queue_family_properties, queue_family_index)->queueFlags & VK_QUEUE_GRAPHICS_BIT)
+        if (GetPtr(&queue_family_properties, queue_family_index)->queueFlags & VK_QUEUE_GRAPHICS_BIT)
         {
             queue_families.graphics = queue_family_index;
             break;
@@ -128,7 +129,7 @@ static QueueFamilies FindQueueFamilies(Stack temp_stack, VkPhysicalDevice physic
     }
 
     // Find first present queue family.
-    for (uint32 queue_family_index = 0; queue_family_index < queue_family_properties->count; ++queue_family_index)
+    for (uint32 queue_family_index = 0; queue_family_index < queue_family_properties.count; ++queue_family_index)
     {
         // Check if queue supports present operations.
         VkBool32 present_supported = VK_FALSE;
@@ -263,18 +264,23 @@ static void InitSurface()
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
-static void LoadCapablePhysicalDevices(Stack temp_stack, FreeList* free_list, DeviceFeatures* required_features)
+static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack temp_stack, DeviceFeatures* required_features)
 {
-    // Get system physical devices and ensure there is enough space in the context's physical devices list.
-    Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_stack, global_ctx.instance);
+    // Get system physical devices and ensure atleast 1 physical device was found.
+    Array<VkPhysicalDevice> vk_physical_devices = {};
+    LoadVkPhysicalDevices(&vk_physical_devices, &temp_stack, global_ctx.instance);
+    if (vk_physical_devices.count == 0)
+    {
+        CTK_FATAL("failed to find any physical devices");
+    }
 
-    // Reset context's physical device list if already populated.
-    Clear(&global_ctx.physical_devices);
+    // Initialize physical devices array to hold all physical devices if necessary.
+    InitArray(&global_ctx.physical_devices, perm_stack, vk_physical_devices.count);
 
     // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
-    for (uint32 i = 0; i < vk_physical_devices->count; ++i)
+    for (uint32 i = 0; i < vk_physical_devices.count; ++i)
     {
-        VkPhysicalDevice vk_physical_device = Get(vk_physical_devices, i);
+        VkPhysicalDevice vk_physical_device = Get(&vk_physical_devices, i);
 
         // Collect all info about physical device.
         PhysicalDevice physical_device =
@@ -306,18 +312,14 @@ static void LoadCapablePhysicalDevices(Stack temp_stack, FreeList* free_list, De
             continue;
         }
 
-        // Physical device has required capabilities, add to physical devices array.
-        if (!CanPush(&global_ctx.physical_devices, 1))
-        {
-            Expand(&global_ctx.physical_devices, free_list, 4);
-        }
+        // Physical device is capable.
         Push(&global_ctx.physical_devices, physical_device);
     }
 
     // Ensure atleast 1 capable physical device was loaded.
     if (global_ctx.physical_devices.count == 0)
     {
-        CTK_FATAL("failed to load any capable physical devices");
+        CTK_FATAL("failed to find any capable physical devices");
     }
 }
 
@@ -497,17 +499,17 @@ static void InitSwapchain(Stack* perm_stack, Stack temp_stack)
     swapchain->extent = surface->capabilities.currentExtent;
 
     // Create swapchain image views.
-    Array<VkImage>* swapchain_images = GetVkSwapchainImages(&temp_stack, device, swapchain->hnd);
-    swapchain->image_count = swapchain_images->count;
-    InitArrayFull(&swapchain->image_views, perm_stack, swapchain->image_count);
-
-    for (uint32 i = 0; i < swapchain_images->count; ++i)
+    Array<VkImage> swapchain_images = {};
+    LoadVkSwapchainImages(&swapchain_images, &temp_stack, device, swapchain->hnd);
+    InitArrayFull(&swapchain->image_views, perm_stack, swapchain_images.count);
+    swapchain->image_count = swapchain_images.count;
+    for (uint32 i = 0; i < swapchain_images.count; ++i)
     {
         VkImageViewCreateInfo view_info =
         {
             .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .flags    = 0,
-            .image    = Get(swapchain_images, i),
+            .image    = Get(&swapchain_images, i),
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
             .format   = swapchain->image_format,
             .components =
@@ -646,14 +648,13 @@ static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_size
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitContext(Stack* perm_stack, Stack temp_stack, FreeList* free_list, ContextInfo* info)
+static void InitContext(Stack* perm_stack, Stack temp_stack, ContextInfo* info)
 {
     InitInstance(&info->instance_info);
     InitSurface();
 
-    // Load physical devices and select the first capable physical device.
-    InitArray(&global_ctx.physical_devices, free_list, 4);
-    LoadCapablePhysicalDevices(temp_stack, free_list, &info->required_features);
+    // Load capable physical devices and select the first one.
+    LoadCapablePhysicalDevices(perm_stack, temp_stack, &info->required_features);
     UsePhysicalDevice(0);
 
     // Initialize device state.

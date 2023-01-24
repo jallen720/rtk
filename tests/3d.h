@@ -790,7 +790,7 @@ static void TestMain()
         .render_thread_count   = RENDER_THREAD_COUNT,
         .descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
     };
-    InitContext(perm_stack, *temp_stack, free_list, &context_info);
+    InitContext(perm_stack, *temp_stack, &context_info);
 
     ResourcesInfo resources_info =
     {

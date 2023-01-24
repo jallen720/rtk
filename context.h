@@ -6,6 +6,7 @@
 #include "rtk/device.h"
 #include "ctk3/ctk3.h"
 #include "ctk3/stack.h"
+#include "ctk3/free_list.h"
 #include "ctk3/array.h"
 #include "ctk3/ring_buffer.h"
 #include "ctk3/file.h"
@@ -42,7 +43,6 @@ struct ContextInfo
 {
     InstanceInfo                instance_info;
     DeviceFeatures              required_features;
-    uint32                      max_physical_devices;
     uint32                      render_thread_count;
     Array<VkDescriptorPoolSize> descriptor_pool_sizes;
 };
@@ -263,18 +263,13 @@ static void InitSurface()
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
-static void LoadCapablePhysicalDevices(Stack temp_stack, DeviceFeatures* required_features)
+static void LoadCapablePhysicalDevices(Stack temp_stack, FreeList* free_list, DeviceFeatures* required_features)
 {
     // Get system physical devices and ensure there is enough space in the context's physical devices list.
     Array<VkPhysicalDevice>* vk_physical_devices = GetVkPhysicalDevices(&temp_stack, global_ctx.instance);
-    if (vk_physical_devices->size > global_ctx.physical_devices.size)
-    {
-        CTK_FATAL("can't load physical devices: max device count is %u, system device count is %u",
-                  global_ctx.physical_devices.size, vk_physical_devices->size);
-    }
 
-    // Reset context's physical device list to store new list.
-    global_ctx.physical_devices.count = 0;
+    // Reset context's physical device list if already populated.
+    Clear(&global_ctx.physical_devices);
 
     // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
     for (uint32 i = 0; i < vk_physical_devices->count; ++i)
@@ -311,6 +306,11 @@ static void LoadCapablePhysicalDevices(Stack temp_stack, DeviceFeatures* require
             continue;
         }
 
+        // Physical device has required capabilities, add to physical devices array.
+        if (!CanPush(&global_ctx.physical_devices, 1))
+        {
+            Expand(&global_ctx.physical_devices, free_list, 4);
+        }
         Push(&global_ctx.physical_devices, physical_device);
     }
 
@@ -646,15 +646,17 @@ static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_size
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitContext(Stack* perm_stack, Stack temp_stack, ContextInfo* info)
+static void InitContext(Stack* perm_stack, Stack temp_stack, FreeList* free_list, ContextInfo* info)
 {
     InitInstance(&info->instance_info);
     InitSurface();
 
+    // Load physical devices and select the first capable physical device.
+    InitArray(&global_ctx.physical_devices, free_list, 4);
+    LoadCapablePhysicalDevices(temp_stack, free_list, &info->required_features);
+    UsePhysicalDevice(0);
+
     // Initialize device state.
-    InitArray(&global_ctx.physical_devices, perm_stack, info->max_physical_devices);
-    LoadCapablePhysicalDevices(temp_stack, &info->required_features);
-    UsePhysicalDevice(0); // Default to first capable device found. Required by InitDevice().
     InitDevice(&info->required_features);
     InitQueues();
     GetSurfaceInfo(perm_stack);

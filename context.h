@@ -186,7 +186,7 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(uint32 queue_family_index)
     return info;
 }
 
-static void InitInstance(InstanceInfo* info)
+static void InitInstance(InstanceInfo* info, Stack temp_stack)
 {
     VkResult res = VK_SUCCESS;
 
@@ -214,6 +214,19 @@ static void InitInstance(InstanceInfo* info)
         .apiVersion         = VK_API_VERSION_1_0,
     };
 
+    static constexpr const char* REQUIRED_EXTENSIONS[] =
+    {
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+        VK_KHR_SURFACE_EXTENSION_NAME,
+#ifdef RTK_ENABLE_VALIDATION
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+#endif
+    };
+    Array<const char*> extensions = {};
+    InitArray(&extensions, &temp_stack, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS) + info->extensions.count);
+    PushRange(&extensions, REQUIRED_EXTENSIONS, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS));
+    PushRange(&extensions, &info->extensions);
+
 #ifdef RTK_ENABLE_VALIDATION
     const char* validation_layer = "VK_LAYER_KHRONOS_validation";
 #endif
@@ -222,8 +235,8 @@ static void InitInstance(InstanceInfo* info)
     create_info.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.flags                   = 0;
     create_info.pApplicationInfo        = &app_info;
-    create_info.enabledExtensionCount   = info->extensions.count;
-    create_info.ppEnabledExtensionNames = info->extensions.data;
+    create_info.enabledExtensionCount   = extensions.count;
+    create_info.ppEnabledExtensionNames = extensions.data;
 #ifdef RTK_ENABLE_VALIDATION
     create_info.pNext                   = &debug_msgr_info;
     create_info.enabledLayerCount       = 1;
@@ -642,7 +655,7 @@ static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_size
 ////////////////////////////////////////////////////////////
 static void InitContext(Stack* perm_stack, Stack temp_stack, ContextInfo* info)
 {
-    InitInstance(&info->instance_info);
+    InitInstance(&info->instance_info, temp_stack);
     InitSurface();
 
     // Load capable physical devices and select the first one.

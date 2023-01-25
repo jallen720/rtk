@@ -763,17 +763,9 @@ static void TestMain()
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
         { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
     };
-    const char* extensions[] =
-    {
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-        VK_KHR_SURFACE_EXTENSION_NAME,
-#ifdef RTK_ENABLE_VALIDATION
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-#endif
-    };
     ContextInfo context_info = {};
     context_info.instance_info.application_name = "RTK 3D Test",
-    context_info.instance_info.extensions       = CTK_WRAP_ARRAY(extensions);
+    context_info.instance_info.extensions       = {};
 #ifdef RTK_ENABLE_VALIDATION
     context_info.instance_info.debug_callback         = DefaultDebugCallback,
     context_info.instance_info.debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
@@ -808,12 +800,12 @@ static void TestMain()
 
     Game* game = CreateGame(perm_stack);
     RenderState* render_state = CreateRenderState(perm_stack, *temp_stack, thread_pool);
-    ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
+    // ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
 
     // Run game.
     for (;;)
     {
-        StartProfile(prof_tree, "Frame");
+        // StartProfile(prof_tree, "Frame");
 
         ProcessWindowEvents();
         if (!WindowIsOpen())
@@ -823,33 +815,33 @@ static void TestMain()
 
         if (WindowIsActive())
         {
-            StartProfile(prof_tree, "NextFrame()");
+            // StartProfile(prof_tree, "NextFrame()");
             NextFrame();
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
 
-            StartProfile(prof_tree, "UpdateGame()");
+            // StartProfile(prof_tree, "UpdateGame()");
             UpdateGame(game);
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
 
-            StartProfile(prof_tree, "UpdateMVPMatrixes()");
+            // StartProfile(prof_tree, "UpdateMVPMatrixes()");
             UpdateMVPMatrixes(render_state, game, thread_pool);
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
 
-            StartProfile(prof_tree, "RecordRenderCommands()");
+            // StartProfile(prof_tree, "RecordRenderCommands()");
             RecordRenderCommands(game, render_state, thread_pool);
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
 
-            StartProfile(prof_tree, "SubmitRenderCommands()");
+            // StartProfile(prof_tree, "SubmitRenderCommands()");
             SubmitRenderCommands(render_state->render_target.main);
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
         }
         else
         {
             Sleep(1);
         }
 
-        EndProfile(prof_tree);
-        PrintProfileTree(prof_tree);
-        ClearProfileTree(prof_tree);
+        // EndProfile(prof_tree);
+        // PrintProfileTree(prof_tree);
+        // ClearProfileTree(prof_tree);
     }
 }

@@ -749,6 +749,26 @@ static void TestMain()
     ThreadPool* thread_pool = CreateThreadPool(perm_stack, 8);
 
     // Init RTK Context + Resources
+    ContextInfo context_info = {};
+    context_info.instance_info.application_name       = "RTK 3D Test",
+    context_info.instance_info.extensions             = {};
+#ifdef RTK_ENABLE_VALIDATION
+    context_info.instance_info.debug_callback         = DefaultDebugCallback,
+    context_info.instance_info.debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                                        // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+    context_info.instance_info.debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+#endif
+
+    context_info.required_features.as_struct =
+    {
+        .geometryShader    = VK_TRUE,
+        .samplerAnisotropy = VK_TRUE,
+    };
+
     VkDescriptorPoolSize descriptor_pool_sizes[] =
     {
         { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
@@ -763,26 +783,9 @@ static void TestMain()
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
         { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
     };
-    ContextInfo context_info = {};
-    context_info.instance_info.application_name = "RTK 3D Test",
-    context_info.instance_info.extensions       = {};
-#ifdef RTK_ENABLE_VALIDATION
-    context_info.instance_info.debug_callback         = DefaultDebugCallback,
-    context_info.instance_info.debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                                        // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-    context_info.instance_info.debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
-#endif
-    context_info.required_features.as_struct =
-    {
-        .geometryShader    = VK_TRUE,
-        .samplerAnisotropy = VK_TRUE,
-    };
-    context_info.render_thread_count   = RENDER_THREAD_COUNT,
     context_info.descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
+
+    context_info.render_thread_count = RENDER_THREAD_COUNT,
     InitContext(perm_stack, *temp_stack, &context_info);
 
     ResourcesInfo resources_info =
@@ -798,6 +801,7 @@ static void TestMain()
     };
     InitResources(perm_stack, &resources_info);
 
+    // Initialize other test state.
     Game* game = CreateGame(perm_stack);
     RenderState* render_state = CreateRenderState(perm_stack, *temp_stack, thread_pool);
     // ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);

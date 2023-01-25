@@ -208,7 +208,7 @@ static void Validate(VkResult result, const char* fail_message, Args... args)
     if (result != VK_SUCCESS)
     {
         PrintResult(result);
-        CTK_FATAL(fail_message, args...)
+        CTK_FATAL(fail_message, args...);
     }
 }
 

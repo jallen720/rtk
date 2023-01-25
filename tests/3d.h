@@ -352,10 +352,10 @@ static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, Ima
     };
 }
 
-static ShaderDataHnd CreateTexture(const char* image_data_path, RenderState* render_state, Stack* perm_stack)
+static ShaderDataHnd CreateTexture(const char* image_path, RenderState* render_state, Stack* perm_stack)
 {
     ImageData image_data = {};
-    LoadImageData(&image_data, image_data_path);
+    LoadImageData(&image_data, image_path);
 
     ShaderDataInfo info = DefaultTextureInfo(GetSwapchain()->image_format, render_state->sampler, &image_data);
     ShaderDataHnd shader_data_hnd = CreateShaderData(perm_stack, &info);
@@ -763,33 +763,34 @@ static void TestMain()
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
         { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
     };
-    ContextInfo context_info =
+    const char* extensions[] =
     {
-        .instance_info =
-        {
-            .application_name = "RTK 3D Test",
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+        VK_KHR_SURFACE_EXTENSION_NAME,
 #ifdef RTK_ENABLE_VALIDATION
-            .debug_callback         = DefaultDebugCallback,
-            .debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-                                      // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
-                                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                      VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
-            .debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                                      VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                      VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif
-        },
-        .required_features =
-        {
-            .as_struct =
-            {
-                .geometryShader    = VK_TRUE,
-                .samplerAnisotropy = VK_TRUE,
-            },
-        },
-        .render_thread_count   = RENDER_THREAD_COUNT,
-        .descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
     };
+    ContextInfo context_info = {};
+    context_info.instance_info.application_name = "RTK 3D Test",
+    context_info.instance_info.extensions       = CTK_WRAP_ARRAY(extensions);
+#ifdef RTK_ENABLE_VALIDATION
+    context_info.instance_info.debug_callback         = DefaultDebugCallback,
+    context_info.instance_info.debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                                        // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
+                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+    context_info.instance_info.debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+#endif
+    context_info.required_features.as_struct =
+    {
+        .geometryShader    = VK_TRUE,
+        .samplerAnisotropy = VK_TRUE,
+    };
+    context_info.render_thread_count   = RENDER_THREAD_COUNT,
+    context_info.descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
     InitContext(perm_stack, *temp_stack, &context_info);
 
     ResourcesInfo resources_info =

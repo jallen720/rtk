@@ -37,6 +37,7 @@ struct InstanceInfo
     DebugCallback                       debug_callback;
     VkDebugUtilsMessageSeverityFlagsEXT debug_message_severity;
     VkDebugUtilsMessageTypeFlagsEXT     debug_message_type;
+    Array<const char*>                  extensions;
 };
 
 struct ContextInfo
@@ -213,15 +214,6 @@ static void InitInstance(InstanceInfo* info)
         .apiVersion         = VK_API_VERSION_1_0,
     };
 
-    const char* extensions[] =
-    {
-        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
-        VK_KHR_SURFACE_EXTENSION_NAME,
-#ifdef RTK_ENABLE_VALIDATION
-        VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
-#endif
-    };
-
 #ifdef RTK_ENABLE_VALIDATION
     const char* validation_layer = "VK_LAYER_KHRONOS_validation";
 #endif
@@ -230,8 +222,8 @@ static void InitInstance(InstanceInfo* info)
     create_info.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.flags                   = 0;
     create_info.pApplicationInfo        = &app_info;
-    create_info.enabledExtensionCount   = CTK_ARRAY_SIZE(extensions);
-    create_info.ppEnabledExtensionNames = extensions;
+    create_info.enabledExtensionCount   = info->extensions.count;
+    create_info.ppEnabledExtensionNames = info->extensions.data;
 #ifdef RTK_ENABLE_VALIDATION
     create_info.pNext                   = &debug_msgr_info;
     create_info.enabledLayerCount       = 1;

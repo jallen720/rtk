@@ -685,28 +685,6 @@ static Swapchain* GetSwapchain()
     return &global_ctx.swapchain;
 }
 
-static void NextFrame()
-{
-    VkDevice device = global_ctx.device;
-    VkResult res = VK_SUCCESS;
-
-    // Get next frame and wait for it to be finished (if still in-progress) before proceeding.
-    Frame* frame = Next(&global_ctx.frames);
-
-    res = vkWaitForFences(device, 1, &frame->in_progress, VK_TRUE, UINT64_MAX);
-    Validate(res, "vkWaitForFences() failed");
-
-    res = vkResetFences(device, 1, &frame->in_progress);
-    Validate(res, "vkResetFences() failed");
-
-    // Once frame is ready, aquire next swapchain image's index.
-    res = vkAcquireNextImageKHR(device, global_ctx.swapchain.hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
-                                &frame->swapchain_image_index);
-    Validate(res, "vkAcquireNextImageKHR() failed");
-
-    global_ctx.frame = frame;
-}
-
 static void BeginTempCommandBuffer()
 {
     VkCommandBufferBeginInfo info =

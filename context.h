@@ -48,14 +48,6 @@ struct ContextInfo
     Array<VkDescriptorPoolSize> descriptor_pool_sizes;
 };
 
-struct Surface
-{
-    VkSurfaceKHR              hnd;
-    VkSurfaceCapabilitiesKHR  capabilities;
-    Array<VkSurfaceFormatKHR> formats;
-    Array<VkPresentModeKHR>   present_modes;
-};
-
 struct Swapchain
 {
     VkSwapchainKHR     hnd;
@@ -85,7 +77,7 @@ struct Context
     VkDebugUtilsMessengerEXT debug_messenger;
 
     // Device State
-    Surface               surface;
+    VkSurfaceKHR          surface;
     Array<PhysicalDevice> physical_devices;
     PhysicalDevice*       physical_device;
     VkDevice              device;
@@ -108,7 +100,7 @@ static Context global_ctx;
 
 /// Internal
 ////////////////////////////////////////////////////////////
-static QueueFamilies FindQueueFamilies(Stack temp_stack, VkPhysicalDevice physical_device, Surface* surface)
+static QueueFamilies FindQueueFamilies(Stack temp_stack, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
     QueueFamilies queue_families =
     {
@@ -134,7 +126,7 @@ static QueueFamilies FindQueueFamilies(Stack temp_stack, VkPhysicalDevice physic
     {
         // Check if queue supports present operations.
         VkBool32 present_supported = VK_FALSE;
-        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, queue_family_index, surface->hnd, &present_supported);
+        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, queue_family_index, surface, &present_supported);
         if (present_supported)
         {
             queue_families.present = queue_family_index;
@@ -265,7 +257,7 @@ static void InitSurface()
         .hinstance = window->instance,
         .hwnd      = window->handle,
     };
-    VkResult res = vkCreateWin32SurfaceKHR(global_ctx.instance, &info, NULL, &global_ctx.surface.hnd);
+    VkResult res = vkCreateWin32SurfaceKHR(global_ctx.instance, &info, NULL, &global_ctx.surface);
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
@@ -291,7 +283,7 @@ static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack temp_stack, Devi
         PhysicalDevice physical_device =
         {
             .hnd                = vk_physical_device,
-            .queue_families     = FindQueueFamilies(temp_stack, vk_physical_device, &global_ctx.surface),
+            .queue_families     = FindQueueFamilies(temp_stack, vk_physical_device, global_ctx.surface),
             .depth_image_format = FindDepthImageFormat(vk_physical_device),
         };
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
@@ -377,18 +369,6 @@ static void InitQueues()
     vkGetDeviceQueue(global_ctx.device, queue_families->present, 0, &global_ctx.present_queue);
 }
 
-static void GetSurfaceInfo(Stack* perm_stack)
-{
-    Surface* surface = &global_ctx.surface;
-    VkPhysicalDevice vk_physical_device = global_ctx.physical_device->hnd;
-
-    VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, surface->hnd, &surface->capabilities);
-    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
-
-    LoadVkSurfaceFormats(&surface->formats, perm_stack, vk_physical_device, surface->hnd);
-    LoadVkSurfacePresentModes(&surface->present_modes, perm_stack, vk_physical_device, surface->hnd);
-}
-
 static void InitMainCommandState()
 {
     VkDevice device = global_ctx.device;
@@ -416,19 +396,30 @@ static void InitMainCommandState()
     Validate(res, "vkAllocateCommandBuffers() failed");
 }
 
-static void InitSwapchain(Stack* perm_stack, Stack temp_stack)
+static void InitSwapchain(FreeList* free_list, Stack temp_stack)
 {
     VkDevice device = global_ctx.device;
-    Surface* surface = &global_ctx.surface;
+    VkSurfaceKHR surface = global_ctx.surface;
+    VkPhysicalDevice physical_device = global_ctx.physical_device->hnd;
     Swapchain* swapchain = &global_ctx.swapchain;
     VkResult res = VK_SUCCESS;
 
+    // Get surface info.
+    VkSurfaceCapabilitiesKHR surface_capabilities = {};
+    res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_capabilities);
+    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
+
+    Array<VkSurfaceFormatKHR> formats = {};
+    Array<VkPresentModeKHR> present_modes = {};
+    LoadVkSurfaceFormats(&formats, &temp_stack, physical_device, surface);
+    LoadVkSurfacePresentModes(&present_modes, &temp_stack, physical_device, surface);
+
     // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
     // color space.
-    VkSurfaceFormatKHR selected_format = Get(&surface->formats, 0);
-    for (uint32 i = 0; i < surface->formats.count; ++i)
+    VkSurfaceFormatKHR selected_format = Get(&formats, 0);
+    for (uint32 i = 0; i < formats.count; ++i)
     {
-        VkSurfaceFormatKHR surface_format = Get(&surface->formats, i);
+        VkSurfaceFormatKHR surface_format = Get(&formats, i);
         if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM &&
             surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
         {
@@ -439,9 +430,9 @@ static void InitSwapchain(Stack* perm_stack, Stack temp_stack)
 
     // Default to FIFO (only present mode with guarenteed availability), check for preferred mailbox present mode.
     VkPresentModeKHR selected_present_mode = VK_PRESENT_MODE_FIFO_KHR;
-    for (uint32 i = 0; i < surface->present_modes.count; ++i)
+    for (uint32 i = 0; i < present_modes.count; ++i)
     {
-        VkPresentModeKHR surface_present_mode = Get(&surface->present_modes, i);
+        VkPresentModeKHR surface_present_mode = Get(&present_modes, i);
         if (surface_present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
         {
             selected_present_mode = surface_present_mode;
@@ -450,14 +441,14 @@ static void InitSwapchain(Stack* perm_stack, Stack temp_stack)
     }
 
     // Set image count to min image count + 1 or max image count (whichever is smaller).
-    uint32 min_image_count = surface->capabilities.minImageCount + 1;
-    if (surface->capabilities.maxImageCount > 0 && min_image_count > surface->capabilities.maxImageCount)
+    uint32 min_image_count = surface_capabilities.minImageCount + 1;
+    if (surface_capabilities.maxImageCount > 0 && min_image_count > surface_capabilities.maxImageCount)
     {
-        min_image_count = surface->capabilities.maxImageCount;
+        min_image_count = surface_capabilities.maxImageCount;
     }
 
     // Verify current extent has been set for surface.
-    if (surface->capabilities.currentExtent.width == UINT32_MAX)
+    if (surface_capabilities.currentExtent.width == UINT32_MAX)
     {
         CTK_FATAL("current extent not set for surface");
     }
@@ -466,15 +457,15 @@ static void InitSwapchain(Stack* perm_stack, Stack temp_stack)
     {
         .sType            = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .flags            = 0,
-        .surface          = surface->hnd,
+        .surface          = global_ctx.surface,
         .minImageCount    = min_image_count,
         .imageFormat      = selected_format.format,
         .imageColorSpace  = selected_format.colorSpace,
-        .imageExtent      = surface->capabilities.currentExtent,
+        .imageExtent      = surface_capabilities.currentExtent,
         .imageArrayLayers = 1, // Always 1 for standard images.
         .imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
                             VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .preTransform     = surface->capabilities.currentTransform,
+        .preTransform     = surface_capabilities.currentTransform,
         .compositeAlpha   = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
         .presentMode      = selected_present_mode,
         .clipped          = VK_TRUE,
@@ -501,12 +492,12 @@ static void InitSwapchain(Stack* perm_stack, Stack temp_stack)
 
     // Store surface state used to create swapchain for future reference.
     swapchain->image_format = selected_format.format;
-    swapchain->extent = surface->capabilities.currentExtent;
+    swapchain->extent = surface_capabilities.currentExtent;
 
     // Create swapchain image views.
     Array<VkImage> swapchain_images = {};
     LoadVkSwapchainImages(&swapchain_images, &temp_stack, device, swapchain->hnd);
-    InitArrayFull(&swapchain->image_views, perm_stack, swapchain_images.count);
+    InitArrayFull(&swapchain->image_views, free_list, swapchain_images.count);
     swapchain->image_count = swapchain_images.count;
     for (uint32 i = 0; i < swapchain_images.count; ++i)
     {
@@ -653,7 +644,7 @@ static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_size
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitContext(Stack* perm_stack, Stack temp_stack, ContextInfo* info)
+static void InitContext(Stack* perm_stack, Stack temp_stack, FreeList* free_list, ContextInfo* info)
 {
     InitInstance(&info->instance_info, temp_stack);
     InitSurface();
@@ -665,11 +656,10 @@ static void InitContext(Stack* perm_stack, Stack temp_stack, ContextInfo* info)
     // Initialize device state.
     InitDevice(&info->required_features);
     InitQueues();
-    GetSurfaceInfo(perm_stack);
     InitMainCommandState();
 
     // Initialize rendering state.
-    InitSwapchain(perm_stack, temp_stack);
+    InitSwapchain(free_list, temp_stack);
     InitRenderCommandPools(perm_stack, info->render_thread_count);
     InitFrames(perm_stack);
     InitDescriptorPool(&info->descriptor_pool_sizes);

@@ -17,7 +17,7 @@ namespace RTK
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void NextFrame()
+static bool NextFrame()
 {
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
@@ -34,9 +34,20 @@ static void NextFrame()
     // Once frame is ready, aquire next swapchain image's index.
     res = vkAcquireNextImageKHR(device, global_ctx.swapchain.hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
                                 &frame->swapchain_image_index);
-    Validate(res, "vkAcquireNextImageKHR() failed");
+    if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        // Recreate swapchain.
+        vkDeviceWaitIdle(global_ctx.device);
+        vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
+        return false;
+    }
+    else
+    {
+        Validate(res, "vkAcquireNextImageKHR() failed");
+    }
 
     global_ctx.frame = frame;
+    return true;
 }
 
 static VkCommandBuffer BeginRecordingRenderCommands(RenderTargetHnd render_target_hnd, uint32 render_thread_index)
@@ -195,7 +206,16 @@ static void SubmitRenderCommands(RenderTargetHnd render_target_hnd)
         .pResults           = NULL,
     };
     res = vkQueuePresentKHR(global_ctx.present_queue, &present_info);
-    Validate(res, "vkQueuePresentKHR() failed");
+    if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
+    {
+        // Recreate swapchain.
+        vkDeviceWaitIdle(global_ctx.device);
+        vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
+    }
+    else
+    {
+        Validate(res, "vkAcquireNextImageKHR() failed");
+    }
 }
 
 }

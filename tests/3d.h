@@ -2,12 +2,13 @@
 #include "ctk3/ctk3.h"
 #include "ctk3/memory.h"
 #include "ctk3/free_list.h"
+#include "ctk3/free_list_debug.h"
 #include "ctk3/thread_pool.h"
 #include "ctk3/math.h"
 #include "ctk3/profile.h"
 #include "ctk3/window.h"
 
-// #define RTK_ENABLE_VALIDATION
+#define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
@@ -786,7 +787,7 @@ static void TestMain()
     context_info.descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
 
     context_info.render_thread_count = RENDER_THREAD_COUNT,
-    InitContext(perm_stack, *temp_stack, &context_info);
+    InitContext(perm_stack, *temp_stack, free_list, &context_info);
 
     ResourcesInfo resources_info =
     {
@@ -806,6 +807,8 @@ static void TestMain()
     RenderState* render_state = CreateRenderState(perm_stack, *temp_stack, thread_pool);
     // ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
 
+    VisualizeFreeList(free_list, 16);
+
     // Run game.
     for (;;)
     {
@@ -820,7 +823,10 @@ static void TestMain()
         if (WindowIsActive())
         {
             // StartProfile(prof_tree, "NextFrame()");
-            NextFrame();
+            if (!NextFrame())
+            {
+                continue;
+            }
             // EndProfile(prof_tree);
 
             // StartProfile(prof_tree, "UpdateGame()");

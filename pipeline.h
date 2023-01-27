@@ -112,7 +112,6 @@ static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_targe
 
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
     VkDevice device = global_ctx.device;
-    VkExtent2D surface_extent = global_ctx.surface.capabilities.currentExtent;
     VkResult res = VK_SUCCESS;
 
     VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
@@ -124,6 +123,11 @@ static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_targe
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
 
     // Viewport
+    VkSurfaceCapabilitiesKHR surface_capabilities = {};
+    res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(global_ctx.physical_device->hnd, global_ctx.surface,
+                                                    &surface_capabilities);
+    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
+    VkExtent2D surface_extent = surface_capabilities.currentExtent;
     VkViewport viewport =
     {
         .x        = 0,
@@ -178,7 +182,7 @@ static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_targe
     layout_create_info.pPushConstantRanges    = info->push_constant_ranges.data;
 
     VkPipelineLayout layout = VK_NULL_HANDLE;
-    res = vkCreatePipelineLayout(global_ctx.device, &layout_create_info, NULL, &pipeline->layout);
+    res = vkCreatePipelineLayout(device, &layout_create_info, NULL, &pipeline->layout);
     Validate(res, "vkCreatePipelineLayout() failed");
 
     // Pipeline

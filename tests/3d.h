@@ -473,6 +473,12 @@ static void InitPipelines(RenderState* render_state, Stack temp_stack)
     render_state->pipeline.main = CreatePipeline(temp_stack, render_state->render_target.main, &pipeline_info);
 }
 
+static void ReinitPipelines(RenderState* render_state, Stack temp_stack)
+{
+    DestroyPipeline(render_state->pipeline.main);
+    InitPipelines(render_state, temp_stack);
+}
+
 static void InitMeshes(RenderState* render_state)
 {
     MeshDataInfo mesh_data_info =
@@ -833,9 +839,11 @@ static void TestMain()
         if (WindowIsActive())
         {
             // StartProfile(prof_tree, "NextFrame()");
-            if (!NextFrame())
+            if (!NextFrame() || true)
             {
-                continue;
+                vkDeviceWaitIdle(global_ctx.device);
+                ReinitPipelines(render_state, *temp_stack);
+                // continue;
             }
             // EndProfile(prof_tree);
 

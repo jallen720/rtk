@@ -125,6 +125,53 @@ static PipelineHnd AllocatePipeline()
     return Allocate(&global_resources.pipelines);
 }
 
+/// Deallocate Functions
+////////////////////////////////////////////////////////////
+static void DeallocateBuffer(BufferHnd buffer_hnd)
+{
+    Deallocate(&global_resources.buffers, buffer_hnd);
+}
+
+static void DeallocateImage(ImageHnd image_hnd)
+{
+    Deallocate(&global_resources.images, image_hnd);
+}
+
+static void DeallocateShaderData(ShaderDataHnd shader_data_hnd)
+{
+    Deallocate(&global_resources.shader_datas, shader_data_hnd);
+}
+
+static void DeallocateShaderDataSet(ShaderDataSetHnd shader_data_set_hnd)
+{
+    Deallocate(&global_resources.shader_data_sets, shader_data_set_hnd);
+}
+
+static void DeallocateShader(ShaderHnd shader_hnd)
+{
+    Deallocate(&global_resources.shaders, shader_hnd);
+}
+
+static void DeallocateMeshData(MeshDataHnd mesh_data_hnd)
+{
+    Deallocate(&global_resources.mesh_datas, mesh_data_hnd);
+}
+
+static void DeallocateMesh(MeshHnd mesh_hnd)
+{
+    Deallocate(&global_resources.meshes, mesh_hnd);
+}
+
+static void DeallocateRenderTarget(RenderTargetHnd render_target_hnd)
+{
+    Deallocate(&global_resources.render_targets, render_target_hnd);
+}
+
+static void DeallocatePipeline(PipelineHnd pipeline_hnd)
+{
+    Deallocate(&global_resources.pipelines, pipeline_hnd);
+}
+
 /// Get Functions
 ////////////////////////////////////////////////////////////
 static Buffer* GetBuffer(BufferHnd hnd)

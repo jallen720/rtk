@@ -36,9 +36,12 @@ static bool NextFrame()
                                 &frame->swapchain_image_index);
     if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        // Recreate swapchain.
-        vkDeviceWaitIdle(global_ctx.device);
-        vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
+        PrintLine("vkAcquireNextImageKHR() returned %s", res == VK_SUBOPTIMAL_KHR ? "VK_SUBOPTIMAL_KHR" : "VK_ERROR_OUT_OF_DATE_KHR");
+
+        // // Recreate swapchain.
+        // vkDeviceWaitIdle(global_ctx.device);
+        // vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
+        global_ctx.frame = frame;
         return false;
     }
     else
@@ -208,9 +211,9 @@ static void SubmitRenderCommands(RenderTargetHnd render_target_hnd)
     res = vkQueuePresentKHR(global_ctx.present_queue, &present_info);
     if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        // Recreate swapchain.
-        vkDeviceWaitIdle(global_ctx.device);
-        vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
+        // // Recreate swapchain.
+        // vkDeviceWaitIdle(global_ctx.device);
+        // vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
     }
     else
     {

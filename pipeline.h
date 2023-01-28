@@ -216,4 +216,12 @@ static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_targe
     return pipeline_hnd;
 }
 
+static void DestroyPipeline(PipelineHnd pipeline_hnd)
+{
+    Pipeline* pipeline = GetPipeline(pipeline_hnd);
+    vkDestroyPipelineLayout(global_ctx.device, pipeline->layout, NULL);
+    vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
+    DeallocatePipeline(pipeline_hnd);
+}
+
 }

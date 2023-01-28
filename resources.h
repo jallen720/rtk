@@ -15,6 +15,7 @@ struct Buffer;
 struct Image;
 struct ShaderData;
 struct ShaderDataSet;
+struct Shader;
 struct MeshData;
 struct Mesh;
 struct RenderTarget;
@@ -24,6 +25,7 @@ using BufferHnd        = PoolHnd<Buffer>;
 using ImageHnd         = PoolHnd<Image>;
 using ShaderDataHnd    = PoolHnd<ShaderData>;
 using ShaderDataSetHnd = PoolHnd<ShaderDataSet>;
+using ShaderHnd        = PoolHnd<Shader>;
 using MeshDataHnd      = PoolHnd<MeshData>;
 using MeshHnd          = PoolHnd<Mesh>;
 using RenderTargetHnd  = PoolHnd<RenderTarget>;
@@ -37,6 +39,7 @@ struct ResourcesInfo
     uint32 max_images;
     uint32 max_shader_datas;
     uint32 max_shader_data_sets;
+    uint32 max_shaders;
     uint32 max_mesh_datas;
     uint32 max_meshes;
     uint32 max_render_targets;
@@ -49,6 +52,7 @@ struct Resources
     Pool<Image>         images;
     Pool<ShaderData>    shader_datas;
     Pool<ShaderDataSet> shader_data_sets;
+    Pool<Shader>        shaders;
     Pool<MeshData>      mesh_datas;
     Pool<Mesh>          meshes;
     Pool<RenderTarget>  render_targets;
@@ -67,6 +71,7 @@ static void InitResources(Stack* perm_stack, ResourcesInfo* info)
     InitPool(&global_resources.images,           perm_stack, info->max_images);
     InitPool(&global_resources.shader_datas,     perm_stack, info->max_shader_datas);
     InitPool(&global_resources.shader_data_sets, perm_stack, info->max_shader_data_sets);
+    InitPool(&global_resources.shaders,          perm_stack, info->max_shaders);
     InitPool(&global_resources.mesh_datas,       perm_stack, info->max_mesh_datas);
     InitPool(&global_resources.meshes,           perm_stack, info->max_meshes);
     InitPool(&global_resources.render_targets,   perm_stack, info->max_render_targets);
@@ -93,6 +98,11 @@ static ShaderDataHnd AllocateShaderData()
 static ShaderDataSetHnd AllocateShaderDataSet()
 {
     return Allocate(&global_resources.shader_data_sets);
+}
+
+static ShaderHnd AllocateShader()
+{
+    return Allocate(&global_resources.shaders);
 }
 
 static MeshDataHnd AllocateMeshData()
@@ -135,6 +145,11 @@ static ShaderData* GetShaderData(ShaderDataHnd hnd)
 static ShaderDataSet* GetShaderDataSet(ShaderDataSetHnd hnd)
 {
     return GetData(&global_resources.shader_data_sets, hnd);
+}
+
+static Shader* GetShader(ShaderHnd hnd)
+{
+    return GetData(&global_resources.shaders, hnd);
 }
 
 static MeshData* GetMeshData(MeshDataHnd hnd)

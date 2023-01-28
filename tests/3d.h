@@ -121,6 +121,12 @@ struct RenderState
     data_set;
     struct
     {
+        ShaderHnd vert_3d;
+        ShaderHnd frag_3d;
+    }
+    shader;
+    struct
+    {
         PipelineHnd main;
     }
     pipeline;
@@ -427,20 +433,22 @@ static void InitShaderDataSets(RenderState* render_state, Stack* perm_stack, Sta
     }
 }
 
+static void InitShaders(RenderState* render_state, Stack temp_stack)
+{
+    render_state->shader.vert_3d = CreateShader(temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    render_state->shader.frag_3d = CreateShader(temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+}
+
 static void InitPipelines(RenderState* render_state, Stack temp_stack)
 {
-    // Pipeline info arrays.
-    Shader shaders[] =
+    // Shaders
+    ShaderHnd shaders[] =
     {
-        {
-            .module = LoadShaderModule(temp_stack, "shaders/bin/3d.vert.spv"),
-            .stage  = VK_SHADER_STAGE_VERTEX_BIT
-        },
-        {
-            .module = LoadShaderModule(temp_stack, "shaders/bin/3d.frag.spv"),
-            .stage  = VK_SHADER_STAGE_FRAGMENT_BIT
-        },
+        render_state->shader.vert_3d,
+        render_state->shader.frag_3d,
     };
+
+    // Pipeline info arrays.
     ShaderDataSetHnd shader_data_sets[] =
     {
         render_state->data_set.entity_data,
@@ -512,6 +520,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack temp_stack, Threa
     InitSampler(render_state);
     InitShaderDatas(render_state, perm_stack);
     InitShaderDataSets(render_state, perm_stack, temp_stack);
+    InitShaders(render_state, temp_stack);
     InitPipelines(render_state, temp_stack);
     InitMeshes(render_state);
     InitThreadPoolJobs(render_state, perm_stack, thread_pool);
@@ -795,6 +804,7 @@ static void TestMain()
         .max_images           = 8,
         .max_shader_datas     = 8,
         .max_shader_data_sets = 8,
+        .max_shaders          = 2,
         .max_mesh_datas       = 1,
         .max_meshes           = 8,
         .max_render_targets   = 1,

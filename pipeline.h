@@ -41,7 +41,7 @@ struct VertexLayout
 struct PipelineInfo
 {
     VertexLayout*              vertex_layout;
-    Array<Shader>              shaders;
+    Array<ShaderHnd>           shaders;
     Array<ShaderDataSetHnd>    shader_data_sets;
     Array<VkPushConstantRange> push_constant_ranges;
 };
@@ -185,7 +185,7 @@ static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_targe
     auto shader_stages = CreateArray<VkPipelineShaderStageCreateInfo>(&temp_stack, info->shaders.count);
     for (uint32 i = 0; i < info->shaders.count; ++i)
     {
-        Push(shader_stages, DefaultShaderStageCreateInfo(GetPtr(&info->shaders, i)));
+        Push(shader_stages, DefaultShaderStageCreateInfo(Get(&info->shaders, i)));
     }
 
     VkGraphicsPipelineCreateInfo create_info =

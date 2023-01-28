@@ -123,11 +123,7 @@ static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_targe
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
 
     // Viewport
-    VkSurfaceCapabilitiesKHR surface_capabilities = {};
-    res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(global_ctx.physical_device->hnd, global_ctx.surface,
-                                                    &surface_capabilities);
-    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
-    VkExtent2D surface_extent = surface_capabilities.currentExtent;
+    VkExtent2D surface_extent = GetSurfaceCapabilities().currentExtent;
     VkViewport viewport =
     {
         .x        = 0,

@@ -98,6 +98,10 @@ struct Context
 ////////////////////////////////////////////////////////////
 static Context global_ctx;
 
+/// Forward Declarations
+////////////////////////////////////////////////////////////
+static VkSurfaceCapabilitiesKHR GetSurfaceCapabilities();
+
 /// Internal
 ////////////////////////////////////////////////////////////
 static QueueFamilies FindQueueFamilies(Stack temp_stack, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
@@ -405,14 +409,11 @@ static void InitSwapchain(FreeList* free_list, Stack temp_stack)
     VkResult res = VK_SUCCESS;
 
     // Get surface info.
-    VkSurfaceCapabilitiesKHR surface_capabilities = {};
-    res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_capabilities);
-    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
-
     Array<VkSurfaceFormatKHR> formats = {};
     Array<VkPresentModeKHR> present_modes = {};
     LoadVkSurfaceFormats(&formats, &temp_stack, physical_device, surface);
     LoadVkSurfacePresentModes(&present_modes, &temp_stack, physical_device, surface);
+    VkSurfaceCapabilitiesKHR surface_capabilities = GetSurfaceCapabilities();
 
     // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
     // color space.
@@ -673,6 +674,15 @@ static PhysicalDevice* GetPhysicalDevice()
 static Swapchain* GetSwapchain()
 {
     return &global_ctx.swapchain;
+}
+
+static VkSurfaceCapabilitiesKHR GetSurfaceCapabilities()
+{
+    VkSurfaceCapabilitiesKHR capabilities;
+    VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(global_ctx.physical_device->hnd, global_ctx.surface,
+                                                             &capabilities);
+    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
+    return capabilities;
 }
 
 static void BeginTempCommandBuffer()

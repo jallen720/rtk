@@ -39,11 +39,11 @@ struct RenderTarget
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void InitRenderPassAttachments(RenderPassAttachments* attachments, Stack* perm_stack,
+static void InitRenderPassAttachments(RenderPassAttachments* attachments, Stack temp_stack,
                                       uint32 max_color_attachments, bool depth_attachment)
 {
-    InitArray(&attachments->descriptions, perm_stack, max_color_attachments + (depth_attachment ? 1 : 0));
-    InitArray(&attachments->color, perm_stack, max_color_attachments);
+    InitArray(&attachments->descriptions, &temp_stack, max_color_attachments + (depth_attachment ? 1 : 0));
+    InitArray(&attachments->color, &temp_stack, max_color_attachments);
 }
 
 static void PushColorAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
@@ -68,15 +68,10 @@ static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentD
     });
 }
 
-static VkAttachmentReference* GetDepthAttachment(RenderPassAttachments* attachments)
-{
-    return attachments->depth.exists ? &attachments->depth.value : NULL;
-}
-
 static void InitRenderPass(RenderTarget* render_target, Stack temp_stack, bool depth_testing)
 {
     RenderPassAttachments attachments = {};
-    InitRenderPassAttachments(&attachments, &temp_stack, 1, depth_testing);
+    InitRenderPassAttachments(&attachments, temp_stack, 1, depth_testing);
     PushColorAttachment(&attachments,
     {
         .flags          = 0,
@@ -116,7 +111,7 @@ static void InitRenderPass(RenderTarget* render_target, Stack temp_stack, bool d
             .pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS,
             .colorAttachmentCount    = attachments.color.count,
             .pColorAttachments       = attachments.color.data,
-            .pDepthStencilAttachment = GetDepthAttachment(&attachments),
+            .pDepthStencilAttachment = attachments.depth.exists ? &attachments.depth.value : NULL,
         }
     };
     VkRenderPassCreateInfo create_info =

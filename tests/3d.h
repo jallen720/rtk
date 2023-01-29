@@ -679,14 +679,14 @@ static void RecordRenderCommandsThread(void* data)
     auto state = (RenderCommandState*)data;
     RenderState* render_state = state->render_state;
 
-    VkCommandBuffer command_buffer = BeginRecordingRenderCommands(render_state->render_target.main,
-                                                                  state->thread_index);
-        BindPipeline(command_buffer, render_state->pipeline.main);
+    VkCommandBuffer command_buffer = BeginRenderCommands(render_state->render_target.main, state->thread_index);
+        PipelineHnd pipeline = render_state->pipeline.main;
+        BindPipeline(command_buffer, pipeline);
         BindMeshData(command_buffer, render_state->mesh.data);
-        BindShaderDataSet(command_buffer, render_state->data_set.entity_data, render_state->pipeline.main, 0);
-        BindShaderDataSet(command_buffer, state->texture, render_state->pipeline.main, 1);
+        BindShaderDataSet(command_buffer, render_state->data_set.entity_data, pipeline, 0);
+        BindShaderDataSet(command_buffer, state->texture, pipeline, 1);
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
-    EndRecordingRenderCommands(command_buffer);
+    EndRenderCommands(command_buffer);
 }
 
 static void RecordRenderCommands(Game* game, RenderState* render_state, ThreadPool* thread_pool)
@@ -708,8 +708,6 @@ static void RecordRenderCommands(Game* game, RenderState* render_state, ThreadPo
     static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(meshes);
     static constexpr uint32 THREAD_COUNT = TEXTURE_COUNT * MESH_COUNT;
     static_assert(THREAD_COUNT <= RENDER_THREAD_COUNT);
-    uint32 entity_count = game->entity_data.count;
-
     for (uint32 texture_index = 0; texture_index < TEXTURE_COUNT; ++texture_index)
     {
         for (uint32 mesh_index = 0; mesh_index < MESH_COUNT; ++mesh_index)
@@ -720,7 +718,7 @@ static void RecordRenderCommands(Game* game, RenderState* render_state, ThreadPo
             state->thread_index = thread_index;
             state->texture      = textures[texture_index];
             state->mesh         = meshes[mesh_index];
-            state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, entity_count);
+            state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, game->entity_data.count);
 
             Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));
         }

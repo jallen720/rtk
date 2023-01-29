@@ -53,7 +53,7 @@ static bool NextFrame()
     return true;
 }
 
-static VkCommandBuffer BeginRecordingRenderCommands(RenderTargetHnd render_target_hnd, uint32 render_thread_index)
+static VkCommandBuffer BeginRenderCommands(RenderTargetHnd render_target_hnd, uint32 render_thread_index)
 {
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
     Frame* frame = global_ctx.frame;
@@ -129,7 +129,7 @@ static void DrawMesh(VkCommandBuffer command_buffer, MeshHnd mesh_hnd, uint32 in
                      instance_start);     // First Instance
 }
 
-static void EndRecordingRenderCommands(VkCommandBuffer command_buffer)
+static void EndRenderCommands(VkCommandBuffer command_buffer)
 {
     VkResult res = vkEndCommandBuffer(command_buffer);
     Validate(res, "vkEndCommandBuffer() failed");

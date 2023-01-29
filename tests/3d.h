@@ -827,21 +827,29 @@ static void TestMain()
 
         if (WindowIsActive())
         {
-            // StartProfile(prof_tree, "NextFrame()");
-            if (!NextFrame() || true)
-            {
-                // Surface has changed, recreate pipelines.
-                ReinitPipelines(render_state, *temp_stack);
-                // continue;
-            }
-            // EndProfile(prof_tree);
-
             // StartProfile(prof_tree, "UpdateGame()");
             UpdateGame(game);
             // EndProfile(prof_tree);
             if (!WindowIsOpen())
             {
                 break; // Controls closed window.
+            }
+
+            // StartProfile(prof_tree, "NextFrame()");
+            VkResult next_frame_result = NextFrame();
+            // EndProfile(prof_tree);
+            if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR
+|| true
+                )
+            {
+                // Surface has changed, recreate pipelines.
+                ReinitPipelines(render_state, *temp_stack);
+            }
+
+            // If NextFrame() was unable to acquire a swapchain image, skip rendering until next frame.
+            if (next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
+            {
+                continue;
             }
 
             // StartProfile(prof_tree, "UpdateMVPMatrixes()");

@@ -17,7 +17,7 @@ namespace RTK
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static bool NextFrame()
+static VkResult NextFrame()
 {
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
@@ -37,21 +37,17 @@ static bool NextFrame()
     if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
     {
 PrintLine("vkAcquireNextImageKHR() returned %s", res == VK_SUBOPTIMAL_KHR ? "VK_SUBOPTIMAL_KHR" : "VK_ERROR_OUT_OF_DATE_KHR");
-
-        // // Recreate swapchain.
+        // Recreate swapchain.
+        vkDeviceWaitIdle(global_ctx.device);
         // vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
-
-vkDeviceWaitIdle(global_ctx.device);
-        return false;
     }
     else
     {
         Validate(res, "vkAcquireNextImageKHR() failed");
-
 vkDeviceWaitIdle(global_ctx.device);
-        return true;
     }
 
+    return res;
 }
 
 static VkCommandBuffer BeginRenderCommands(RenderTargetHnd render_target_hnd, uint32 render_thread_index)

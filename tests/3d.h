@@ -245,8 +245,7 @@ static void InitRenderTargets(RenderState* render_state, Stack* perm_stack, Stac
 {
     RenderTargetInfo info =
     {
-        .depth_testing          = true,
-        .color_attachment_count = 1,
+        .depth_testing = true,
     };
     render_state->render_target.main = CreateRenderTarget(perm_stack, temp_stack, &info);
     PushClearValue(render_state->render_target.main, { 0.0f, 0.1f, 0.2f, 1.0f });
@@ -617,9 +616,10 @@ static Matrix GetViewProjectionMatrix(View* view)
     };
     Matrix view_matrix = LookAt(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
 
-    // Projection Matrix (with aspect ratio based on window dimensions)
-    Window* window = GetWindow();
-    Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, (float32)window->width / window->height,
+    // Projection Matrix
+    VkExtent2D swapchain_extent = GetSwapchain()->extent;
+    float32 swapchain_aspect_ratio = (float32)swapchain_extent.width / swapchain_extent.height;
+    Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, swapchain_aspect_ratio,
                                                     view->z_near, view->z_far);
 
     return projection_matrix * view_matrix;

@@ -25,8 +25,7 @@ struct RenderPassAttachments
 
 struct RenderTargetInfo
 {
-    bool   depth_testing;
-    uint32 color_attachment_count;
+    bool depth_testing;
 };
 
 struct RenderTarget
@@ -237,7 +236,7 @@ static RenderTargetHnd CreateRenderTarget(Stack* perm_stack, Stack temp_stack, R
     }
 
     uint32 depth_attachment_count = info->depth_testing ? 1 : 0;
-    uint32 total_attachment_count = info->color_attachment_count + depth_attachment_count;
+    uint32 total_attachment_count = 1 + depth_attachment_count;
     InitFramebuffers(render_target, perm_stack, temp_stack, total_attachment_count, info->depth_testing);
     InitArray(&render_target->attachment_clear_values, perm_stack, total_attachment_count);
 

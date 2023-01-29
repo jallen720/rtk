@@ -123,20 +123,20 @@ static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_targe
     VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
 
     // Viewport
-    VkExtent2D surface_extent = GetSurfaceCapabilities().currentExtent;
+    VkExtent2D swapchain_extent = global_ctx.swapchain.extent;
     VkViewport viewport =
     {
         .x        = 0,
         .y        = 0,
-        .width    = (float32)surface_extent.width,
-        .height   = (float32)surface_extent.height,
+        .width    = (float32)swapchain_extent.width,
+        .height   = (float32)swapchain_extent.height,
         .minDepth = 0,
         .maxDepth = 1
     };
     VkRect2D scissor =
     {
         .offset = { 0, 0 },
-        .extent = surface_extent,
+        .extent = swapchain_extent,
     };
     VkPipelineViewportStateCreateInfo viewport_state = DEFAULT_VIEWPORT_STATE;
     viewport_state.viewportCount = 1;

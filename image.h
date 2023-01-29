@@ -91,7 +91,7 @@ static ImageHnd CreateImage(ImageInfo* info)
 static VkSampler CreateSampler(VkSamplerCreateInfo* info)
 {
     VkSampler sampler = VK_NULL_HANDLE;
-    VkResult res = vkCreateSampler(RTK::global_ctx.device, info, NULL, &sampler);
+    VkResult res = vkCreateSampler(global_ctx.device, info, NULL, &sampler);
     Validate(res, "vkCreateSampler() failed");
     return sampler;
 }

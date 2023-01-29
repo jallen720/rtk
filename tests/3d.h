@@ -24,7 +24,6 @@ struct View
     Vec3<float32> position;
     Vec3<float32> rotation;
     float32       vertical_fov;
-    float32       aspect;
     float32       z_near;
     float32       z_far;
     float32       max_x_angle;
@@ -171,7 +170,6 @@ static Game* CreateGame(Stack* perm_stack)
         .position     = { 0, 0, -1 },
         .rotation     = { 0, 0, 0 },
         .vertical_fov = 90.0f,
-        .aspect       = 16.0f / 9.0f,
         .z_near       = 0.1f,
         .z_far        = 1000.0f,
         .max_x_angle  = 85.0f,
@@ -589,37 +587,28 @@ static void ViewControls(Game* game)
     }
 }
 
-static void Controls(Game* game)
+static void UpdateGame(Game* game)
 {
+    // If window will close, skip all other controls.
     if (KeyDown(KEY_ESCAPE))
     {
         CloseWindow();
         return;
     }
 
-    ViewControls(game);
-}
-
-static void UpdateGame(Game* game)
-{
     UpdateMouse(&game->mouse);
-
-    Controls(game);
-    if (!WindowIsOpen())
-    {
-        return; // Controls closed window.
-    }
+    ViewControls(game);
 }
 
 /// RenderState Update
 ////////////////////////////////////////////////////////////
-static Matrix CreateViewProjectionMatrix(View* view)
+static Matrix GetViewProjectionMatrix(View* view)
 {
+    // View Matrix
     Matrix view_model_matrix = ID_MATRIX;
     view_model_matrix = RotateX(view_model_matrix, view->rotation.x);
     view_model_matrix = RotateY(view_model_matrix, view->rotation.y);
     view_model_matrix = RotateZ(view_model_matrix, view->rotation.z);
-
     Vec3<float32> forward =
     {
         .x = Get(&view_model_matrix, 0, 2),
@@ -628,8 +617,10 @@ static Matrix CreateViewProjectionMatrix(View* view)
     };
     Matrix view_matrix = LookAt(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
 
-    // Projection Matrix
-    Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, view->aspect, view->z_near, view->z_far);
+    // Projection Matrix (with aspect ratio based on window dimensions)
+    Window* window = GetWindow();
+    Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, (float32)window->width / window->height,
+                                                    view->z_near, view->z_far);
 
     return projection_matrix * view_matrix;
 }
@@ -637,10 +628,10 @@ static Matrix CreateViewProjectionMatrix(View* view)
 static void UpdateMVPMatrixesThread(void* data)
 {
     auto state = (MVPMatrixState*)data;
-    BatchRange  batch_range            = state->batch_range;
-    Matrix      view_projection_matrix = state->view_projection_matrix;
-    VSBuffer*   frame_vs_buffer        = state->frame_vs_buffer;
-    EntityData* entity_data            = state->entity_data;
+    BatchRange batch_range = state->batch_range;
+    Matrix view_projection_matrix = state->view_projection_matrix;
+    VSBuffer* frame_vs_buffer = state->frame_vs_buffer;
+    EntityData* entity_data = state->entity_data;
 
     // Update entity MVP matrixes.
     for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
@@ -660,8 +651,8 @@ static void UpdateMVPMatrixesThread(void* data)
 static void UpdateMVPMatrixes(RenderState* render_state, Game* game, ThreadPool* thread_pool)
 {
     ThreadPoolJob<MVPMatrixState>* job = &render_state->thread_pool_job.update_mvp_matrixes;
-    Matrix view_projection_matrix = CreateViewProjectionMatrix(&game->view);
-    auto frame_vs_buffer = GetBufferMem<VSBuffer>(render_state->data.vs_buffer, RTK::global_ctx.frames.index);
+    Matrix view_projection_matrix = GetViewProjectionMatrix(&game->view);
+    auto frame_vs_buffer = GetBufferMem<VSBuffer>(render_state->data.vs_buffer);
     uint32 thread_count = thread_pool->size;
 
     // Initialize thread states and submit tasks.
@@ -850,6 +841,10 @@ static void TestMain()
             // StartProfile(prof_tree, "UpdateGame()");
             UpdateGame(game);
             // EndProfile(prof_tree);
+            if (!WindowIsOpen())
+            {
+                break; // Controls closed window.
+            }
 
             // StartProfile(prof_tree, "UpdateMVPMatrixes()");
             UpdateMVPMatrixes(render_state, game, thread_pool);

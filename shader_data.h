@@ -114,13 +114,13 @@ static ShaderDataHnd CreateShaderData(Stack* perm_stack, ShaderDataInfo* info)
 }
 
 template<typename Type>
-static Type* GetBufferMem(ShaderDataHnd shader_data_hnd, uint32 instance)
+static Type* GetBufferMem(ShaderDataHnd shader_data_hnd)
 {
     ShaderData* shader_data = GetShaderData(shader_data_hnd);
     CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
-    return (Type*)GetBuffer(shader_data, instance)->mapped_mem;
+    return (Type*)GetBuffer(shader_data, global_ctx.frames.index)->mapped_mem;
 }
 
 static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instance_index,

@@ -90,7 +90,6 @@ struct Context
     Swapchain            swapchain;
     Array<VkCommandPool> render_command_pools;
     RingBuffer<Frame>    frames;
-    Frame*               frame;
     VkDescriptorPool     descriptor_pool;
 };
 

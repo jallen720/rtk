@@ -36,27 +36,28 @@ static bool NextFrame()
                                 &frame->swapchain_image_index);
     if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        PrintLine("vkAcquireNextImageKHR() returned %s", res == VK_SUBOPTIMAL_KHR ? "VK_SUBOPTIMAL_KHR" : "VK_ERROR_OUT_OF_DATE_KHR");
+PrintLine("vkAcquireNextImageKHR() returned %s", res == VK_SUBOPTIMAL_KHR ? "VK_SUBOPTIMAL_KHR" : "VK_ERROR_OUT_OF_DATE_KHR");
 
         // // Recreate swapchain.
-        // vkDeviceWaitIdle(global_ctx.device);
         // vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
-        global_ctx.frame = frame;
+
+vkDeviceWaitIdle(global_ctx.device);
         return false;
     }
     else
     {
         Validate(res, "vkAcquireNextImageKHR() failed");
+
+vkDeviceWaitIdle(global_ctx.device);
+        return true;
     }
 
-    global_ctx.frame = frame;
-    return true;
 }
 
 static VkCommandBuffer BeginRenderCommands(RenderTargetHnd render_target_hnd, uint32 render_thread_index)
 {
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-    Frame* frame = global_ctx.frame;
+    Frame* frame = GetCurrentPtr(&global_ctx.frames);
     VkCommandBuffer command_buffer = Get(&frame->render_command_buffers, render_thread_index);
 
     VkCommandBufferInheritanceInfo inheritance_info =
@@ -138,7 +139,7 @@ static void EndRenderCommands(VkCommandBuffer command_buffer)
 static void SubmitRenderCommands(RenderTargetHnd render_target_hnd)
 {
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-    Frame* frame = global_ctx.frame;
+    Frame* frame = GetCurrentPtr(&global_ctx.frames);
     VkResult res = VK_SUCCESS;
 
     // Record current frame's primary command buffer, including render command buffers.

@@ -830,7 +830,7 @@ static void TestMain()
             // StartProfile(prof_tree, "NextFrame()");
             if (!NextFrame() || true)
             {
-                vkDeviceWaitIdle(global_ctx.device);
+                // Surface has changed, recreate pipelines.
                 ReinitPipelines(render_state, *temp_stack);
                 // continue;
             }

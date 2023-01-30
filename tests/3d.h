@@ -844,7 +844,6 @@ static void TestMain()
             {
                 // Surface has changed, recreate pipelines.
                 UpdatePipelines(render_state, *temp_stack);
-                // ReinitRenderTargets(render_state);
             }
 
             // If NextFrame() was unable to acquire a swapchain image, skip rendering until next frame.

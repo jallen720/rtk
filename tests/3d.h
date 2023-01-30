@@ -126,7 +126,8 @@ struct RenderState
     shader;
     struct
     {
-        PipelineHnd main;
+        PipelineInfo main_info;
+        PipelineHnd  main;
     }
     pipeline;
     struct
@@ -436,16 +437,9 @@ static void InitShaders(RenderState* render_state, Stack temp_stack)
     render_state->shader.frag_3d = CreateShader(temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
-static void InitPipelines(RenderState* render_state, Stack temp_stack)
+static void InitPipelines(RenderState* render_state, Stack* perm_stack, Stack temp_stack)
 {
-    // Shaders
-    ShaderHnd shaders[] =
-    {
-        render_state->shader.vert_3d,
-        render_state->shader.frag_3d,
-    };
-
-    // Pipeline info arrays.
+    // Pipeline Layout
     ShaderDataSetHnd shader_data_sets[] =
     {
         render_state->data_set.entity_data,
@@ -459,21 +453,29 @@ static void InitPipelines(RenderState* render_state, Stack temp_stack)
     //         .size       = sizeof(uint32)
     //     },
     // };
-
-    PipelineInfo pipeline_info =
+    PipelineLayoutInfo pipeline_layout_info =
     {
-        .vertex_layout        = &render_state->vertex_layout,
-        .shaders              = CTK_WRAP_ARRAY(shaders),
         .shader_data_sets     = CTK_WRAP_ARRAY(shader_data_sets),
         // .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
     };
-    render_state->pipeline.main = CreatePipeline(temp_stack, render_state->render_target.main, &pipeline_info);
+
+    // Pipeline Info
+    ShaderHnd shaders[] =
+    {
+        render_state->shader.vert_3d,
+        render_state->shader.frag_3d,
+    };
+    PipelineInfo* pipeline_info = &render_state->pipeline.main_info;
+    pipeline_info->vertex_layout     = &render_state->vertex_layout;
+    pipeline_info->render_target_hnd = render_state->render_target.main;
+    InitArray(&pipeline_info->shaders, perm_stack, shaders, CTK_ARRAY_SIZE(shaders));
+
+    render_state->pipeline.main = CreatePipeline(temp_stack, &pipeline_layout_info, pipeline_info);
 }
 
-static void ReinitPipelines(RenderState* render_state, Stack temp_stack)
+static void UpdatePipelines(RenderState* render_state, Stack temp_stack)
 {
-    DestroyPipeline(render_state->pipeline.main);
-    InitPipelines(render_state, temp_stack);
+    UpdatePipeline(render_state->pipeline.main, temp_stack, &render_state->pipeline.main_info);
 }
 
 static void InitMeshes(RenderState* render_state)
@@ -524,7 +526,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack temp_stack, Threa
     InitShaderDatas(render_state, perm_stack);
     InitShaderDataSets(render_state, perm_stack, temp_stack);
     InitShaders(render_state, temp_stack);
-    InitPipelines(render_state, temp_stack);
+    InitPipelines(render_state, perm_stack, temp_stack);
     InitMeshes(render_state);
     InitThreadPoolJobs(render_state, perm_stack, thread_pool);
     return render_state;
@@ -838,12 +840,11 @@ static void TestMain()
             // StartProfile(prof_tree, "NextFrame()");
             VkResult next_frame_result = NextFrame();
             // EndProfile(prof_tree);
-            if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR
-|| true
-                )
+            // if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
             {
                 // Surface has changed, recreate pipelines.
-                ReinitPipelines(render_state, *temp_stack);
+                UpdatePipelines(render_state, *temp_stack);
+                // ReinitRenderTargets(render_state);
             }
 
             // If NextFrame() was unable to acquire a swapchain image, skip rendering until next frame.

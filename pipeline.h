@@ -40,8 +40,13 @@ struct VertexLayout
 
 struct PipelineInfo
 {
-    VertexLayout*              vertex_layout;
-    Array<ShaderHnd>           shaders;
+    VertexLayout*    vertex_layout;
+    Array<ShaderHnd> shaders;
+    RenderTargetHnd  render_target_hnd;
+};
+
+struct PipelineLayoutInfo
+{
     Array<ShaderDataSetHnd>    shader_data_sets;
     Array<VkPushConstantRange> push_constant_ranges;
 };
@@ -51,6 +56,115 @@ struct Pipeline
     VkPipeline       hnd;
     VkPipelineLayout layout;
 };
+
+/// Utils
+////////////////////////////////////////////////////////////
+static void InitPipelineLayout(Pipeline* pipeline, Stack temp_stack, PipelineLayoutInfo* layout_info)
+{
+    Array<VkDescriptorSetLayout> descriptor_set_layouts = {};
+    if (layout_info->shader_data_sets.count > 0)
+    {
+        InitArray(&descriptor_set_layouts, &temp_stack, layout_info->shader_data_sets.count);
+        for (uint32 i = 0; i < layout_info->shader_data_sets.count; ++i)
+        {
+            Push(&descriptor_set_layouts, GetShaderDataSet(Get(&layout_info->shader_data_sets, i))->layout);
+        }
+    }
+
+    VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
+    layout_create_info.setLayoutCount         = descriptor_set_layouts.count;
+    layout_create_info.pSetLayouts            = descriptor_set_layouts.data;
+    layout_create_info.pushConstantRangeCount = layout_info->push_constant_ranges.count;
+    layout_create_info.pPushConstantRanges    = layout_info->push_constant_ranges.data;
+
+    VkPipelineLayout layout = VK_NULL_HANDLE;
+    VkResult res = vkCreatePipelineLayout(global_ctx.device, &layout_create_info, NULL, &pipeline->layout);
+    Validate(res, "vkCreatePipelineLayout() failed");
+}
+
+static void InitPipeline(Pipeline* pipeline, Stack temp_stack, PipelineInfo* info)
+{
+    RenderTarget* render_target = GetRenderTarget(info->render_target_hnd);
+
+    VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
+    vertex_input_state.vertexBindingDescriptionCount   = info->vertex_layout->bindings.count;
+    vertex_input_state.pVertexBindingDescriptions      = info->vertex_layout->bindings.data;
+    vertex_input_state.vertexAttributeDescriptionCount = info->vertex_layout->attributes.count;
+    vertex_input_state.pVertexAttributeDescriptions    = info->vertex_layout->attributes.data;
+
+    VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
+
+    // Viewport
+    VkExtent2D swapchain_extent = global_ctx.swapchain.extent;
+    VkViewport viewport =
+    {
+        .x        = 0,
+        .y        = 0,
+        .width    = (float32)swapchain_extent.width,
+        .height   = (float32)swapchain_extent.height,
+        .minDepth = 0,
+        .maxDepth = 1
+    };
+    VkRect2D scissor =
+    {
+        .offset = { 0, 0 },
+        .extent = swapchain_extent,
+    };
+    VkPipelineViewportStateCreateInfo viewport_state = DEFAULT_VIEWPORT_STATE;
+    viewport_state.viewportCount = 1;
+    viewport_state.pViewports    = &viewport;
+    viewport_state.scissorCount  = 1;
+    viewport_state.pScissors     = &scissor;
+
+    VkPipelineRasterizationStateCreateInfo rasterization_state = DEFAULT_RASTERIZATION_STATE;
+    VkPipelineMultisampleStateCreateInfo multisample_state = DEFAULT_MULTISAMPLE_STATE;
+
+    VkPipelineDepthStencilStateCreateInfo depth_stencil_state = DEFAULT_DEPTH_STENCIL_STATE;
+    depth_stencil_state.depthTestEnable  = VK_TRUE;
+    depth_stencil_state.depthWriteEnable = VK_TRUE;
+    depth_stencil_state.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
+
+    // Color Blend
+    VkPipelineColorBlendAttachmentState swapchain_image_color_blend = DEFAULT_COLOR_BLEND_ATTACHMENT_STATE;
+    VkPipelineColorBlendStateCreateInfo color_blend_state = DEFAULT_COLOR_BLEND_STATE;
+    color_blend_state.attachmentCount = 1;
+    color_blend_state.pAttachments    = &swapchain_image_color_blend;
+
+    VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
+
+    // Shader Stages
+    auto shader_stages = CreateArray<VkPipelineShaderStageCreateInfo>(&temp_stack, info->shaders.count);
+    for (uint32 i = 0; i < info->shaders.count; ++i)
+    {
+        Push(shader_stages, DefaultShaderStageCreateInfo(Get(&info->shaders, i)));
+    }
+
+    // Pipeline
+    VkGraphicsPipelineCreateInfo create_info =
+    {
+        .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .pNext               = NULL,
+        .flags               = 0,
+        .stageCount          = shader_stages->count,
+        .pStages             = shader_stages->data,
+        .pVertexInputState   = &vertex_input_state,
+        .pInputAssemblyState = &input_assembly_state,
+        .pTessellationState  = NULL,
+        .pViewportState      = &viewport_state,
+        .pRasterizationState = &rasterization_state,
+        .pMultisampleState   = &multisample_state,
+        .pDepthStencilState  = &depth_stencil_state,
+        .pColorBlendState    = &color_blend_state,
+        .pDynamicState       = &dynamic_state,
+        .layout              = pipeline->layout,
+        .renderPass          = render_target->render_pass,
+        .subpass             = 0,
+        .basePipelineHandle  = VK_NULL_HANDLE,
+        .basePipelineIndex   = -1,
+    };
+    VkResult res = vkCreateGraphicsPipelines(global_ctx.device, VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline->hnd);
+    Validate(res, "vkCreateGraphicsPipelines() failed");
+}
 
 /// Interface
 ////////////////////////////////////////////////////////////
@@ -105,115 +219,20 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count, AttributeTyp
     ++layout->attribute_location;
 }
 
-static PipelineHnd CreatePipeline(Stack temp_stack, RenderTargetHnd render_target_hnd, PipelineInfo* info)
+static PipelineHnd CreatePipeline(Stack temp_stack, PipelineLayoutInfo* layout_info, PipelineInfo* info)
 {
     PipelineHnd pipeline_hnd = AllocatePipeline();
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
-
-    RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-    VkDevice device = global_ctx.device;
-    VkResult res = VK_SUCCESS;
-
-    VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
-    vertex_input_state.vertexBindingDescriptionCount   = info->vertex_layout->bindings.count;
-    vertex_input_state.pVertexBindingDescriptions      = info->vertex_layout->bindings.data;
-    vertex_input_state.vertexAttributeDescriptionCount = info->vertex_layout->attributes.count;
-    vertex_input_state.pVertexAttributeDescriptions    = info->vertex_layout->attributes.data;
-
-    VkPipelineInputAssemblyStateCreateInfo input_assembly_state = DEFAULT_INPUT_ASSEMBLY_STATE;
-
-    // Viewport
-    VkExtent2D swapchain_extent = global_ctx.swapchain.extent;
-    VkViewport viewport =
-    {
-        .x        = 0,
-        .y        = 0,
-        .width    = (float32)swapchain_extent.width,
-        .height   = (float32)swapchain_extent.height,
-        .minDepth = 0,
-        .maxDepth = 1
-    };
-    VkRect2D scissor =
-    {
-        .offset = { 0, 0 },
-        .extent = swapchain_extent,
-    };
-    VkPipelineViewportStateCreateInfo viewport_state = DEFAULT_VIEWPORT_STATE;
-    viewport_state.viewportCount = 1;
-    viewport_state.pViewports    = &viewport;
-    viewport_state.scissorCount  = 1;
-    viewport_state.pScissors     = &scissor;
-
-    VkPipelineRasterizationStateCreateInfo rasterization_state = DEFAULT_RASTERIZATION_STATE;
-    VkPipelineMultisampleStateCreateInfo multisample_state = DEFAULT_MULTISAMPLE_STATE;
-
-    VkPipelineDepthStencilStateCreateInfo depth_stencil_state = DEFAULT_DEPTH_STENCIL_STATE;
-    depth_stencil_state.depthTestEnable  = VK_TRUE;
-    depth_stencil_state.depthWriteEnable = VK_TRUE;
-    depth_stencil_state.depthCompareOp   = VK_COMPARE_OP_LESS_OR_EQUAL;
-
-    // Color Blend
-    VkPipelineColorBlendAttachmentState swapchain_image_color_blend = DEFAULT_COLOR_BLEND_ATTACHMENT_STATE;
-    VkPipelineColorBlendStateCreateInfo color_blend_state = DEFAULT_COLOR_BLEND_STATE;
-    color_blend_state.attachmentCount = 1;
-    color_blend_state.pAttachments    = &swapchain_image_color_blend;
-
-    VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
-
-    // Pipeline Layout
-    Array<VkDescriptorSetLayout> descriptor_set_layouts = {};
-    if (info->shader_data_sets.count > 0)
-    {
-        InitArray(&descriptor_set_layouts, &temp_stack, info->shader_data_sets.count);
-        for (uint32 i = 0; i < info->shader_data_sets.count; ++i)
-        {
-            Push(&descriptor_set_layouts, GetShaderDataSet(Get(&info->shader_data_sets, i))->layout);
-        }
-    }
-
-    VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
-    layout_create_info.setLayoutCount         = descriptor_set_layouts.count;
-    layout_create_info.pSetLayouts            = descriptor_set_layouts.data;
-    layout_create_info.pushConstantRangeCount = info->push_constant_ranges.count;
-    layout_create_info.pPushConstantRanges    = info->push_constant_ranges.data;
-
-    VkPipelineLayout layout = VK_NULL_HANDLE;
-    res = vkCreatePipelineLayout(device, &layout_create_info, NULL, &pipeline->layout);
-    Validate(res, "vkCreatePipelineLayout() failed");
-
-    // Pipeline
-    auto shader_stages = CreateArray<VkPipelineShaderStageCreateInfo>(&temp_stack, info->shaders.count);
-    for (uint32 i = 0; i < info->shaders.count; ++i)
-    {
-        Push(shader_stages, DefaultShaderStageCreateInfo(Get(&info->shaders, i)));
-    }
-
-    VkGraphicsPipelineCreateInfo create_info =
-    {
-        .sType               = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .pNext               = NULL,
-        .flags               = 0,
-        .stageCount          = shader_stages->count,
-        .pStages             = shader_stages->data,
-        .pVertexInputState   = &vertex_input_state,
-        .pInputAssemblyState = &input_assembly_state,
-        .pTessellationState  = NULL,
-        .pViewportState      = &viewport_state,
-        .pRasterizationState = &rasterization_state,
-        .pMultisampleState   = &multisample_state,
-        .pDepthStencilState  = &depth_stencil_state,
-        .pColorBlendState    = &color_blend_state,
-        .pDynamicState       = &dynamic_state,
-        .layout              = pipeline->layout,
-        .renderPass          = render_target->render_pass,
-        .subpass             = 0,
-        .basePipelineHandle  = VK_NULL_HANDLE,
-        .basePipelineIndex   = -1,
-    };
-    res = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline->hnd);
-    Validate(res, "vkCreateGraphicsPipelines() failed");
-
+    InitPipelineLayout(pipeline, temp_stack, layout_info);
+    InitPipeline(pipeline, temp_stack, info);
     return pipeline_hnd;
+}
+
+static void UpdatePipeline(PipelineHnd pipeline_hnd, Stack temp_stack, PipelineInfo* info)
+{
+    Pipeline* pipeline = GetPipeline(pipeline_hnd);
+    vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
+    InitPipeline(pipeline, temp_stack, info);
 }
 
 static void DestroyPipeline(PipelineHnd pipeline_hnd)

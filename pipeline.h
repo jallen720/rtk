@@ -262,11 +262,13 @@ static void UpdateViewports(PipelineHnd pipeline_hnd, FreeList* free_list, Array
 {
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
 
+    // Reinit viewport & scissor arrays.
     DeinitArray(&pipeline->viewports, free_list);
     DeinitArray(&pipeline->scissors, free_list);
     InitArray(&pipeline->viewports, free_list, &viewports);
     InitScissors(pipeline, free_list);
 
+    // Reinit pipeline.
     vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
     InitPipeline(pipeline);
 }

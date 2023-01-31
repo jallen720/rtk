@@ -126,8 +126,7 @@ struct RenderState
     shader;
     struct
     {
-        PipelineInfo main_info;
-        PipelineHnd  main;
+        PipelineHnd main;
     }
     pipeline;
     struct
@@ -437,7 +436,7 @@ static void InitShaders(RenderState* render_state, Stack temp_stack)
     render_state->shader.frag_3d = CreateShader(temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
-static void InitPipelines(RenderState* render_state, Stack* perm_stack, Stack temp_stack)
+static void InitPipelines(RenderState* render_state, Stack temp_stack, FreeList* free_list)
 {
     // Pipeline Layout
     ShaderDataSetHnd shader_data_sets[] =
@@ -460,22 +459,33 @@ static void InitPipelines(RenderState* render_state, Stack* perm_stack, Stack te
     };
 
     // Pipeline Info
+    VkExtent2D swapchain_extent = GetSwapchain()->extent;
+    VkViewport viewports[] =
+    {
+        {
+            .x        = 0,
+            .y        = 0,
+            .width    = (float32)swapchain_extent.width,
+            .height   = (float32)swapchain_extent.height,
+            .minDepth = 0,
+            .maxDepth = 1
+        },
+    };
     ShaderHnd shaders[] =
     {
         render_state->shader.vert_3d,
         render_state->shader.frag_3d,
     };
-    PipelineInfo* pipeline_info = &render_state->pipeline.main_info;
-    pipeline_info->vertex_layout     = &render_state->vertex_layout;
-    pipeline_info->render_target_hnd = render_state->render_target.main;
-    InitArray(&pipeline_info->shaders, perm_stack, shaders, CTK_ARRAY_SIZE(shaders));
+    PipelineInfo pipeline_info =
+    {
+        .shaders           = CTK_WRAP_ARRAY(shaders),
+        .viewports         = CTK_WRAP_ARRAY(viewports),
+        .vertex_layout     = &render_state->vertex_layout,
+        .depth_testing     = true,
+        .render_target_hnd = render_state->render_target.main,
+    };
 
-    render_state->pipeline.main = CreatePipeline(temp_stack, &pipeline_layout_info, pipeline_info);
-}
-
-static void UpdatePipelines(RenderState* render_state, Stack temp_stack)
-{
-    UpdatePipeline(render_state->pipeline.main, temp_stack, &render_state->pipeline.main_info);
+    render_state->pipeline.main = CreatePipeline(temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
 }
 
 static void InitMeshes(RenderState* render_state)
@@ -516,7 +526,7 @@ static void InitThreadPoolJobs(RenderState* render_state, Stack* perm_stack, Thr
     InitThreadPoolJob(&render_state->thread_pool_job.record_render_commands, perm_stack, RENDER_THREAD_COUNT);
 }
 
-static RenderState* CreateRenderState(Stack* perm_stack, Stack temp_stack, ThreadPool* thread_pool)
+static RenderState* CreateRenderState(Stack* perm_stack, Stack temp_stack, FreeList* free_list, ThreadPool* thread_pool)
 {
     RenderState* render_state = Allocate<RenderState>(perm_stack, 1);
     InitBuffers(render_state);
@@ -526,10 +536,27 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack temp_stack, Threa
     InitShaderDatas(render_state, perm_stack);
     InitShaderDataSets(render_state, perm_stack, temp_stack);
     InitShaders(render_state, temp_stack);
-    InitPipelines(render_state, perm_stack, temp_stack);
+    InitPipelines(render_state, temp_stack, free_list);
     InitMeshes(render_state);
     InitThreadPoolJobs(render_state, perm_stack, thread_pool);
     return render_state;
+}
+
+static void UpdateAllPipelineViewports(RenderState* render_state, FreeList* free_list)
+{
+    VkExtent2D swapchain_extent = GetSwapchain()->extent;
+    VkViewport viewports[] =
+    {
+        {
+            .x        = 0,
+            .y        = 0,
+            .width    = (float32)swapchain_extent.width,
+            .height   = (float32)swapchain_extent.height,
+            .minDepth = 0,
+            .maxDepth = 1
+        },
+    };
+    UpdateViewports(render_state->pipeline.main, free_list, CTK_WRAP_ARRAY(viewports));
 }
 
 /// Game Update
@@ -811,7 +838,7 @@ static void TestMain()
 
     // Initialize other test state.
     Game* game = CreateGame(perm_stack);
-    RenderState* render_state = CreateRenderState(perm_stack, *temp_stack, thread_pool);
+    RenderState* render_state = CreateRenderState(perm_stack, *temp_stack, free_list, thread_pool);
     // ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
 
     VisualizeFreeList(free_list, 16);
@@ -843,13 +870,19 @@ static void TestMain()
             // if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
             {
                 // Surface has changed, recreate pipelines.
-                UpdatePipelines(render_state, *temp_stack);
+                UpdateAllPipelineViewports(render_state, free_list);
             }
 
             // If NextFrame() was unable to acquire a swapchain image, skip rendering until next frame.
             if (next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
             {
                 continue;
+            }
+
+            if (KeyPressed(KEY_G))
+            {
+                vkDeviceWaitIdle(global_ctx.device);
+                UpdateDepthTesting(render_state->pipeline.main, false);
             }
 
             // StartProfile(prof_tree, "UpdateMVPMatrixes()");

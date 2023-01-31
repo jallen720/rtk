@@ -128,11 +128,11 @@ static void InitRenderPass(RenderTarget* render_target, Stack temp_stack, bool d
     Validate(res, "vkCreateRenderPass() failed");
 }
 
-static void InitDepthImages(RenderTarget* render_target, Stack* perm_stack)
+static void InitDepthImages(RenderTarget* render_target, FreeList* free_list)
 {
     Swapchain* swapchain = &global_ctx.swapchain;
     VkFormat depth_image_format = global_ctx.physical_device->depth_image_format;
-    InitArray(&render_target->depth_images, perm_stack, swapchain->image_count);
+    InitArray(&render_target->depth_images, free_list, swapchain->image_count);
     ImageInfo depth_image_info =
     {
         .image =
@@ -191,11 +191,11 @@ static void InitDepthImages(RenderTarget* render_target, Stack* perm_stack)
     }
 }
 
-static void InitFramebuffers(RenderTarget* render_target, Stack* perm_stack, Stack temp_stack, uint32 attachment_count,
-                             bool depth_testing)
+static void InitFramebuffers(RenderTarget* render_target, Stack temp_stack, FreeList* free_list,
+                             uint32 attachment_count, bool depth_testing)
 {
     Swapchain* swapchain = &global_ctx.swapchain;
-    InitArray(&render_target->framebuffers, perm_stack, swapchain->image_count);
+    InitArray(&render_target->framebuffers, free_list, swapchain->image_count);
     auto attachments = CreateArray<VkImageView>(&temp_stack, attachment_count);
     for (uint32 i = 0; i < swapchain->image_count; ++i)
     {
@@ -226,7 +226,7 @@ static void InitFramebuffers(RenderTarget* render_target, Stack* perm_stack, Sta
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static RenderTargetHnd CreateRenderTarget(Stack* perm_stack, Stack temp_stack, RenderTargetInfo* info)
+static RenderTargetHnd CreateRenderTarget(Stack temp_stack, FreeList* free_list, RenderTargetInfo* info)
 {
     RenderTargetHnd render_target_hnd = AllocateRenderTarget();
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
@@ -246,13 +246,13 @@ static RenderTargetHnd CreateRenderTarget(Stack* perm_stack, Stack temp_stack, R
 
     if (info->depth_testing)
     {
-        InitDepthImages(render_target, perm_stack);
+        InitDepthImages(render_target, free_list);
     }
 
     uint32 depth_attachment_count = info->depth_testing ? 1 : 0;
     uint32 total_attachment_count = 1 + depth_attachment_count;
-    InitFramebuffers(render_target, perm_stack, temp_stack, total_attachment_count, info->depth_testing);
-    InitArray(&render_target->attachment_clear_values, perm_stack, total_attachment_count);
+    InitFramebuffers(render_target, temp_stack, free_list, total_attachment_count, info->depth_testing);
+    InitArray(&render_target->attachment_clear_values, free_list, total_attachment_count);
 
     return render_target_hnd;
 }

@@ -241,13 +241,13 @@ static void InitBuffers(RenderState* render_state)
     render_state->buffer.staging = CreateBuffer(render_state->buffer.host, Megabyte32<16>());
 }
 
-static void InitRenderTargets(RenderState* render_state, Stack* perm_stack, Stack temp_stack)
+static void InitRenderTargets(RenderState* render_state, Stack temp_stack, FreeList* free_list)
 {
     RenderTargetInfo info =
     {
         .depth_testing = true,
     };
-    render_state->render_target.main = CreateRenderTarget(perm_stack, temp_stack, &info);
+    render_state->render_target.main = CreateRenderTarget(temp_stack, free_list, &info);
     PushClearValue(render_state->render_target.main, { 0.0f, 0.1f, 0.2f, 1.0f });
     PushClearValue(render_state->render_target.main, { 1.0f });
 }
@@ -530,7 +530,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack temp_stack, FreeL
 {
     RenderState* render_state = Allocate<RenderState>(perm_stack, 1);
     InitBuffers(render_state);
-    InitRenderTargets(render_state, perm_stack, temp_stack);
+    InitRenderTargets(render_state, temp_stack, free_list);
     InitVertexLayout(render_state, perm_stack);
     InitSampler(render_state);
     InitShaderDatas(render_state, perm_stack);

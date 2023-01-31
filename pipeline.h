@@ -8,6 +8,7 @@
 #include "ctk3/ctk3.h"
 #include "ctk3/stack.h"
 #include "ctk3/array.h"
+#include "ctk3/free_list.h"
 
 using namespace CTK;
 

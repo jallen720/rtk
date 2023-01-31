@@ -31,6 +31,7 @@ struct RenderTargetInfo
 struct RenderTarget
 {
     VkRenderPass         render_pass;
+    VkRect2D             render_area;
     Array<ImageHnd>      depth_images;
     Array<VkFramebuffer> framebuffers;
     Array<VkClearValue>  attachment_clear_values;
@@ -194,9 +195,9 @@ static void InitFramebuffers(RenderTarget* render_target, Stack* perm_stack, Sta
                              bool depth_testing)
 {
     Swapchain* swapchain = &global_ctx.swapchain;
-    InitArray(&render_target->framebuffers, perm_stack, global_ctx.swapchain.image_count);
+    InitArray(&render_target->framebuffers, perm_stack, swapchain->image_count);
     auto attachments = CreateArray<VkImageView>(&temp_stack, attachment_count);
-    for (uint32 i = 0; i < global_ctx.swapchain.image_count; ++i)
+    for (uint32 i = 0; i < swapchain->image_count; ++i)
     {
         Push(attachments, Get(&swapchain->image_views, i));
 
@@ -229,7 +230,20 @@ static RenderTargetHnd CreateRenderTarget(Stack* perm_stack, Stack temp_stack, R
 {
     RenderTargetHnd render_target_hnd = AllocateRenderTarget();
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
+
     InitRenderPass(render_target, temp_stack, info->depth_testing);
+
+    VkExtent2D swapchain_extent = global_ctx.swapchain.extent;
+    render_target->render_area =
+    {
+        .offset = { 0, 0 },
+        .extent =
+        {
+            .width  = swapchain_extent.width,
+            .height = swapchain_extent.height,
+        },
+    };
+
     if (info->depth_testing)
     {
         InitDepthImages(render_target, perm_stack);

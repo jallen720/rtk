@@ -154,15 +154,11 @@ static void SubmitRenderCommands(RenderTargetHnd render_target_hnd)
     // Begin render pass.
     VkRenderPassBeginInfo render_pass_begin_info =
     {
-        .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext       = NULL,
-        .renderPass  = render_target->render_pass,
-        .framebuffer = Get(&render_target->framebuffers, frame->swapchain_image_index),
-        .renderArea =
-        {
-            .offset = { 0, 0 },
-            .extent = global_ctx.swapchain.extent,
-        },
+        .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .pNext           = NULL,
+        .renderPass      = render_target->render_pass,
+        .framebuffer     = Get(&render_target->framebuffers, frame->swapchain_image_index),
+        .renderArea      = render_target->render_area,
         .clearValueCount = render_target->attachment_clear_values.count,
         .pClearValues    = render_target->attachment_clear_values.data,
     };

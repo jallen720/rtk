@@ -2,7 +2,6 @@
 #include "ctk3/ctk3.h"
 #include "ctk3/memory.h"
 #include "ctk3/free_list.h"
-#include "ctk3/free_list_debug.h"
 #include "ctk3/thread_pool.h"
 #include "ctk3/math.h"
 #include "ctk3/profile.h"
@@ -243,13 +242,17 @@ static void InitBuffers(RenderState* render_state)
 
 static void InitRenderTargets(RenderState* render_state, Stack temp_stack, FreeList* free_list)
 {
+    VkClearValue attachment_clear_values[] =
+    {
+        { 0.0f, 0.1f, 0.2f, 1.0f },
+        { 1.0f },
+    };
     RenderTargetInfo info =
     {
-        .depth_testing = true,
+        .depth_testing           = true,
+        .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
     };
     render_state->render_target.main = CreateRenderTarget(temp_stack, free_list, &info);
-    PushClearValue(render_state->render_target.main, { 0.0f, 0.1f, 0.2f, 1.0f });
-    PushClearValue(render_state->render_target.main, { 1.0f });
 }
 
 static void InitVertexLayout(RenderState* render_state, Stack* perm_stack)
@@ -542,7 +545,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack temp_stack, FreeL
     return render_state;
 }
 
-static void UpdateAllPipelineViewports(RenderState* render_state, FreeList* free_list)
+static void UpdateAllPipelines(RenderState* render_state, FreeList* free_list)
 {
     VkExtent2D swapchain_extent = GetSwapchain()->extent;
     VkViewport viewports[] =
@@ -557,6 +560,11 @@ static void UpdateAllPipelineViewports(RenderState* render_state, FreeList* free
         },
     };
     UpdateViewports(render_state->pipeline.main, free_list, CTK_WRAP_ARRAY(viewports));
+}
+
+static void UpdateAllRenderTargets(RenderState* render_state, Stack temp_stack, FreeList* free_list)
+{
+    UpdateRenderTarget(render_state->render_target.main, temp_stack, free_list);
 }
 
 /// Game Update
@@ -841,8 +849,6 @@ static void TestMain()
     RenderState* render_state = CreateRenderState(perm_stack, *temp_stack, free_list, thread_pool);
     // ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
 
-    VisualizeFreeList(free_list, 64);
-
     // Run game.
     for (;;)
     {
@@ -870,7 +876,8 @@ static void TestMain()
             // if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
             {
                 // Surface has changed, recreate pipelines.
-                UpdateAllPipelineViewports(render_state, free_list);
+                UpdateAllPipelines(render_state, free_list);
+                UpdateAllRenderTargets(render_state, *temp_stack, free_list);
             }
 
             // If NextFrame() was unable to acquire a swapchain image, skip rendering until next frame.

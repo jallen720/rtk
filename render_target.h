@@ -6,6 +6,7 @@
 #include "rtk/image.h"
 #include "ctk3/ctk3.h"
 #include "ctk3/stack.h"
+#include "ctk3/free_list.h"
 #include "ctk3/array.h"
 #include "ctk3/optional.h"
 
@@ -25,7 +26,8 @@ struct RenderPassAttachments
 
 struct RenderTargetInfo
 {
-    bool depth_testing;
+    bool                depth_testing;
+    Array<VkClearValue> attachment_clear_values;
 };
 
 struct RenderTarget
@@ -229,8 +231,6 @@ static void InitFramebuffers(RenderTarget* render_target, Stack temp_stack, Free
 
 static void InitRenderTarget(RenderTarget* render_target, Stack temp_stack, FreeList* free_list)
 {
-    InitRenderPass(render_target, temp_stack);
-
     render_target->extent = global_ctx.swapchain.extent;
 
     uint32 depth_attachment_count = 0;
@@ -243,7 +243,6 @@ static void InitRenderTarget(RenderTarget* render_target, Stack temp_stack, Free
     uint32 color_attachment_count = 1;
     uint32 total_attachment_count = color_attachment_count + depth_attachment_count;
     InitFramebuffers(render_target, temp_stack, free_list, total_attachment_count);
-    InitArray(&render_target->attachment_clear_values, free_list, total_attachment_count);
 }
 
 /// Interface
@@ -253,13 +252,35 @@ static RenderTargetHnd CreateRenderTarget(Stack temp_stack, FreeList* free_list,
     RenderTargetHnd render_target_hnd = AllocateRenderTarget();
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
     render_target->depth_testing = info->depth_testing;
+    InitRenderPass(render_target, temp_stack);
+    InitArray(&render_target->attachment_clear_values, free_list, &info->attachment_clear_values);
     InitRenderTarget(render_target, temp_stack, free_list);
     return render_target_hnd;
 }
 
-static void PushClearValue(RenderTargetHnd render_target_hnd, VkClearValue clear_value)
+static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack temp_stack, FreeList* free_list)
 {
-    Push(&GetRenderTarget(render_target_hnd)->attachment_clear_values, clear_value);
+    RenderTarget* render_target = GetRenderTarget(render_target_hnd);
+
+    // Destory depth images.
+    if (render_target->depth_testing)
+    {
+        for (uint32 i = 0; i < render_target->depth_images.count; ++i)
+        {
+            DestroyImage(Get(&render_target->depth_images, i));
+        }
+        DeinitArray(&render_target->depth_images, free_list);
+    }
+
+    // Destory framebuffers.
+    for (uint32 i = 0; i < render_target->framebuffers.count; ++i)
+    {
+        vkDestroyFramebuffer(global_ctx.device, Get(&render_target->framebuffers, i), NULL);
+    }
+    DeinitArray(&render_target->framebuffers, free_list);
+
+    // Update render target extent and re-initialize depth images and framebuffers with new render target extent.
+    InitRenderTarget(render_target, temp_stack, free_list);;
 }
 
 }

@@ -154,11 +154,11 @@ static void SubmitRenderCommands(RenderTargetHnd render_target_hnd)
     // Begin render pass.
     VkRenderPassBeginInfo render_pass_begin_info =
     {
-        .sType           = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext           = NULL,
-        .renderPass      = render_target->render_pass,
-        .framebuffer     = Get(&render_target->framebuffers, frame->swapchain_image_index),
-        .renderArea      =
+        .sType       = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .pNext       = NULL,
+        .renderPass  = render_target->render_pass,
+        .framebuffer = Get(&render_target->framebuffers, frame->swapchain_image_index),
+        .renderArea  =
         {
             .offset = { 0, 0 },
             .extent = render_target->extent,

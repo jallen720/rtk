@@ -88,6 +88,18 @@ static ImageHnd CreateImage(ImageInfo* info)
     return image_hnd;
 }
 
+static void DestroyImage(ImageHnd image_hnd)
+{
+    Image* image = GetImage(image_hnd);
+    VkDevice device = global_ctx.device;
+
+    vkDestroyImageView(device, image->view, NULL);
+    vkDestroyImage(device, image->hnd, NULL);
+    vkFreeMemory(device, image->mem, NULL);
+
+    DeallocateImage(image_hnd);
+}
+
 static VkSampler CreateSampler(VkSamplerCreateInfo* info)
 {
     VkSampler sampler = VK_NULL_HANDLE;

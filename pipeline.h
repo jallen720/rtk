@@ -157,12 +157,6 @@ static void InitPipeline(Pipeline* pipeline)
     Validate(res, "vkCreateGraphicsPipelines() failed");
 }
 
-static void ReinitPipeline(Pipeline* pipeline)
-{
-    vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
-    InitPipeline(pipeline);
-}
-
 /// Interface
 ////////////////////////////////////////////////////////////
 static void PushBinding(VertexLayout* layout, VkVertexInputRate input_rate)
@@ -273,14 +267,8 @@ static void UpdateViewports(PipelineHnd pipeline_hnd, FreeList* free_list, Array
     InitArray(&pipeline->viewports, free_list, &viewports);
     InitScissors(pipeline, free_list);
 
-    ReinitPipeline(pipeline);
-}
-
-static void UpdateDepthTesting(PipelineHnd pipeline_hnd, bool depth_testing)
-{
-    Pipeline* pipeline = GetPipeline(pipeline_hnd);
-    pipeline->depth_testing = depth_testing;
-    ReinitPipeline(pipeline);
+    vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
+    InitPipeline(pipeline);
 }
 
 static void DestroyPipeline(PipelineHnd pipeline_hnd)

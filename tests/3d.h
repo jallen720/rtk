@@ -879,12 +879,6 @@ static void TestMain()
                 continue;
             }
 
-            if (KeyPressed(KEY_G))
-            {
-                vkDeviceWaitIdle(global_ctx.device);
-                UpdateDepthTesting(render_state->pipeline.main, false);
-            }
-
             // StartProfile(prof_tree, "UpdateMVPMatrixes()");
             UpdateMVPMatrixes(render_state, game, thread_pool);
             // EndProfile(prof_tree);

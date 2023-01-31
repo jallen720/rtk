@@ -158,7 +158,11 @@ static void SubmitRenderCommands(RenderTargetHnd render_target_hnd)
         .pNext           = NULL,
         .renderPass      = render_target->render_pass,
         .framebuffer     = Get(&render_target->framebuffers, frame->swapchain_image_index),
-        .renderArea      = render_target->render_area,
+        .renderArea      =
+        {
+            .offset = { 0, 0 },
+            .extent = render_target->extent,
+        },
         .clearValueCount = render_target->attachment_clear_values.count,
         .pClearValues    = render_target->attachment_clear_values.data,
     };

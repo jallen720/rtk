@@ -31,10 +31,13 @@ struct RenderTargetInfo
 struct RenderTarget
 {
     VkRenderPass         render_pass;
-    VkRect2D             render_area;
+    VkExtent2D           extent;
     Array<ImageHnd>      depth_images;
     Array<VkFramebuffer> framebuffers;
     Array<VkClearValue>  attachment_clear_values;
+
+    // Cached Init State
+    bool depth_testing;
 };
 
 /// Utils
@@ -68,10 +71,10 @@ static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentD
     });
 }
 
-static void InitRenderPass(RenderTarget* render_target, Stack temp_stack, bool depth_testing)
+static void InitRenderPass(RenderTarget* render_target, Stack temp_stack)
 {
     RenderPassAttachments attachments = {};
-    InitRenderPassAttachments(&attachments, temp_stack, 1, depth_testing);
+    InitRenderPassAttachments(&attachments, temp_stack, 1, render_target->depth_testing);
     PushColorAttachment(&attachments,
     {
         .flags          = 0,
@@ -87,7 +90,7 @@ static void InitRenderPass(RenderTarget* render_target, Stack temp_stack, bool d
         .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
     });
 
-    if (depth_testing)
+    if (render_target->depth_testing)
     {
         SetDepthAttachment(&attachments,
         {
@@ -144,8 +147,8 @@ static void InitDepthImages(RenderTarget* render_target, FreeList* free_list)
             .format    = depth_image_format,
             .extent =
             {
-                .width  = swapchain->extent.width,
-                .height = swapchain->extent.height,
+                .width  = render_target->extent.width,
+                .height = render_target->extent.height,
                 .depth  = 1
             },
             .mipLevels             = 1,
@@ -192,7 +195,7 @@ static void InitDepthImages(RenderTarget* render_target, FreeList* free_list)
 }
 
 static void InitFramebuffers(RenderTarget* render_target, Stack temp_stack, FreeList* free_list,
-                             uint32 attachment_count, bool depth_testing)
+                             uint32 attachment_count)
 {
     Swapchain* swapchain = &global_ctx.swapchain;
     InitArray(&render_target->framebuffers, free_list, swapchain->image_count);
@@ -201,7 +204,7 @@ static void InitFramebuffers(RenderTarget* render_target, Stack temp_stack, Free
     {
         Push(attachments, Get(&swapchain->image_views, i));
 
-        if (depth_testing)
+        if (render_target->depth_testing)
         {
             Push(attachments, GetImage(Get(&render_target->depth_images, i))->view);
         }
@@ -212,8 +215,8 @@ static void InitFramebuffers(RenderTarget* render_target, Stack temp_stack, Free
             .renderPass      = render_target->render_pass,
             .attachmentCount = attachments->count,
             .pAttachments    = attachments->data,
-            .width           = swapchain->extent.width,
-            .height          = swapchain->extent.height,
+            .width           = render_target->extent.width,
+            .height          = render_target->extent.height,
             .layers          = 1,
         };
         VkResult res = vkCreateFramebuffer(global_ctx.device, &info, NULL, Push(&render_target->framebuffers));
@@ -224,37 +227,33 @@ static void InitFramebuffers(RenderTarget* render_target, Stack temp_stack, Free
     }
 }
 
+static void InitRenderTarget(RenderTarget* render_target, Stack temp_stack, FreeList* free_list)
+{
+    InitRenderPass(render_target, temp_stack);
+
+    render_target->extent = global_ctx.swapchain.extent;
+
+    uint32 depth_attachment_count = 0;
+    if (render_target->depth_testing)
+    {
+        InitDepthImages(render_target, free_list);
+        depth_attachment_count = 1;
+    }
+
+    uint32 color_attachment_count = 1;
+    uint32 total_attachment_count = color_attachment_count + depth_attachment_count;
+    InitFramebuffers(render_target, temp_stack, free_list, total_attachment_count);
+    InitArray(&render_target->attachment_clear_values, free_list, total_attachment_count);
+}
+
 /// Interface
 ////////////////////////////////////////////////////////////
 static RenderTargetHnd CreateRenderTarget(Stack temp_stack, FreeList* free_list, RenderTargetInfo* info)
 {
     RenderTargetHnd render_target_hnd = AllocateRenderTarget();
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-
-    InitRenderPass(render_target, temp_stack, info->depth_testing);
-
-    VkExtent2D swapchain_extent = global_ctx.swapchain.extent;
-    render_target->render_area =
-    {
-        .offset = { 0, 0 },
-        .extent =
-        {
-            .width  = swapchain_extent.width,
-            .height = swapchain_extent.height,
-        },
-    };
-
-    if (info->depth_testing)
-    {
-        InitDepthImages(render_target, free_list);
-    }
-
-    uint32 color_attachment_count = 1;
-    uint32 depth_attachment_count = info->depth_testing ? 1 : 0;
-    uint32 total_attachment_count = color_attachment_count + depth_attachment_count;
-    InitFramebuffers(render_target, temp_stack, free_list, total_attachment_count, info->depth_testing);
-    InitArray(&render_target->attachment_clear_values, free_list, total_attachment_count);
-
+    render_target->depth_testing = info->depth_testing;
+    InitRenderTarget(render_target, temp_stack, free_list);
     return render_target_hnd;
 }
 

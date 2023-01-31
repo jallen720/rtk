@@ -841,7 +841,7 @@ static void TestMain()
     RenderState* render_state = CreateRenderState(perm_stack, *temp_stack, free_list, thread_pool);
     // ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
 
-    VisualizeFreeList(free_list, 16);
+    VisualizeFreeList(free_list, 64);
 
     // Run game.
     for (;;)

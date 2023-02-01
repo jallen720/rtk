@@ -753,4 +753,15 @@ static void UpdateSwapchain(Stack temp_stack, FreeList* free_list)
     SetupSwapchain(temp_stack, free_list);
 }
 
+static void WaitIdle()
+{
+    vkDeviceWaitIdle(global_ctx.device);
+    // for (uint32 i = 0; i < global_ctx.frames.size; ++i)
+    // {
+    //     Frame* frame = GetPtr(&global_ctx.frames, i);
+    //     VkResult res = vkWaitForFences(global_ctx.device, 1, &frame->in_progress, VK_TRUE, UINT64_MAX);
+    //     Validate(res, "vkWaitForFences() failed");
+    // }
+}
+
 }

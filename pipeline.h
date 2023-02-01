@@ -59,7 +59,7 @@ struct Pipeline
     VkPipelineLayout layout;
     VkPipeline       hnd;
 
-    // Cached initialization state for updating pipeline.
+    // Configuration
     Array<VkPipelineShaderStageCreateInfo> shader_stage_create_infos;
     Array<VkViewport>                      viewports;
     Array<VkRect2D>                        scissors;
@@ -93,7 +93,7 @@ static void InitScissors(Pipeline* pipeline, FreeList* free_list)
     }
 }
 
-static void InitPipeline(Pipeline* pipeline)
+static void SetupPipeline(Pipeline* pipeline)
 {
     // Vertex Input
     VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
@@ -124,10 +124,10 @@ static void InitPipeline(Pipeline* pipeline)
     }
 
     // Color Blend
-    VkPipelineColorBlendAttachmentState swapchain_image_color_blend = DEFAULT_COLOR_BLEND_ATTACHMENT_STATE;
-    VkPipelineColorBlendStateCreateInfo color_blend_state = DEFAULT_COLOR_BLEND_STATE;
-    color_blend_state.attachmentCount = 1;
-    color_blend_state.pAttachments    = &swapchain_image_color_blend;
+    static constexpr VkPipelineColorBlendAttachmentState SWAPCHAIN_IMAGE_COLOR_BLEND =
+        DEFAULT_COLOR_BLEND_ATTACHMENT_STATE;
+    static constexpr VkPipelineColorBlendStateCreateInfo COLOR_BLEND_STATE =
+        DefaultColorBlendStateCreateInfo(&SWAPCHAIN_IMAGE_COLOR_BLEND, 1);
 
     VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
 
@@ -146,7 +146,7 @@ static void InitPipeline(Pipeline* pipeline)
         .pRasterizationState = &rasterization_state,
         .pMultisampleState   = &multisample_state,
         .pDepthStencilState  = &depth_stencil_state,
-        .pColorBlendState    = &color_blend_state,
+        .pColorBlendState    = &COLOR_BLEND_STATE,
         .pDynamicState       = &dynamic_state,
         .layout              = pipeline->layout,
         .renderPass          = GetRenderTarget(pipeline->render_target_hnd)->render_pass,
@@ -249,12 +249,11 @@ static PipelineHnd CreatePipeline(Stack temp_stack, FreeList* free_list, Pipelin
     InitArray(&pipeline->viewports, free_list, &info->viewports);
     InitScissors(pipeline, free_list);
 
-    // Cached Init State
     pipeline->vertex_layout     = info->vertex_layout;
     pipeline->depth_testing     = info->depth_testing;
     pipeline->render_target_hnd = info->render_target_hnd;
 
-    InitPipeline(pipeline);
+    SetupPipeline(pipeline);
 
     return pipeline_hnd;
 }
@@ -263,23 +262,15 @@ static void UpdateViewports(PipelineHnd pipeline_hnd, FreeList* free_list, Array
 {
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
 
-    // Reinit viewport & scissor arrays.
+    // Re-init viewport & scissor arrays.
     DeinitArray(&pipeline->viewports, free_list);
     DeinitArray(&pipeline->scissors, free_list);
     InitArray(&pipeline->viewports, free_list, &viewports);
     InitScissors(pipeline, free_list);
 
-    // Reinit pipeline.
+    // Re-setup pipeline.
     vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
-    InitPipeline(pipeline);
-}
-
-static void DestroyPipeline(PipelineHnd pipeline_hnd)
-{
-    Pipeline* pipeline = GetPipeline(pipeline_hnd);
-    vkDestroyPipelineLayout(global_ctx.device, pipeline->layout, NULL);
-    vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
-    DeallocatePipeline(pipeline_hnd);
+    SetupPipeline(pipeline);
 }
 
 }

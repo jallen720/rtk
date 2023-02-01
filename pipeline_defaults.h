@@ -105,17 +105,17 @@ static constexpr VkPipelineColorBlendAttachmentState DEFAULT_COLOR_BLEND_ATTACHM
     .colorWriteMask      = COLOR_COMPONENT_RGBA,
 };
 
-static constexpr VkPipelineColorBlendStateCreateInfo DEFAULT_COLOR_BLEND_STATE =
-{
-    .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
-    .pNext           = NULL,
-    .flags           = 0,
-    .logicOpEnable   = VK_FALSE,
-    .logicOp         = VK_LOGIC_OP_COPY,
-    .attachmentCount = 0,
-    .pAttachments    = NULL,
-    .blendConstants  = { 1.0f, 1.0f, 1.0f, 1.0f },
-};
+// static constexpr VkPipelineColorBlendStateCreateInfo DEFAULT_COLOR_BLEND_STATE =
+// {
+//     .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+//     .pNext           = NULL,
+//     .flags           = 0,
+//     .logicOpEnable   = VK_FALSE,
+//     .logicOp         = VK_LOGIC_OP_COPY,
+//     .attachmentCount = 0,
+//     .pAttachments    = NULL,
+//     .blendConstants  = { 1.0f, 1.0f, 1.0f, 1.0f },
+// };
 
 static constexpr VkPipelineDynamicStateCreateInfo DEFAULT_DYNAMIC_STATE =
 {
@@ -149,5 +149,21 @@ static VkPipelineShaderStageCreateInfo DefaultShaderStageCreateInfo(ShaderHnd sh
         .module              = shader->module,
         .pName               = "main",
         .pSpecializationInfo = NULL,
+    };
+}
+
+static constexpr VkPipelineColorBlendStateCreateInfo
+DefaultColorBlendStateCreateInfo(const VkPipelineColorBlendAttachmentState* attachments, uint32 attachment_count)
+{
+    return
+    {
+        .sType           = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .pNext           = NULL,
+        .flags           = 0,
+        .logicOpEnable   = VK_FALSE,
+        .logicOp         = VK_LOGIC_OP_COPY,
+        .attachmentCount = attachment_count,
+        .pAttachments    = attachments,
+        .blendConstants  = { 1.0f, 1.0f, 1.0f, 1.0f },
     };
 }

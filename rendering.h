@@ -28,26 +28,20 @@ static VkResult NextFrame()
     res = vkWaitForFences(device, 1, &frame->in_progress, VK_TRUE, UINT64_MAX);
     Validate(res, "vkWaitForFences() failed");
 
-    res = vkResetFences(device, 1, &frame->in_progress);
-    Validate(res, "vkResetFences() failed");
-
     // Once frame is ready, aquire next swapchain image's index.
     res = vkAcquireNextImageKHR(device, global_ctx.swapchain.hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
                                 &frame->swapchain_image_index);
     if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
     {
-PrintLine("vkAcquireNextImageKHR() returned %s", res == VK_SUBOPTIMAL_KHR ? "VK_SUBOPTIMAL_KHR" : "VK_ERROR_OUT_OF_DATE_KHR");
-        // Recreate swapchain.
-        vkDeviceWaitIdle(global_ctx.device);
-        // vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
-    }
-    else
-    {
-        Validate(res, "vkAcquireNextImageKHR() failed");
-vkDeviceWaitIdle(global_ctx.device);
+        return res;
     }
 
-    return res;
+    Validate(res, "vkAcquireNextImageKHR() failed");
+
+    // Only reset fence after image is successfully acquired to avoid deadlock if swapchain is recreated.
+    res = vkResetFences(device, 1, &frame->in_progress);
+    Validate(res, "vkResetFences() failed");
+    return VK_SUCCESS;
 }
 
 static VkCommandBuffer BeginRenderCommands(RenderTargetHnd render_target_hnd, uint32 render_thread_index)
@@ -206,15 +200,9 @@ static void SubmitRenderCommands(RenderTargetHnd render_target_hnd)
         .pResults           = NULL,
     };
     res = vkQueuePresentKHR(global_ctx.present_queue, &present_info);
-    if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
+    if (res != VK_SUBOPTIMAL_KHR || res != VK_ERROR_OUT_OF_DATE_KHR)
     {
-        // // Recreate swapchain.
-        // vkDeviceWaitIdle(global_ctx.device);
-        // vkDestroySwapchainKHR(global_ctx.device, global_ctx.swapchain.hnd, NULL);
-    }
-    else
-    {
-        Validate(res, "vkAcquireNextImageKHR() failed");
+        Validate(res, "vkQueuePresentKHR() failed");
     }
 }
 

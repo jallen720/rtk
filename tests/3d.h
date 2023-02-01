@@ -868,6 +868,7 @@ static void TestMain()
             {
                 break; // Controls closed window.
             }
+
             // StartProfile(prof_tree, "NextFrame()");
             VkResult next_frame_result = NextFrame();
             // EndProfile(prof_tree);

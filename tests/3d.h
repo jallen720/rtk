@@ -7,7 +7,7 @@
 #include "ctk3/profile.h"
 #include "ctk3/window.h"
 
-#define RTK_ENABLE_VALIDATION
+// #define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
@@ -847,13 +847,12 @@ static void TestMain()
     // Initialize other test state.
     Game* game = CreateGame(perm_stack);
     RenderState* render_state = CreateRenderState(perm_stack, *temp_stack, free_list, thread_pool);
-    ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
+    // ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
 
     // Run game.
     for (;;)
     {
-        StartProfile(prof_tree, "Frame");
-
+        // StartProfile(prof_tree, "Frame");
         ProcessWindowEvents();
         if (!WindowIsOpen())
         {
@@ -862,55 +861,48 @@ static void TestMain()
 
         if (WindowIsActive())
         {
-            StartProfile(prof_tree, "UpdateGame()");
+            // StartProfile(prof_tree, "UpdateGame()");
             UpdateGame(game);
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
             if (!WindowIsOpen())
             {
                 break; // Controls closed window.
             }
 
-            StartProfile(prof_tree, "NextFrame()");
+            // StartProfile(prof_tree, "NextFrame()");
             VkResult next_frame_result = NextFrame();
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
             if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
             {
                 vkDeviceWaitIdle(global_ctx.device);
                 UpdateSwapchain(*temp_stack, free_list);
                 UpdateAllPipelines(render_state, free_list);
                 UpdateAllRenderTargets(render_state, *temp_stack, free_list);
-                vkDeviceWaitIdle(global_ctx.device);
-                EndProfile(prof_tree);
+
+                // EndProfile(prof_tree);
+
                 continue;
             }
 
-            // PrintLine("swapchain extent: %u %u", GetSwapchain()->extent.width, GetSwapchain()->extent.height);
-
-            // // If NextFrame() was unable to acquire a swapchain image, skip rendering until next frame.
-            // if (next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
-            // {
-            //     continue;
-            // }
-
-            StartProfile(prof_tree, "UpdateMVPMatrixes()");
+            // StartProfile(prof_tree, "UpdateMVPMatrixes()");
             UpdateMVPMatrixes(render_state, game, thread_pool);
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
 
-            StartProfile(prof_tree, "RecordRenderCommands()");
+            // StartProfile(prof_tree, "RecordRenderCommands()");
             RecordRenderCommands(game, render_state, thread_pool);
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
 
-            StartProfile(prof_tree, "SubmitRenderCommands()");
+            // StartProfile(prof_tree, "SubmitRenderCommands()");
             SubmitRenderCommands(render_state->render_target.main);
-            EndProfile(prof_tree);
+            // EndProfile(prof_tree);
         }
         else
         {
             Sleep(1);
         }
 
-        EndProfile(prof_tree);
-        PrintProfileTree(prof_tree);
-        ClearProfileTree(prof_tree);
+        // EndProfile(prof_tree);
+        // PrintProfileTree(prof_tree);
+        // ClearProfileTree(prof_tree);
     }
 }

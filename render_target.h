@@ -34,7 +34,7 @@ struct RenderTarget
 {
     VkRenderPass         render_pass;
     VkExtent2D           extent;
-    Array<ImageHnd>      depth_images;
+    Array<Image>         depth_images;
     Array<VkFramebuffer> framebuffers;
     Array<VkClearValue>  attachment_clear_values;
 
@@ -84,7 +84,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
     if (render_target->depth_testing)
     {
         VkFormat depth_image_format = global_ctx.physical_device->depth_image_format;
-        InitArray(&render_target->depth_images, free_list, swapchain->image_count);
+        InitArrayFull(&render_target->depth_images, free_list, swapchain->image_count);
         ImageInfo depth_image_info =
         {
             .image =
@@ -138,7 +138,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
         };
         for (uint32 i = 0; i < swapchain->image_count; ++i)
         {
-            Push(&render_target->depth_images, CreateImage(&depth_image_info));
+            InitImage(GetPtr(&render_target->depth_images, i), &depth_image_info);
         }
     }
 
@@ -154,7 +154,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
 
         if (render_target->depth_testing)
         {
-            Push(attachments, GetImage(Get(&render_target->depth_images, i))->view);
+            Push(attachments, GetPtr(&render_target->depth_images, i)->view);
         }
 
         VkFramebufferCreateInfo info =
@@ -260,7 +260,7 @@ static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack temp_sta
     {
         for (uint32 i = 0; i < render_target->depth_images.count; ++i)
         {
-            DestroyImage(Get(&render_target->depth_images, i));
+            DeinitImage(GetPtr(&render_target->depth_images, i));
         }
         DeinitArray(&render_target->depth_images, free_list);
     }

@@ -60,11 +60,8 @@ static void DestroyImageData(ImageData* image_data)
     *image_data = {};
 }
 
-static ImageHnd CreateImage(ImageInfo* info)
+static void InitImage(Image* image, ImageInfo* info)
 {
-    ImageHnd image_hnd = AllocateImage();
-    Image* image = GetImage(image_hnd);
-
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
 
@@ -84,20 +81,21 @@ static ImageHnd CreateImage(ImageInfo* info)
     info->view.image = image->hnd;
     res = vkCreateImageView(device, &info->view, NULL, &image->view);
     Validate(res, "vkCreateImageView() failed");
-
-    return image_hnd;
 }
 
-static void DestroyImage(ImageHnd image_hnd)
+static void DeinitImage(Image* image)
 {
-    Image* image = GetImage(image_hnd);
     VkDevice device = global_ctx.device;
-
     vkDestroyImageView(device, image->view, NULL);
     vkDestroyImage(device, image->hnd, NULL);
     vkFreeMemory(device, image->mem, NULL);
+}
 
-    DeallocateImage(image_hnd);
+static ImageHnd CreateImage(ImageInfo* info)
+{
+    ImageHnd image_hnd = AllocateImage();
+    InitImage(GetImage(image_hnd), info);
+    return image_hnd;
 }
 
 static VkSampler CreateSampler(VkSamplerCreateInfo* info)

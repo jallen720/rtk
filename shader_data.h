@@ -331,4 +331,9 @@ static VkDescriptorSet GetInstance(ShaderDataSetHnd shader_data_set_hnd, uint32 
     return Get(&GetShaderDataSet(shader_data_set_hnd)->instances, instance);
 }
 
+static uint32 GetImageCount(ShaderDataHnd shader_data_hnd)
+{
+    return GetShaderData(shader_data_hnd)->image_hnds.count;
+}
+
 }

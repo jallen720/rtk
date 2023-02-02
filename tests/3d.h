@@ -370,7 +370,7 @@ static ShaderDataHnd CreateTexture(const char* image_path, RenderState* render_s
     // Copy image data into staging buffer.
     Clear(render_state->buffer.staging);
     Write(render_state->buffer.staging, image_data.data, image_data.size);
-    uint32 image_count = GetShaderData(shader_data_hnd)->image_hnds.count;
+    uint32 image_count = GetImageCount(shader_data_hnd);
     for (uint32 i = 0; i < image_count; ++i)
     {
         WriteToShaderDataImage(shader_data_hnd, i, render_state->buffer.staging);

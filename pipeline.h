@@ -65,7 +65,7 @@ struct Pipeline
     Array<VkRect2D>                        scissors;
     VertexLayout*                          vertex_layout;
     bool                                   depth_testing;
-    RenderTargetHnd                        render_target_hnd;
+    VkRenderPass                           render_pass;
 };
 
 /// Utils
@@ -149,7 +149,7 @@ static void SetupPipeline(Pipeline* pipeline)
         .pColorBlendState    = &COLOR_BLEND_STATE,
         .pDynamicState       = &dynamic_state,
         .layout              = pipeline->layout,
-        .renderPass          = GetRenderTarget(pipeline->render_target_hnd)->render_pass,
+        .renderPass          = pipeline->render_pass,
         .subpass             = 0,
         .basePipelineHandle  = VK_NULL_HANDLE,
         .basePipelineIndex   = -1,
@@ -249,9 +249,9 @@ static PipelineHnd CreatePipeline(Stack temp_stack, FreeList* free_list, Pipelin
     InitArray(&pipeline->viewports, free_list, &info->viewports);
     InitScissors(pipeline, free_list);
 
-    pipeline->vertex_layout     = info->vertex_layout;
-    pipeline->depth_testing     = info->depth_testing;
-    pipeline->render_target_hnd = info->render_target_hnd;
+    pipeline->vertex_layout = info->vertex_layout;
+    pipeline->depth_testing = info->depth_testing;
+    pipeline->render_pass   = GetRenderTarget(info->render_target_hnd)->render_pass;
 
     SetupPipeline(pipeline);
 

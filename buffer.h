@@ -34,11 +34,8 @@ struct Buffer
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static BufferHnd CreateBuffer(BufferInfo* info)
+static void InitBuffer(Buffer* buffer, BufferInfo* info)
 {
-    BufferHnd buffer_hnd = AllocateBuffer();
-    Buffer* buffer = GetBuffer(buffer_hnd);
-
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
 
@@ -72,16 +69,10 @@ static BufferHnd CreateBuffer(BufferInfo* info)
 
     // Buffers allocated directly from device memory manage the entire region of memory.
     buffer->offset = 0;
-
-    return buffer_hnd;
 }
 
-static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, VkDeviceSize size)
+static void InitBuffer(Buffer* buffer, Buffer* parent_buffer, VkDeviceSize size)
 {
-    BufferHnd buffer_hnd = AllocateBuffer();
-    Buffer* buffer = GetBuffer(buffer_hnd);
-    Buffer* parent_buffer = GetBuffer(parent_buffer_hnd);
-
     if (parent_buffer->index + size > parent_buffer->size)
     {
         CTK_FATAL("can't allocate %u bytes from parent buffer at index %u: allocation would exceed parent buffer size "
@@ -96,13 +87,24 @@ static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, VkDeviceSize size)
     buffer->index      = 0;
 
     parent_buffer->index += size;
+}
 
+static BufferHnd CreateBuffer(BufferInfo* info)
+{
+    BufferHnd buffer_hnd = AllocateBuffer();
+    InitBuffer(GetBuffer(buffer_hnd), info);
     return buffer_hnd;
 }
 
-static void Write(BufferHnd buffer_hnd, void* data, VkDeviceSize data_size)
+static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, VkDeviceSize size)
 {
-    Buffer* buffer = GetBuffer(buffer_hnd);
+    BufferHnd buffer_hnd = AllocateBuffer();
+    InitBuffer(GetBuffer(buffer_hnd), GetBuffer(parent_buffer_hnd), size);
+    return buffer_hnd;
+}
+
+static void Write(Buffer* buffer, void* data, VkDeviceSize data_size)
+{
     if (buffer->mapped_mem == NULL)
     {
         CTK_FATAL("can't write to buffer: buffer is not host visible (mapped_mem == NULL)");
@@ -116,6 +118,12 @@ static void Write(BufferHnd buffer_hnd, void* data, VkDeviceSize data_size)
 
     memcpy(buffer->mapped_mem + buffer->index, data, data_size);
     buffer->index += data_size;
+}
+
+static void Write(BufferHnd buffer_hnd, void* data, VkDeviceSize data_size)
+{
+    Buffer* buffer = GetBuffer(buffer_hnd);
+    Write(buffer, data, data_size);
 }
 
 static void Clear(BufferHnd buffer_hnd)

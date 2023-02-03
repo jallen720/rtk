@@ -6,7 +6,7 @@
 #include "rtk/render_target.h"
 #include "rtk/pipeline.h"
 #include "rtk/shader_data.h"
-#include "rtk/mesh_data.h"
+#include "rtk/mesh.h"
 #include "ctk3/ctk3.h"
 #include "ctk3/array.h"
 
@@ -81,9 +81,10 @@ static void BindPipeline(VkCommandBuffer command_buffer, PipelineHnd pipeline_hn
 static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd shader_data_set_hnd,
                               PipelineHnd pipeline_hnd, uint32 binding)
 {
+    ShaderDataSet* shader_data_set = GetShaderDataSet(shader_data_set_hnd);
     VkDescriptorSet descriptor_sets[] =
     {
-        GetInstance(shader_data_set_hnd, global_ctx.frames.index)
+        Get(&shader_data_set->instances, global_ctx.frames.index)
     };
     vkCmdBindDescriptorSets(command_buffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -96,16 +97,14 @@ static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSetHnd s
 static void BindMeshData(VkCommandBuffer command_buffer, MeshDataHnd mesh_data_hnd)
 {
     MeshData* mesh_data = GetMeshData(mesh_data_hnd);
-    Buffer* vertex_buffer = GetBuffer(mesh_data->vertex_buffer);
-    Buffer* index_buffer = GetBuffer(mesh_data->index_buffer);
     vkCmdBindVertexBuffers(command_buffer,
                            0, // First Binding
                            1, // Binding Count
-                           &vertex_buffer->hnd,
-                           &vertex_buffer->offset);
+                           &mesh_data->vertex_buffer.hnd,
+                           &mesh_data->vertex_buffer.offset);
     vkCmdBindIndexBuffer(command_buffer,
-                         index_buffer->hnd,
-                         index_buffer->offset,
+                         mesh_data->index_buffer.hnd,
+                         mesh_data->index_buffer.offset,
                          VK_INDEX_TYPE_UINT32);
 }
 

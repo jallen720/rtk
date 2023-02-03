@@ -392,8 +392,8 @@ static void InitShaderDatas(RenderState* render_state, Stack* perm_stack)
             .per_frame = true,
             .buffer =
             {
-                .parent = render_state->buffer.host,
-                .size   = sizeof(VSBuffer),
+                .parent_hnd = render_state->buffer.host,
+                .size       = sizeof(VSBuffer),
             }
         };
         render_state->data.vs_buffer = CreateShaderData(perm_stack, &info);
@@ -495,7 +495,7 @@ static void InitMeshes(RenderState* render_state)
 {
     MeshDataInfo mesh_data_info =
     {
-        .parent_buffer      = render_state->buffer.host,
+        .parent_buffer_hnd  = render_state->buffer.host,
         .vertex_buffer_size = Megabyte32<1>(),
         .index_buffer_size  = Megabyte32<1>(),
     };

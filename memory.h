@@ -12,8 +12,8 @@ namespace RTK
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static VkDeviceMemory
-AllocateDeviceMemory(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags mem_property_flags)
+static VkDeviceMemory AllocateDeviceMemory(VkMemoryRequirements mem_requirements,
+                                           VkMemoryPropertyFlags mem_property_flags)
 {
     // Find memory type index in memory properties based on memory property flags.
     VkPhysicalDeviceMemoryProperties* mem_properties = &global_ctx.physical_device->mem_properties;

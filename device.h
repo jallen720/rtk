@@ -2,8 +2,13 @@
 
 #include "rtk/vulkan.h"
 #include "ctk3/ctk3.h"
+#include "ctk3/io.h"
 
 using namespace CTK;
+
+/// Macros
+////////////////////////////////////////////////////////////
+#define RTK_PRINT_MEM_PROPERTY_FLAG(FLAG) if (type->propertyFlags & FLAG == FLAG) { PrintLine("        " #FLAG); }
 
 namespace RTK
 {
@@ -49,6 +54,9 @@ static bool HasRequiredFeatures(PhysicalDevice* physical_device, DeviceFeatures*
     return true;
 }
 
+
+/// Debugging
+////////////////////////////////////////////////////////////
 static void LogPhysicalDevice(PhysicalDevice* physical_device, const char* message)
 {
     VkPhysicalDeviceType type = physical_device->properties.deviceType;
@@ -70,6 +78,27 @@ static void LogPhysicalDevice(PhysicalDevice* physical_device, const char* messa
         depth_image_format == VK_FORMAT_D16_UNORM_S8_UINT  ? "VK_FORMAT_D16_UNORM_S8_UINT"  :
         depth_image_format == VK_FORMAT_D16_UNORM          ? "VK_FORMAT_D16_UNORM"          :
         "UNKNWON");
+}
+
+static void ListMemoryTypes(PhysicalDevice* physical_device)
+{
+    VkPhysicalDeviceMemoryProperties* mem_properties = &physical_device->mem_properties;
+    CTK_ITERATE_PTR(type, mem_properties->memoryTypes, mem_properties->memoryTypeCount)
+    {
+        PrintLine();
+        PrintLine("VkMemoryType (%p):", type);
+        PrintLine("    heapIndex: %u", type->heapIndex);
+        PrintLine("    propertyFlags:");
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT);
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_PROTECTED_BIT);
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD);
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD);
+        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV);
+    }
 }
 
 }

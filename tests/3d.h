@@ -212,7 +212,7 @@ static void InitBuffers()
 {
     BufferInfo host_buffer_info =
     {
-        .size               = Megabyte32<128>(),
+        .size               = Megabyte32<64>(),
         .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
@@ -225,7 +225,7 @@ static void InitBuffers()
 
     BufferInfo device_buffer_info =
     {
-        .size               = Megabyte32<256>(),
+        .size               = Megabyte32<64>(),
         .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
@@ -235,7 +235,7 @@ static void InitBuffers()
     };
     render_state.buffer.device = CreateBuffer(&device_buffer_info);
 
-    render_state.buffer.staging = CreateBuffer(render_state.buffer.host, Megabyte32<16>());
+    render_state.buffer.staging = CreateBuffer(render_state.buffer.host, Megabyte32<4>());
 }
 
 static void InitRenderTargets(Stack temp_stack, FreeList* free_list)

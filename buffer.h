@@ -5,7 +5,6 @@
 #include "rtk/debug.h"
 #include "rtk/context.h"
 #include "rtk/resources.h"
-#include "rtk/memory.h"
 
 using namespace CTK;
 

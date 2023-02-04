@@ -5,7 +5,6 @@
 #include "rtk/debug.h"
 #include "rtk/context.h"
 #include "rtk/resources.h"
-#include "rtk/memory.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "rtk/stb/stb_image.h"

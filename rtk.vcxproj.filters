@@ -27,9 +27,6 @@
     <ClInclude Include="vulkan.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="memory.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="device.h">
       <Filter>Source Files</Filter>
     </ClInclude>

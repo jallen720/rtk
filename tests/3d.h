@@ -69,7 +69,7 @@ struct RenderCommandState
 };
 
 template<typename StateType>
-struct ThreadPoolJob
+struct Job
 {
     Array<StateType> states;
     Array<TaskHnd>   tasks;
@@ -82,10 +82,10 @@ struct RenderState
 
     struct
     {
-        ThreadPoolJob<MVPMatrixState>     update_mvp_matrixes;
-        ThreadPoolJob<RenderCommandState> record_render_commands;
+        Job<MVPMatrixState>     update_mvp_matrixes;
+        Job<RenderCommandState> record_render_commands;
     }
-    thread_pool_job;
+    job;
 
     // Resources
     struct
@@ -515,7 +515,7 @@ static void InitMeshes()
 }
 
 template<typename StateType>
-static void InitThreadPoolJob(ThreadPoolJob<StateType>* job, Stack* perm_stack, uint32 thread_count)
+static void InitThreadPoolJob(Job<StateType>* job, Stack* perm_stack, uint32 thread_count)
 {
     InitArrayFull(&job->states, perm_stack, thread_count);
     InitArrayFull(&job->tasks, perm_stack, thread_count);
@@ -523,8 +523,8 @@ static void InitThreadPoolJob(ThreadPoolJob<StateType>* job, Stack* perm_stack, 
 
 static void InitThreadPoolJobs(Stack* perm_stack, ThreadPool* thread_pool)
 {
-    InitThreadPoolJob(&render_state.thread_pool_job.update_mvp_matrixes, perm_stack, thread_pool->size);
-    InitThreadPoolJob(&render_state.thread_pool_job.record_render_commands, perm_stack, RENDER_THREAD_COUNT);
+    InitThreadPoolJob(&render_state.job.update_mvp_matrixes, perm_stack, thread_pool->size);
+    InitThreadPoolJob(&render_state.job.record_render_commands, perm_stack, RENDER_THREAD_COUNT);
 }
 
 static void InitRenderState(Stack* perm_stack, Stack temp_stack, FreeList* free_list, ThreadPool* thread_pool)
@@ -683,7 +683,7 @@ static void UpdateMVPMatrixesThread(void* data)
 
 static void UpdateMVPMatrixes(ThreadPool* thread_pool)
 {
-    ThreadPoolJob<MVPMatrixState>* job = &render_state.thread_pool_job.update_mvp_matrixes;
+    Job<MVPMatrixState>* job = &render_state.job.update_mvp_matrixes;
     Matrix view_projection_matrix = GetViewProjectionMatrix(&game.view);
     auto frame_vs_buffer = GetBufferMem<VSBuffer>(render_state.data.vs_buffer);
     uint32 thread_count = thread_pool->size;
@@ -722,7 +722,7 @@ static void RecordRenderCommandsThread(void* data)
 
 static void RecordRenderCommands(ThreadPool* thread_pool)
 {
-    ThreadPoolJob<RenderCommandState>* job = &render_state.thread_pool_job.record_render_commands;
+    Job<RenderCommandState>* job = &render_state.job.record_render_commands;
 
     // Initialize thread states and submit tasks.
     static ShaderDataSetHnd textures[] =

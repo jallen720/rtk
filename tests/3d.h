@@ -357,7 +357,7 @@ static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, Ima
     };
 }
 
-static ShaderDataHnd CreateTexture(const char* image_path, Stack* perm_stack)
+static ShaderDataHnd CreateTexture(Stack* perm_stack, const char* image_path)
 {
     ImageData image_data = {};
     LoadImageData(&image_data, image_path);
@@ -397,8 +397,8 @@ static void InitShaderDatas(Stack* perm_stack)
         render_state.data.vs_buffer = CreateShaderData(perm_stack, &info);
     }
 
-    render_state.data.axis_cube_texture  = CreateTexture("images/axis_cube.png", perm_stack);
-    render_state.data.dirt_block_texture = CreateTexture("images/dirt_block.png", perm_stack);
+    render_state.data.axis_cube_texture  = CreateTexture(perm_stack, "images/axis_cube.png");
+    render_state.data.dirt_block_texture = CreateTexture(perm_stack, "images/dirt_block.png");
 }
 
 static void InitShaderDataSets(Stack* perm_stack, Stack temp_stack)

@@ -8,7 +8,7 @@ using namespace CTK;
 
 /// Macros
 ////////////////////////////////////////////////////////////
-#define RTK_PRINT_MEM_PROPERTY_FLAG(FLAG) if (type->propertyFlags & FLAG == FLAG) { PrintLine("        " #FLAG); }
+#define RTK_PRINT_MEM_PROPERTY_FLAG(FLAG) if ((type->propertyFlags & FLAG) == FLAG) { PrintLine("        " #FLAG); }
 
 namespace RTK
 {

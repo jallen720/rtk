@@ -440,19 +440,6 @@ static void InitThreadPoolJobs(Stack* perm_stack, ThreadPool* thread_pool)
     InitThreadPoolJob(&render_state.job.record_render_commands, perm_stack, RENDER_THREAD_COUNT);
 }
 
-static void RecordRenderCommandsThread(void* data)
-{
-    auto state = (RenderCommandState*)data;
-    VkCommandBuffer command_buffer = BeginRenderCommands(render_state.render_target.main, state->thread_index);
-        PipelineHnd pipeline = render_state.pipeline.main;
-        BindPipeline(command_buffer, pipeline);
-        BindShaderDataSet(command_buffer, render_state.data_set.entity_data, pipeline, 0);
-        BindShaderDataSet(command_buffer, state->texture, pipeline, 1);
-        BindMeshData(command_buffer, render_state.mesh.data);
-        DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
-    EndRenderCommands(command_buffer);
-}
-
 static Matrix GetViewProjectionMatrix(View* view)
 {
     // View Matrix
@@ -498,6 +485,19 @@ static void UpdateMVPMatrixesThread(void* data)
 
         frame_vs_buffer->mvp_matrixes[i] = view_projection_matrix * model_matrix;
     }
+}
+
+static void RecordRenderCommandsThread(void* data)
+{
+    auto state = (RenderCommandState*)data;
+    VkCommandBuffer command_buffer = BeginRenderCommands(render_state.render_target.main, state->thread_index);
+        PipelineHnd pipeline = render_state.pipeline.main;
+        BindPipeline(command_buffer, pipeline);
+        BindShaderDataSet(command_buffer, render_state.data_set.entity_data, pipeline, 0);
+        BindShaderDataSet(command_buffer, state->texture, pipeline, 1);
+        BindMeshData(command_buffer, render_state.mesh.data);
+        DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
+    EndRenderCommands(command_buffer);
 }
 
 static void UpdateAllPipelines(FreeList* free_list)

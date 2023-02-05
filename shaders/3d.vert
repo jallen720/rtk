@@ -2,7 +2,7 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_GOOGLE_include_directive    : enable
 
-#include "../tests/defs_3d.h"
+#include "../tests/3d/defs.h"
 
 layout (location = 0) in vec3 in_vert_pos;
 layout (location = 1) in vec2 in_vert_uv;

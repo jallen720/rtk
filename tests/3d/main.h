@@ -10,7 +10,7 @@
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
-#include "rtk/tests/defs_3d.h"
+#include "rtk/tests/3d/defs.h"
 
 using namespace CTK;
 using namespace RTK;

@@ -16,6 +16,9 @@
     <Filter Include="Source Files\tests">
       <UniqueIdentifier>{c6961729-08dd-41ae-aee2-f2d2a17fa84c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\tests\3d">
+      <UniqueIdentifier>{f2ced265-dfe8-4063-a5fa-dd2901a1a182}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="get_vk_array.h">
@@ -35,9 +38,6 @@
     </ClInclude>
     <ClInclude Include="rtk_context.h">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tests\3d.h">
-      <Filter>Source Files\tests</Filter>
     </ClInclude>
     <ClInclude Include="tests\shared.h">
       <Filter>Source Files\tests</Filter>
@@ -75,8 +75,11 @@
     <ClInclude Include="rtk_resources.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="tests\defs_3d.h">
-      <Filter>Source Files\tests</Filter>
+    <ClInclude Include="tests\3d\defs.h">
+      <Filter>Source Files\tests\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\3d\main.h">
+      <Filter>Source Files\tests\3d</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -3,12 +3,19 @@
 #include "rtk/vulkan.h"
 #include "ctk3/ctk3.h"
 #include "ctk3/pair.h"
+#include "ctk3/debug.h"
 
 using namespace CTK;
 
 /// Macros
 ////////////////////////////////////////////////////////////
 #define RTK_VK_RESULT_NAME(VK_RESULT) VK_RESULT, #VK_RESULT
+#define RTK_CHECK_PRINT_MEMORY_PROPERTY(FLAG) \
+    if ((mem_property_flags & FLAG) == FLAG) \
+    { \
+        PrintTabs(tabs); \
+        PrintLine(#FLAG); \
+    }
 
 namespace RTK
 {
@@ -255,6 +262,37 @@ static const char* VkPresentModeName(VkPresentModeKHR present_mode)
     }
 
     return name;
+}
+
+static void PrintMemoryProperties(uint32 mem_property_flags, uint32 tabs = 0)
+{
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT);
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_PROTECTED_BIT);
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD);
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD);
+    RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV);
+}
+
+static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint32 mem_property_flags, uint32 tabs = 0)
+{
+    PrintTabs(tabs);
+    PrintLine("size:           %u", mem_requirements->size);
+
+    PrintTabs(tabs);
+    PrintLine("align:          %u", mem_requirements->alignment);
+
+    PrintTabs(tabs);
+    Print("memoryTypeBits: ");
+    PrintBits(mem_requirements->memoryTypeBits);
+    PrintLine();
+
+    PrintTabs(tabs);
+    PrintLine("memory properties:");
+    PrintMemoryProperties(mem_property_flags, tabs + 1);
 }
 
 }

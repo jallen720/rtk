@@ -346,7 +346,7 @@ static void InitDevice(DeviceFeatures* enabled_features)
     QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
 
     // Add queue creation info for 1 queue in each queue family.
-    FixedArray<VkDeviceQueueCreateInfo, 2> queue_infos = {};
+    FArray<VkDeviceQueueCreateInfo, 2> queue_infos = {};
     Push(&queue_infos, GetSingleQueueInfo(queue_families->graphics));
 
     // Don't create separate queues if present and graphics queue families are the same.
@@ -764,26 +764,28 @@ static void WaitIdle()
     // }
 }
 
-static VkDeviceMemory AllocateDeviceMemory(VkMemoryRequirements mem_requirements,
-                                           VkMemoryPropertyFlags mem_property_flags)
+static VkDeviceMemory
+AllocateDeviceMemory(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags mem_property_flags)
 {
-    // Find memory type index in memory properties based on memory property flags.
+    // Reference: https://registry.khronos.org/vulkan/specs/1.3/html/vkspec.html#memory-device
     VkPhysicalDeviceMemoryProperties* mem_properties = &global_ctx.physical_device->mem_properties;
     uint32 mem_type_index = UINT32_MAX;
     for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
     {
-        // Ensure memory type at mem_properties->memoryTypes[i] is supported by mem_requirements.
+        // Memory type at index must be supported for resource.
         if ((mem_requirements.memoryTypeBits & (1 << i)) == 0)
         {
             continue;
         }
 
-        // Check if memory at index has all property flags.
-        if ((mem_properties->memoryTypes[i].propertyFlags & mem_property_flags) == mem_property_flags)
+        // Memory type at index must support all resource memory properties.
+        if ((mem_properties->memoryTypes[i].propertyFlags & mem_property_flags) != mem_property_flags)
         {
-            mem_type_index = i;
-            break;
+            continue;
         }
+
+        mem_type_index = i;
+        break;
     }
 
     if (mem_type_index == UINT32_MAX)

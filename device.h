@@ -6,10 +6,6 @@
 
 using namespace CTK;
 
-/// Macros
-////////////////////////////////////////////////////////////
-#define RTK_PRINT_MEM_PROPERTY_FLAG(FLAG) if ((type->propertyFlags & FLAG) == FLAG) { PrintLine("        " #FLAG); }
-
 namespace RTK
 {
 
@@ -89,15 +85,7 @@ static void ListMemoryTypes(PhysicalDevice* physical_device)
         PrintLine("VkMemoryType (%p):", type);
         PrintLine("    heapIndex: %u", type->heapIndex);
         PrintLine("    propertyFlags:");
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT);
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_PROTECTED_BIT);
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD);
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD);
-        RTK_PRINT_MEM_PROPERTY_FLAG(VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV);
+        PrintMemoryProperties(type->propertyFlags, 2);
     }
 }
 

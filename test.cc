@@ -3,6 +3,6 @@
 
 sint32 main()
 {
-    TestMain();
+    Test3D::Run();
     return 0;
 }

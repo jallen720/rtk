@@ -157,7 +157,9 @@
     <ClInclude Include="shader.h" />
     <ClInclude Include="shader_data.h" />
     <ClInclude Include="tests\3d\defs.h" />
+    <ClInclude Include="tests\3d\game.h" />
     <ClInclude Include="tests\3d\main.h" />
+    <ClInclude Include="tests\3d\rendering.h" />
     <ClInclude Include="tests\shared.h" />
     <ClInclude Include="vk_array.h" />
     <ClInclude Include="vulkan.h" />

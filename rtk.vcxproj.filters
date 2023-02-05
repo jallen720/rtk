@@ -81,6 +81,12 @@
     <ClInclude Include="tests\3d\main.h">
       <Filter>Source Files\tests\3d</Filter>
     </ClInclude>
+    <ClInclude Include="tests\3d\game.h">
+      <Filter>Source Files\tests\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\3d\rendering.h">
+      <Filter>Source Files\tests\3d</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="test.cc">

@@ -99,63 +99,41 @@ static void Run()
     // Initialize other test state.
     InitGame();
     InitRenderState(perm_stack, *temp_stack, free_list, thread_pool);
-    // ProfileTree* prof_tree = CreateProfileTree(perm_stack, 64);
 
     // Run game.
     for (;;)
     {
-        // StartProfile(prof_tree, "Frame");
         ProcessWindowEvents();
         if (!WindowIsOpen())
         {
             break; // Quit event closed window.
         }
 
-        if (WindowIsActive())
-        {
-            // StartProfile(prof_tree, "UpdateGame()");
-            UpdateGame();
-            // EndProfile(prof_tree);
-            if (!WindowIsOpen())
-            {
-                break; // Controls closed window.
-            }
-
-            // StartProfile(prof_tree, "NextFrame()");
-            VkResult next_frame_result = NextFrame();
-            // EndProfile(prof_tree);
-            if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
-            {
-                WaitIdle();
-                UpdateSwapchain(*temp_stack, free_list);
-                UpdateAllPipelines(free_list);
-                UpdateAllRenderTargets(*temp_stack, free_list);
-
-                // EndProfile(prof_tree);
-
-                continue;
-            }
-
-            // StartProfile(prof_tree, "UpdateMVPMatrixes()");
-            UpdateMVPMatrixes(thread_pool);
-            // EndProfile(prof_tree);
-
-            // StartProfile(prof_tree, "RecordRenderCommands()");
-            RecordRenderCommands(thread_pool);
-            // EndProfile(prof_tree);
-
-            // StartProfile(prof_tree, "SubmitRenderCommands()");
-            SubmitRenderCommands(render_state.render_target.main);
-            // EndProfile(prof_tree);
-        }
-        else
+        if (!WindowIsActive())
         {
             Sleep(1);
+            continue;
         }
 
-        // EndProfile(prof_tree);
-        // PrintProfileTree(prof_tree);
-        // ClearProfileTree(prof_tree);
+        UpdateGame();
+        if (!WindowIsOpen())
+        {
+            break; // Controls closed window.
+        }
+
+        VkResult next_frame_result = NextFrame();
+        if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            WaitIdle();
+            UpdateSwapchain(*temp_stack, free_list);
+            UpdateAllPipelines(free_list);
+            UpdateAllRenderTargets(*temp_stack, free_list);
+            continue;
+        }
+
+        UpdateMVPMatrixes(thread_pool);
+        RecordRenderCommands(thread_pool);
+        SubmitRenderCommands(render_state.render_target.main);
     }
 }
 

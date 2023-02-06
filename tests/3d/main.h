@@ -109,18 +109,19 @@ static void Run()
             break; // Quit event closed window.
         }
 
-        if (!WindowIsActive())
-        {
-            Sleep(1);
-            continue;
-        }
-
         UpdateGame();
         if (!WindowIsOpen())
         {
             break; // Controls closed window.
         }
 
+        if (!WindowIsActive())
+        {
+            Sleep(1);
+            continue;
+        }
+
+        // NextFrame() will only return VK_SUCCESS, VK_SUBOPTIMAL_KHR or VK_ERROR_OUT_OF_DATE_KHR.
         VkResult next_frame_result = NextFrame();
         if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
         {

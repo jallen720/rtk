@@ -170,6 +170,11 @@ static void UpdateGame()
 
     UpdateMouse(&game.mouse);
     ViewControls();
+
+    CTK_ITERATE_PTR(transform, game.entity_data.transforms, game.entity_data.count)
+    {
+        transform->rotation.y += 0.1f;
+    }
 }
 
 }

@@ -16,7 +16,6 @@ namespace RTK
 struct BufferInfo
 {
     VkDeviceSize          size;
-    VkSharingMode         sharing_mode;
     VkBufferUsageFlags    usage_flags;
     VkMemoryPropertyFlags mem_property_flags;
 };
@@ -43,7 +42,7 @@ static void InitBuffer(Buffer* buffer, BufferInfo* info)
         .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .size                  = info->size,
         .usage                 = info->usage_flags,
-        .sharingMode           = info->sharing_mode,
+        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
         .queueFamilyIndexCount = 0,
         .pQueueFamilyIndices   = NULL, // Ignored if sharingMode is not VK_SHARING_MODE_CONCURRENT.
     };

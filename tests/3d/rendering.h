@@ -125,7 +125,6 @@ static void InitBuffers()
     BufferInfo host_buffer_info =
     {
         .size               = Megabyte32<64>(),
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                               VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
@@ -138,7 +137,6 @@ static void InitBuffers()
     BufferInfo device_buffer_info =
     {
         .size               = Megabyte32<64>(),
-        .sharing_mode       = VK_SHARING_MODE_EXCLUSIVE,
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
                               VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                               VK_BUFFER_USAGE_INDEX_BUFFER_BIT |

@@ -70,6 +70,9 @@ static void InitImage(Image* image, ImageInfo* info)
     // Allocate/bind image memory.
     VkMemoryRequirements mem_requirements = {};
     vkGetImageMemoryRequirements(device, image->hnd, &mem_requirements);
+PrintLine();
+PrintLine("image memory reqs:");
+PrintMemoryRequirements(&mem_requirements, info->mem_property_flags, 1);
 
     image->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags);
     res = vkBindImageMemory(device, image->hnd, image->mem, 0);

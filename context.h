@@ -671,6 +671,7 @@ static void InitContext(Stack* perm_stack, Stack temp_stack, FreeList* free_list
     // Load capable physical devices and select the first one.
     LoadCapablePhysicalDevices(perm_stack, temp_stack, &info->required_features);
     UsePhysicalDevice(0);
+ListMemoryTypes(global_ctx.physical_device);
 
     // Initialize device state.
     InitDevice(&info->required_features);

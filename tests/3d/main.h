@@ -40,8 +40,6 @@ static void Run()
     };
     OpenWindow(&window_info);
 
-    ThreadPool* thread_pool = CreateThreadPool(perm_stack, 8);
-
     // Init RTK Context + Resources
     ContextInfo context_info = {};
     context_info.instance_info.application_name       = "RTK 3D Test",
@@ -97,6 +95,7 @@ static void Run()
     InitResources(perm_stack, &resources_info);
 
     // Initialize other test state.
+    ThreadPool* thread_pool = CreateThreadPool(perm_stack, 8);
     InitGame();
     InitRenderState(perm_stack, *temp_stack, free_list, thread_pool);
 

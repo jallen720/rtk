@@ -53,13 +53,32 @@ static bool HasRequiredFeatures(PhysicalDevice* physical_device, DeviceFeatures*
 
 /// Debugging
 ////////////////////////////////////////////////////////////
-static void LogPhysicalDevice(PhysicalDevice* physical_device, const char* message)
+static void ListMemoryTypes(PhysicalDevice* physical_device, uint32 tabs = 0)
+{
+    VkPhysicalDeviceMemoryProperties* mem_properties = &physical_device->mem_properties;
+    CTK_ITERATE_PTR(type, mem_properties->memoryTypes, mem_properties->memoryTypeCount)
+    {
+        PrintLine();
+
+        PrintTabs(tabs);
+        PrintLine("VkMemoryType (%p):", type);
+
+        PrintTabs(tabs);
+        PrintLine("    heapIndex: %u", type->heapIndex);
+
+        PrintTabs(tabs);
+        PrintLine("    propertyFlags:");
+
+        PrintMemoryProperties(type->propertyFlags, tabs + 2);
+    }
+}
+
+static void LogPhysicalDevice(PhysicalDevice* physical_device)
 {
     VkPhysicalDeviceType type = physical_device->properties.deviceType;
     VkFormat depth_image_format = physical_device->depth_image_format;
 
-    PrintLine("%s:", message);
-    PrintLine("    name: %s", physical_device->properties.deviceName);
+    PrintLine("%s:", physical_device->properties.deviceName);
     PrintLine("    type: %s",
         type == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU   ? "VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU" :
         type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? "VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU" :
@@ -74,19 +93,8 @@ static void LogPhysicalDevice(PhysicalDevice* physical_device, const char* messa
         depth_image_format == VK_FORMAT_D16_UNORM_S8_UINT  ? "VK_FORMAT_D16_UNORM_S8_UINT"  :
         depth_image_format == VK_FORMAT_D16_UNORM          ? "VK_FORMAT_D16_UNORM"          :
         "UNKNWON");
-}
-
-static void ListMemoryTypes(PhysicalDevice* physical_device)
-{
-    VkPhysicalDeviceMemoryProperties* mem_properties = &physical_device->mem_properties;
-    CTK_ITERATE_PTR(type, mem_properties->memoryTypes, mem_properties->memoryTypeCount)
-    {
-        PrintLine();
-        PrintLine("VkMemoryType (%p):", type);
-        PrintLine("    heapIndex: %u", type->heapIndex);
-        PrintLine("    propertyFlags:");
-        PrintMemoryProperties(type->propertyFlags, 2);
-    }
+    PrintLine("    memory types:");
+    ListMemoryTypes(physical_device, 2);
 }
 
 }

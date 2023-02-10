@@ -468,9 +468,9 @@ static void SetupSwapchain(Stack temp_stack, FreeList* free_list)
             {
                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel   = 0,
-                .levelCount     = 1,
+                .levelCount     = VK_REMAINING_MIP_LEVELS,
                 .baseArrayLayer = 0,
-                .layerCount     = 1,
+                .layerCount     = VK_REMAINING_ARRAY_LAYERS,
             },
         };
         res = vkCreateImageView(device, &view_info, NULL, GetPtr(&swapchain->image_views, i));

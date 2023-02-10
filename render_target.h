@@ -127,7 +127,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
                 },
                 .subresourceRange =
                 {
-                    .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT,
+                    .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
                     .baseMipLevel   = 0,
                     .levelCount     = 1,
                     .baseArrayLayer = 0,

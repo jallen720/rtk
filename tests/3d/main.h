@@ -6,7 +6,7 @@
 #include "ctk3/profile.h"
 #include "ctk3/window.h"
 
-// #define RTK_ENABLE_VALIDATION
+#define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"

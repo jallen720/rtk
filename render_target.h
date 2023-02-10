@@ -129,9 +129,9 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
                 {
                     .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
                     .baseMipLevel   = 0,
-                    .levelCount     = 1,
+                    .levelCount     = VK_REMAINING_MIP_LEVELS,
                     .baseArrayLayer = 0,
-                    .layerCount     = 1,
+                    .layerCount     = VK_REMAINING_ARRAY_LAYERS,
                 },
             },
             .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,

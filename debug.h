@@ -264,6 +264,20 @@ static const char* VkPresentModeName(VkPresentModeKHR present_mode)
     return name;
 }
 
+static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint32 tabs = 0)
+{
+    PrintTabs(tabs);
+    PrintLine("size:           %u", mem_requirements->size);
+
+    PrintTabs(tabs);
+    PrintLine("align:          %u", mem_requirements->alignment);
+
+    PrintTabs(tabs);
+    Print("memoryTypeBits: ");
+    PrintBits(mem_requirements->memoryTypeBits);
+    PrintLine();
+}
+
 static void PrintMemoryProperties(uint32 mem_property_flags, uint32 tabs = 0)
 {
     RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
@@ -277,22 +291,16 @@ static void PrintMemoryProperties(uint32 mem_property_flags, uint32 tabs = 0)
     RTK_CHECK_PRINT_MEMORY_PROPERTY(VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV);
 }
 
-static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint32 mem_property_flags, uint32 tabs = 0)
+static void PrintResourceMemoryInfo(const char* type, VkMemoryRequirements* mem_requirements, uint32 mem_property_flags)
 {
-    PrintTabs(tabs);
-    PrintLine("size:           %u", mem_requirements->size);
-
-    PrintTabs(tabs);
-    PrintLine("align:          %u", mem_requirements->alignment);
-
-    PrintTabs(tabs);
-    Print("memoryTypeBits: ");
-    PrintBits(mem_requirements->memoryTypeBits);
     PrintLine();
-
-    PrintTabs(tabs);
-    PrintLine("memory properties:");
-    PrintMemoryProperties(mem_property_flags, tabs + 1);
+    PrintLine("%s memory:", type);
+    PrintTabs(1);
+    PrintLine("requirements:");
+    PrintMemoryRequirements(mem_requirements, 2);
+    PrintTabs(1);
+    PrintLine("properties:");
+    PrintMemoryProperties(mem_property_flags, 2);
 }
 
 }

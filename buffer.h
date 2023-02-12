@@ -52,9 +52,7 @@ static void InitBuffer(Buffer* buffer, BufferInfo* info)
     // Allocate/bind buffer memory.
     VkMemoryRequirements mem_requirements = {};
     vkGetBufferMemoryRequirements(device, buffer->hnd, &mem_requirements);
-PrintLine();
-PrintLine("buffer memory reqs:");
-PrintMemoryRequirements(&mem_requirements, info->mem_property_flags, 1);
+PrintResourceMemoryInfo("buffer", &mem_requirements, info->mem_property_flags);
 
     buffer->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags, NULL);
     res = vkBindBufferMemory(device, buffer->hnd, buffer->mem, 0);

@@ -69,7 +69,7 @@ static void ListMemoryTypes(PhysicalDevice* physical_device, uint32 tabs = 0)
         PrintTabs(tabs);
         PrintLine("    propertyFlags:");
 
-        PrintMemoryProperties(type->propertyFlags, tabs + 2);
+        PrintMemoryProperties(type->propertyFlags, tabs + 1);
     }
 }
 

@@ -219,6 +219,36 @@ static void Validate(VkResult result, const char* fail_message, Args... args)
     }
 }
 
+// ERROR: Validation Error: [ VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251 ] Object 0: handle = 0x1ff8a05d010, type = VK_OBJECT_TYPE_DEVICE; | MessageID = 0xbebcae79 | vkCreateImage(): Format VK_FORMAT_R8G8B8A8_UNORM is not supported for this combination of parameters and VkGetPhysicalDeviceImageFormatProperties returned back VK_ERROR_FORMAT_NOT_SUPPORTED. The Vulkan spec states: Each of the following values (as described in Image Creation Limits) must not be undefined : imageCreateMaxMipLevels, imageCreateMaxArrayLayers, imageCreateMaxExtent, and imageCreateSampleCounts (https://vulkan.lunarg.com/doc/view/1.3.211.0/windows/1.3-extensions/vkspec.html#VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251)
+
+/*
+ERROR: Validation Error: [ VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251 ]
+       Object 0: handle = 0x1ff8a05d010, type = VK_OBJECT_TYPE_DEVICE;
+       MessageID = 0xbebcae79
+       Message:
+           vkCreateImage(): Format VK_FORMAT_R8G8B8A8_UNORM is not supported for this combination of parameters and
+           VkGetPhysicalDeviceImageFormatProperties returned back VK_ERROR_FORMAT_NOT_SUPPORTED. The Vulkan spec states:
+           Each of the following values (as described in Image Creation Limits) must not be undefined :
+           imageCreateMaxMipLevels, imageCreateMaxArrayLayers, imageCreateMaxExtent, and imageCreateSampleCounts
+           (https://vulkan.lunarg.com/doc/view/1.3.211.0/windows/1.3-extensions/vkspec.html#VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251)
+*/
+
+static uint32 PrintToChar(const char* msg, uint32 msg_size, char end_char, uint32 index)
+{
+    uint32 start = index;
+    while (index < msg_size)
+    {
+        char curr_char = msg[index];
+        if (curr_char == end_char)
+        {
+            break;
+        }
+        ++index;
+    }
+    Print("%.*s", index - start, msg + start);
+    return index;
+}
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL
 DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_flag_bit,
                      VkDebugUtilsMessageTypeFlagsEXT message_type_flags,
@@ -226,18 +256,36 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
 {
     CTK_UNUSED(message_type_flags)
     CTK_UNUSED(user_data)
-    const char* message_id = callback_data->pMessageIdName ? callback_data->pMessageIdName : "";
+
+    uint32 msg_size = StringSize(callback_data->pMessage);
+    uint32 index = 0;
     if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT & message_severity_flag_bit)
     {
-        CTK_FATAL("%s\n", callback_data->pMessage);
+        Print(CTK_ERROR_TAG);
+
+        index = PrintToChar(callback_data->pMessage, msg_size, ']', index);
+        index += 2;
+        Print("]" CTK_ERROR_NL);
+
+        index = PrintToChar(callback_data->pMessage, msg_size, '|', index);
+        index += 2;
+        Print(CTK_ERROR_NL);
+
+        index = PrintToChar(callback_data->pMessage, msg_size, '|', index);
+        index += 2;
+        Print(CTK_ERROR_NL);
+
+        PrintLine("Message:");
+        PrintLine("%.*s", msg_size - index, callback_data->pMessage + index);
+        throw 0;
     }
     else if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT & message_severity_flag_bit)
     {
-        PrintWarning("%s\n", callback_data->pMessage);
+        PrintWarning(callback_data->pMessage);
     }
     else
     {
-        PrintInfo("%s\n", callback_data->pMessage);
+        PrintInfo(callback_data->pMessage);
     }
 
     return VK_FALSE;

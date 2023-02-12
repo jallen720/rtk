@@ -63,13 +63,13 @@ static void ListMemoryTypes(PhysicalDevice* physical_device, uint32 tabs = 0)
         PrintTabs(tabs);
         PrintLine("VkMemoryType (%p):", type);
 
-        PrintTabs(tabs);
-        PrintLine("    heapIndex: %u", type->heapIndex);
+        PrintTabs(tabs + 1);
+        PrintLine("heapIndex: %u", type->heapIndex);
 
-        PrintTabs(tabs);
-        PrintLine("    propertyFlags:");
+        PrintTabs(tabs + 1);
+        PrintLine("propertyFlags:");
 
-        PrintMemoryProperties(type->propertyFlags, tabs + 1);
+        PrintMemoryProperties(type->propertyFlags, tabs + 2);
     }
 }
 
@@ -93,8 +93,9 @@ static void LogPhysicalDevice(PhysicalDevice* physical_device)
         depth_image_format == VK_FORMAT_D16_UNORM_S8_UINT  ? "VK_FORMAT_D16_UNORM_S8_UINT"  :
         depth_image_format == VK_FORMAT_D16_UNORM          ? "VK_FORMAT_D16_UNORM"          :
         "UNKNWON");
-    PrintLine("    memory types:");
+    Print("    memory types:");
     ListMemoryTypes(physical_device, 2);
+    PrintLine();
 }
 
 }

@@ -766,7 +766,8 @@ static void WaitIdle()
 }
 
 static VkDeviceMemory
-AllocateDeviceMemory(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags mem_property_flags)
+AllocateDeviceMemory(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlags mem_property_flags,
+                     VkAllocationCallbacks* allocators)
 {
     // Reference: https://registry.khronos.org/vulkan/specs/1.3/html/vkspec.html#memory-device
     VkPhysicalDeviceMemoryProperties* mem_properties = &global_ctx.physical_device->mem_properties;
@@ -802,7 +803,7 @@ AllocateDeviceMemory(VkMemoryRequirements mem_requirements, VkMemoryPropertyFlag
         .memoryTypeIndex = mem_type_index,
     };
     VkDeviceMemory mem = VK_NULL_HANDLE;
-    VkResult res = vkAllocateMemory(global_ctx.device, &info, NULL, &mem);
+    VkResult res = vkAllocateMemory(global_ctx.device, &info, allocators, &mem);
     Validate(res, "vkAllocateMemory() failed");
 
     return mem;

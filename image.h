@@ -74,7 +74,7 @@ PrintLine();
 PrintLine("image memory reqs:");
 PrintMemoryRequirements(&mem_requirements, info->mem_property_flags, 1);
 
-    image->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags);
+    image->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags, NULL);
     res = vkBindImageMemory(device, image->hnd, image->mem, 0);
     Validate(res, "vkBindImageMemory() failed");
 

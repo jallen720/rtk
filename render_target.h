@@ -119,13 +119,14 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
         VkMemoryRequirements mem_requirements = {};
         vkGetImageMemoryRequirements(device, render_target->depth_image, &mem_requirements);
 
-        render_target->depth_image_mem = AllocateDeviceMemory(mem_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        render_target->depth_image_mem = AllocateDeviceMemory(mem_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                                                              NULL);
         res = vkBindImageMemory(device, render_target->depth_image, render_target->depth_image_mem, 0);
         Validate(res, "vkBindImageMemory() failed");
 
         // Create image views for each array layer.
         InitArray(&render_target->depth_image_views, free_list, swapchain->image_count);
-        for (uint32 i = 0; i < swapchain->image_count; ++i)
+        for (uint32 array_layer_index = 0; array_layer_index < swapchain->image_count; ++array_layer_index)
         {
             VkImageViewCreateInfo image_view_info =
             {
@@ -149,7 +150,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
 
                     .baseMipLevel   = 0,
                     .levelCount     = VK_REMAINING_MIP_LEVELS,
-                    .baseArrayLayer = i,
+                    .baseArrayLayer = array_layer_index,
                     .layerCount     = 1,
                 },
             };

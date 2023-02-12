@@ -56,7 +56,7 @@ PrintLine();
 PrintLine("buffer memory reqs:");
 PrintMemoryRequirements(&mem_requirements, info->mem_property_flags, 1);
 
-    buffer->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags);
+    buffer->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags, NULL);
     res = vkBindBufferMemory(device, buffer->hnd, buffer->mem, 0);
     Validate(res, "vkBindBufferMemory() failed");
 

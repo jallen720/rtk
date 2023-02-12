@@ -79,6 +79,7 @@ static void Run()
 
     context_info.render_thread_count = RENDER_THREAD_COUNT,
     InitContext(perm_stack, *temp_stack, free_list, &context_info);
+// LogPhysicalDevice(global_ctx.physical_device);
 
     ResourcesInfo resources_info =
     {

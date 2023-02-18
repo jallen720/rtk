@@ -34,6 +34,31 @@ struct VkResultInfo
     const char* message;
 };
 
+/// Utils
+////////////////////////////////////////////////////////////
+static uint32 PrintToChar(const char* msg, uint32 msg_size, char end_char, uint32 index, const char* color = NULL)
+{
+    uint32 start = index;
+    while (index < msg_size)
+    {
+        char curr_char = msg[index];
+        if (curr_char == end_char)
+        {
+            break;
+        }
+        ++index;
+    }
+    if (color != NULL)
+    {
+        Print("%s%.*s" CTK_ANSI_RESET, color, index - start, msg + start);
+    }
+    else
+    {
+        Print("%.*s" CTK_ANSI_RESET, index - start, msg + start);
+    }
+    return index;
+}
+
 /// Interface
 ////////////////////////////////////////////////////////////
 static void PrintResult(VkResult result)
@@ -219,36 +244,6 @@ static void Validate(VkResult result, const char* fail_message, Args... args)
     }
 }
 
-// ERROR: Validation Error: [ VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251 ] Object 0: handle = 0x1ff8a05d010, type = VK_OBJECT_TYPE_DEVICE; | MessageID = 0xbebcae79 | vkCreateImage(): Format VK_FORMAT_R8G8B8A8_UNORM is not supported for this combination of parameters and VkGetPhysicalDeviceImageFormatProperties returned back VK_ERROR_FORMAT_NOT_SUPPORTED. The Vulkan spec states: Each of the following values (as described in Image Creation Limits) must not be undefined : imageCreateMaxMipLevels, imageCreateMaxArrayLayers, imageCreateMaxExtent, and imageCreateSampleCounts (https://vulkan.lunarg.com/doc/view/1.3.211.0/windows/1.3-extensions/vkspec.html#VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251)
-
-/*
-ERROR: Validation Error: [ VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251 ]
-       Object 0: handle = 0x1ff8a05d010, type = VK_OBJECT_TYPE_DEVICE;
-       MessageID = 0xbebcae79
-       Message:
-           vkCreateImage(): Format VK_FORMAT_R8G8B8A8_UNORM is not supported for this combination of parameters and
-           VkGetPhysicalDeviceImageFormatProperties returned back VK_ERROR_FORMAT_NOT_SUPPORTED. The Vulkan spec states:
-           Each of the following values (as described in Image Creation Limits) must not be undefined :
-           imageCreateMaxMipLevels, imageCreateMaxArrayLayers, imageCreateMaxExtent, and imageCreateSampleCounts
-           (https://vulkan.lunarg.com/doc/view/1.3.211.0/windows/1.3-extensions/vkspec.html#VUID-VkImageCreateInfo-imageCreateMaxMipLevels-02251)
-*/
-
-static uint32 PrintToChar(const char* msg, uint32 msg_size, char end_char, uint32 index)
-{
-    uint32 start = index;
-    while (index < msg_size)
-    {
-        char curr_char = msg[index];
-        if (curr_char == end_char)
-        {
-            break;
-        }
-        ++index;
-    }
-    Print("%.*s", index - start, msg + start);
-    return index;
-}
-
 static VKAPI_ATTR VkBool32 VKAPI_CALL
 DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_flag_bit,
                      VkDebugUtilsMessageTypeFlagsEXT message_type_flags,
@@ -261,23 +256,72 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
     uint32 index = 0;
     if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT & message_severity_flag_bit)
     {
+        // Print formatted error message properties.
         Print(CTK_ERROR_TAG);
 
+        index = PrintToChar(callback_data->pMessage, msg_size, ':', index, CTK_ANSI_COLOR_SKY);
         index = PrintToChar(callback_data->pMessage, msg_size, ']', index);
         index += 2;
         Print("]" CTK_ERROR_NL);
 
+        index = PrintToChar(callback_data->pMessage, msg_size, ':', index, CTK_ANSI_COLOR_SKY);
         index = PrintToChar(callback_data->pMessage, msg_size, '|', index);
         index += 2;
         Print(CTK_ERROR_NL);
 
+        index = PrintToChar(callback_data->pMessage, msg_size, ' ', index, CTK_ANSI_COLOR_SKY);
+        Print(':');
+        index += 2;
         index = PrintToChar(callback_data->pMessage, msg_size, '|', index);
         index += 2;
         Print(CTK_ERROR_NL);
 
-        PrintLine("Message:");
-        PrintLine("%.*s", msg_size - index, callback_data->pMessage + index);
-        throw 0;
+        // Print formatted error message text, word-wrapped to console width.
+        static constexpr const char* MESSAGE_TAG = CTK_ANSI_HIGHLIGHT(SKY, "Message") ": ";
+        static constexpr uint32 ERROR_TAG_SIZE   = 7;
+        static constexpr uint32 MESSAGE_TAG_SIZE = 9;
+        Print(MESSAGE_TAG);
+
+        uint32 max_width = (uint32)GetConsoleScreenBufferWidth();
+        uint32 first_line_start = ERROR_TAG_SIZE + MESSAGE_TAG_SIZE; // First line starts after message tag.
+        CTK_ASSERT(max_width > first_line_start); // Must be room for atleast 1 character on first line.
+
+        uint32 line_start = first_line_start;
+        while (index < msg_size)
+        {
+            uint32 line_size = 0;
+            uint32 print_size = 0;
+            for (;;)
+            {
+                if (callback_data->pMessage[index + line_size] == ' ')
+                {
+                    ++line_size;
+                    print_size = line_size;
+                }
+
+                ++line_size;
+                if (index + line_size >= msg_size)
+                {
+                    // Print remaing characters in message.
+                    print_size = msg_size - index;
+                    break;
+                }
+
+                if (line_start + line_size >= max_width)
+                {
+                    if (print_size == 0)
+                    {
+                        print_size = max_width - line_start;
+                    }
+                    break;
+                }
+            }
+            Print("%.*s", print_size, callback_data->pMessage + index);
+            Print(CTK_ERROR_NL);
+            index += print_size;
+            line_start = ERROR_TAG_SIZE; // Subsequent lines start after error tag.
+        }
+        PrintLine();
     }
     else if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT & message_severity_flag_bit)
     {

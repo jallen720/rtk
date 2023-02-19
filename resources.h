@@ -12,7 +12,6 @@ namespace RTK
 /// Resource Definitions
 ////////////////////////////////////////////////////////////
 struct Buffer;
-struct Image;
 struct ShaderData;
 struct ShaderDataSet;
 struct Shader;
@@ -22,7 +21,6 @@ struct RenderTarget;
 struct Pipeline;
 
 using BufferHnd        = PoolHnd<Buffer>;
-using ImageHnd         = PoolHnd<Image>;
 using ShaderDataHnd    = PoolHnd<ShaderData>;
 using ShaderDataSetHnd = PoolHnd<ShaderDataSet>;
 using ShaderHnd        = PoolHnd<Shader>;
@@ -36,7 +34,6 @@ using PipelineHnd      = PoolHnd<Pipeline>;
 struct ResourcesInfo
 {
     uint32 max_buffers;
-    uint32 max_images;
     uint32 max_shader_datas;
     uint32 max_shader_data_sets;
     uint32 max_shaders;
@@ -49,7 +46,6 @@ struct ResourcesInfo
 struct Resources
 {
     Pool<Buffer>        buffers;
-    Pool<Image>         images;
     Pool<ShaderData>    shader_datas;
     Pool<ShaderDataSet> shader_data_sets;
     Pool<Shader>        shaders;
@@ -68,7 +64,6 @@ static Resources global_resources;
 static void InitResources(Stack* perm_stack, ResourcesInfo* info)
 {
     InitPool(&global_resources.buffers,          perm_stack, info->max_buffers);
-    InitPool(&global_resources.images,           perm_stack, info->max_images);
     InitPool(&global_resources.shader_datas,     perm_stack, info->max_shader_datas);
     InitPool(&global_resources.shader_data_sets, perm_stack, info->max_shader_data_sets);
     InitPool(&global_resources.shaders,          perm_stack, info->max_shaders);
@@ -83,11 +78,6 @@ static void InitResources(Stack* perm_stack, ResourcesInfo* info)
 static BufferHnd AllocateBuffer()
 {
     return Allocate(&global_resources.buffers);
-}
-
-static ImageHnd AllocateImage()
-{
-    return Allocate(&global_resources.images);
 }
 
 static ShaderDataHnd AllocateShaderData()
@@ -132,11 +122,6 @@ static void DeallocateBuffer(BufferHnd buffer_hnd)
     Deallocate(&global_resources.buffers, buffer_hnd);
 }
 
-static void DeallocateImage(ImageHnd image_hnd)
-{
-    Deallocate(&global_resources.images, image_hnd);
-}
-
 static void DeallocateShaderData(ShaderDataHnd shader_data_hnd)
 {
     Deallocate(&global_resources.shader_datas, shader_data_hnd);
@@ -177,11 +162,6 @@ static void DeallocatePipeline(PipelineHnd pipeline_hnd)
 static Buffer* GetBuffer(BufferHnd hnd)
 {
     return GetData(&global_resources.buffers, hnd);
-}
-
-static Image* GetImage(ImageHnd hnd)
-{
-    return GetData(&global_resources.images, hnd);
 }
 
 static ShaderData* GetShaderData(ShaderDataHnd hnd)

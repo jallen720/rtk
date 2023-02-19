@@ -69,6 +69,11 @@ struct RenderState
     buffer;
     struct
     {
+        ImageMemoryHnd texture;
+    }
+    image_memory;
+    struct
+    {
         RenderTargetHnd main;
     }
     render_target;
@@ -148,6 +153,45 @@ static void InitBuffers()
     render_state.buffer.staging = CreateBuffer(render_state.buffer.host, Megabyte32<4>());
 }
 
+static void InitImageMemory(Stack* perm_stack)
+{
+    InitImageMemoryPool(perm_stack, 4);
+
+    // texture
+    {
+        ImageMemoryInfo info =
+        {
+            .image_info =
+            {
+                .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .pNext     = NULL,
+                .flags     = 0,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format    = GetSwapchain()->image_format,
+                .extent =
+                {
+                    .width  = 64,
+                    .height = 32,
+                    .depth  = 1
+                },
+                .mipLevels             = 1,
+                .arrayLayers           = 1,
+                .samples               = VK_SAMPLE_COUNT_1_BIT,
+                .tiling                = VK_IMAGE_TILING_OPTIMAL,
+                .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                         VK_IMAGE_USAGE_SAMPLED_BIT,
+                .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 0,
+                .pQueueFamilyIndices   = NULL,
+                .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+            },
+            .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            .max_image_count    = 4,
+        };
+        render_state.image_memory.texture = CreateImageMemory(&info, NULL);
+    }
+}
+
 static void InitRenderTargets(Stack temp_stack, FreeList* free_list)
 {
     VkClearValue attachment_clear_values[] =
@@ -202,7 +246,7 @@ static void InitSampler()
     render_state.sampler = CreateSampler(&info);
 }
 
-static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, ImageData* image_data)
+static ShaderDataInfo DefaultTextureInfo(VkSampler sampler)
 {
     return
     {
@@ -211,72 +255,44 @@ static ShaderDataInfo DefaultTextureInfo(VkFormat format, VkSampler sampler, Ima
         .per_frame = false,
         .image =
         {
-            .info =
-            {
-                .image =
-                {
-                    .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                    .pNext     = NULL,
-                    .flags     = 0,
-                    .imageType = VK_IMAGE_TYPE_2D,
-                    .format    = format,
-                    .extent =
-                    {
-                        .width  = (uint32)image_data->width,
-                        .height = (uint32)image_data->height,
-                        .depth  = 1
-                    },
-                    .mipLevels             = 1,
-                    .arrayLayers           = 1,
-                    .samples               = VK_SAMPLE_COUNT_1_BIT,
-                    .tiling                = VK_IMAGE_TILING_OPTIMAL,
-                    .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                             VK_IMAGE_USAGE_SAMPLED_BIT,
-                    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-                    .queueFamilyIndexCount = 0,
-                    .pQueueFamilyIndices   = NULL,
-                    .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-                },
-                .view =
-                {
-                    .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                    .pNext    = NULL,
-                    .flags    = 0,
-                    .image    = VK_NULL_HANDLE,
-                    .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                    .format   = format,
-                    .components =
-                    {
-                        .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                        .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                        .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                        .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    },
-                    .subresourceRange =
-                    {
-                        .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                        .baseMipLevel   = 0,
-                        .levelCount     = VK_REMAINING_MIP_LEVELS,
-                        .baseArrayLayer = 0,
-                        .layerCount     = VK_REMAINING_ARRAY_LAYERS,
-                    },
-                },
-                .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            },
+            .memory  = render_state.image_memory.texture,
             .sampler = sampler,
+            .view =
+            {
+                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .pNext    = NULL,
+                .flags    = 0,
+                .image    = VK_NULL_HANDLE,
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format   = GetSwapchain()->image_format,
+                .components =
+                {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = VK_REMAINING_MIP_LEVELS,
+                    .baseArrayLayer = 0,
+                    .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+                },
+            },
         },
     };
 }
 
 static ShaderDataHnd CreateTexture(Stack* perm_stack, const char* image_path)
 {
-    ImageData image_data = {};
-    LoadImageData(&image_data, image_path);
-
-    ShaderDataInfo info = DefaultTextureInfo(GetSwapchain()->image_format, render_state.sampler, &image_data);
+    ShaderDataInfo info = DefaultTextureInfo(render_state.sampler);
     ShaderDataHnd shader_data_hnd = CreateShaderData(perm_stack, &info);
 
-    // Copy image data into staging buffer.
+    // Copy image data into staging buffer, write to shader data images, then destroy image data.
+    ImageData image_data = {};
+    LoadImageData(&image_data, image_path);
     Clear(render_state.buffer.staging);
     Write(render_state.buffer.staging, image_data.data, image_data.size);
     uint32 image_count = GetImageCount(shader_data_hnd);
@@ -284,7 +300,6 @@ static ShaderDataHnd CreateTexture(Stack* perm_stack, const char* image_path)
     {
         WriteToShaderDataImage(shader_data_hnd, i, render_state.buffer.staging);
     }
-
     DestroyImageData(&image_data);
 
     return shader_data_hnd;
@@ -299,7 +314,7 @@ static void InitShaderDatas(Stack* perm_stack)
             .stages    = VK_SHADER_STAGE_VERTEX_BIT,
             .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .per_frame = true,
-            .buffer =
+            .buffer=
             {
                 .parent_hnd = render_state.buffer.host,
                 .size       = sizeof(VSBuffer),
@@ -525,6 +540,7 @@ static void UpdateAllRenderTargets(Stack temp_stack, FreeList* free_list)
 static void InitRenderState(Stack* perm_stack, Stack temp_stack, FreeList* free_list, ThreadPool* thread_pool)
 {
     InitBuffers();
+    InitImageMemory(perm_stack);
     InitRenderTargets(temp_stack, free_list);
     InitVertexLayout(perm_stack);
     InitSampler();

@@ -141,25 +141,25 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="buffer.h" />
+    <ClInclude Include="context.h" />
     <ClInclude Include="debug.h" />
     <ClInclude Include="device.h" />
-    <ClInclude Include="get_vk_array.h" />
-    <ClInclude Include="image_data.h" />
-    <ClInclude Include="mesh_data.h" />
+    <ClInclude Include="frame_metrics.h" />
+    <ClInclude Include="image.h" />
+    <ClInclude Include="mesh.h" />
     <ClInclude Include="pipeline.h" />
     <ClInclude Include="pipeline_defaults.h" />
     <ClInclude Include="rendering.h" />
     <ClInclude Include="render_target.h" />
+    <ClInclude Include="resources.h" />
     <ClInclude Include="rtk.h" />
-    <ClInclude Include="rtk_context.h" />
-    <ClInclude Include="rtk_pool.h" />
-    <ClInclude Include="rtk_resources.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="shader_data.h" />
     <ClInclude Include="tests\3d\defs.h" />
-    <ClInclude Include="tests\3d\game.h" />
+    <ClInclude Include="tests\3d\game_state.h" />
     <ClInclude Include="tests\3d\main.h" />
-    <ClInclude Include="tests\3d\rendering.h" />
+    <ClInclude Include="tests\3d\render_state.h" />
     <ClInclude Include="tests\shared.h" />
     <ClInclude Include="vk_array.h" />
     <ClInclude Include="vulkan.h" />

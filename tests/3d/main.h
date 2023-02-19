@@ -84,7 +84,6 @@ LogPhysicalDevice(global_ctx.physical_device);
     ResourcesInfo resources_info =
     {
         .max_buffers          = 16,
-        .max_images           = 8,
         .max_shader_datas     = 8,
         .max_shader_data_sets = 8,
         .max_shaders          = 2,

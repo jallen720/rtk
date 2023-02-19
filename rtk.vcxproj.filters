@@ -21,28 +21,34 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="get_vk_array.h">
+    <ClInclude Include="tests\shared.h">
+      <Filter>Source Files\tests</Filter>
+    </ClInclude>
+    <ClInclude Include="buffer.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="rtk.h">
+    <ClInclude Include="context.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="vulkan.h">
+    <ClInclude Include="debug.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="device.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="frame_metrics.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="image.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
     <ClInclude Include="pipeline.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="rtk_context.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="tests\shared.h">
-      <Filter>Source Files\tests</Filter>
-    </ClInclude>
-    <ClInclude Include="debug.h">
+    <ClInclude Include="pipeline_defaults.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="render_target.h">
@@ -51,40 +57,34 @@
     <ClInclude Include="rendering.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="shader_data.h">
+    <ClInclude Include="resources.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="pipeline_defaults.h">
+    <ClInclude Include="rtk.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="shader.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="shader_data.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
     <ClInclude Include="vk_array.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="image_data.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="rtk_pool.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="mesh_data.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="rtk_resources.h">
+    <ClInclude Include="vulkan.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="tests\3d\defs.h">
       <Filter>Source Files\tests\3d</Filter>
     </ClInclude>
+    <ClInclude Include="tests\3d\game_state.h">
+      <Filter>Source Files\tests\3d</Filter>
+    </ClInclude>
     <ClInclude Include="tests\3d\main.h">
       <Filter>Source Files\tests\3d</Filter>
     </ClInclude>
-    <ClInclude Include="tests\3d\game.h">
-      <Filter>Source Files\tests\3d</Filter>
-    </ClInclude>
-    <ClInclude Include="tests\3d\rendering.h">
+    <ClInclude Include="tests\3d\render_state.h">
       <Filter>Source Files\tests\3d</Filter>
     </ClInclude>
   </ItemGroup>

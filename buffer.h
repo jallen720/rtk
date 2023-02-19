@@ -54,7 +54,7 @@ static void InitBuffer(Buffer* buffer, BufferInfo* info)
     vkGetBufferMemoryRequirements(device, buffer->hnd, &mem_requirements);
 PrintResourceMemoryInfo("buffer", &mem_requirements, info->mem_property_flags);
 
-    buffer->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags, NULL);
+    buffer->mem = AllocateDeviceMemory(&mem_requirements, info->mem_property_flags, NULL);
     res = vkBindBufferMemory(device, buffer->hnd, buffer->mem, 0);
     Validate(res, "vkBindBufferMemory() failed");
 

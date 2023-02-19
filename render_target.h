@@ -119,7 +119,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
         VkMemoryRequirements mem_requirements = {};
         vkGetImageMemoryRequirements(device, render_target->depth_image, &mem_requirements);
 
-        render_target->depth_image_mem = AllocateDeviceMemory(mem_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        render_target->depth_image_mem = AllocateDeviceMemory(&mem_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                                                               NULL);
         res = vkBindImageMemory(device, render_target->depth_image, render_target->depth_image_mem, 0);
         Validate(res, "vkBindImageMemory() failed");

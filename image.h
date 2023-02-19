@@ -72,7 +72,7 @@ static void InitImage(Image* image, ImageInfo* info)
     vkGetImageMemoryRequirements(device, image->hnd, &mem_requirements);
 PrintResourceMemoryInfo("image", &mem_requirements, info->mem_property_flags);
 
-    image->mem = AllocateDeviceMemory(mem_requirements, info->mem_property_flags, NULL);
+    image->mem = AllocateDeviceMemory(&mem_requirements, info->mem_property_flags, NULL);
     res = vkBindImageMemory(device, image->hnd, image->mem, 0);
     Validate(res, "vkBindImageMemory() failed");
 

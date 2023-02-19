@@ -322,6 +322,9 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
             line_start = ERROR_TAG_SIZE; // Subsequent lines start after error tag.
         }
         PrintLine();
+
+        // Kill process.
+        throw 0;
     }
     else if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT & message_severity_flag_bit)
     {

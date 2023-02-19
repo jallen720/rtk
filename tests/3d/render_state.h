@@ -9,7 +9,7 @@
 #include "ctk3/thread_pool.h"
 #include "rtk/rtk.h"
 #include "rtk/tests/3d/defs.h"
-#include "rtk/tests/3d/game.h"
+#include "rtk/tests/3d/game_state.h"
 
 using namespace CTK;
 using namespace RTK;
@@ -413,15 +413,15 @@ static void InitMeshes()
     {
         #include "rtk/meshes/cube.h"
         render_state.mesh.cube = CreateMesh(render_state.mesh.data,
-                                             CTK_WRAP_ARRAY(vertexes),
-                                             CTK_WRAP_ARRAY(indexes));
+                                            CTK_WRAP_ARRAY(vertexes),
+                                            CTK_WRAP_ARRAY(indexes));
     }
 
     {
         #include "rtk/meshes/quad_3d.h"
         render_state.mesh.quad = CreateMesh(render_state.mesh.data,
-                                             CTK_WRAP_ARRAY(vertexes),
-                                             CTK_WRAP_ARRAY(indexes));
+                                            CTK_WRAP_ARRAY(vertexes),
+                                            CTK_WRAP_ARRAY(indexes));
     }
 }
 
@@ -539,7 +539,7 @@ static void InitRenderState(Stack* perm_stack, Stack temp_stack, FreeList* free_
 static void UpdateMVPMatrixes(ThreadPool* thread_pool)
 {
     Job<MVPMatrixState>* job = &render_state.job.update_mvp_matrixes;
-    Matrix view_projection_matrix = GetViewProjectionMatrix(&game.view);
+    Matrix view_projection_matrix = GetViewProjectionMatrix(&game_state.view);
     auto frame_vs_buffer = GetBufferMem<VSBuffer>(render_state.data.vs_buffer);
     uint32 thread_count = thread_pool->size;
 
@@ -547,10 +547,10 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool)
     for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
     {
         MVPMatrixState* state = GetPtr(&job->states, thread_index);
-        state->batch_range            = GetBatchRange(thread_index, thread_count, game.entity_data.count);
+        state->batch_range            = GetBatchRange(thread_index, thread_count, game_state.entity_data.count);
         state->view_projection_matrix = view_projection_matrix;
         state->frame_vs_buffer        = frame_vs_buffer;
-        state->entity_data            = &game.entity_data;
+        state->entity_data            = &game_state.entity_data;
 
         Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, UpdateMVPMatrixesThread));
     }
@@ -590,7 +590,7 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
             state->thread_index = thread_index;
             state->texture      = textures[texture_index];
             state->mesh         = meshes[mesh_index];
-            state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, game.entity_data.count);
+            state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, game_state.entity_data.count);
 
             Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));
         }

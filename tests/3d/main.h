@@ -11,8 +11,8 @@
 
 #include "rtk/tests/shared.h"
 #include "rtk/tests/3d/defs.h"
-#include "rtk/tests/3d/game.h"
-#include "rtk/tests/3d/rendering.h"
+#include "rtk/tests/3d/game_state.h"
+#include "rtk/tests/3d/render_state.h"
 
 using namespace CTK;
 using namespace RTK;
@@ -79,7 +79,7 @@ static void Run()
 
     context_info.render_thread_count = RENDER_THREAD_COUNT,
     InitContext(perm_stack, *temp_stack, free_list, &context_info);
-// LogPhysicalDevice(global_ctx.physical_device);
+LogPhysicalDevice(global_ctx.physical_device);
 
     ResourcesInfo resources_info =
     {
@@ -97,7 +97,7 @@ static void Run()
 
     // Initialize other test state.
     ThreadPool* thread_pool = CreateThreadPool(perm_stack, 8);
-    InitGame();
+    InitGameState();
     InitRenderState(perm_stack, *temp_stack, free_list, thread_pool);
 
     // Run game.

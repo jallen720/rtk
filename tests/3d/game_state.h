@@ -38,7 +38,7 @@ struct EntityData
     uint32    count;
 };
 
-struct Game
+struct GameState
 {
     Mouse      mouse;
     View       view;
@@ -47,7 +47,7 @@ struct Game
 
 /// Instance
 ////////////////////////////////////////////////////////////
-static Game game;
+static GameState game_state;
 
 /// Utils
 ////////////////////////////////////////////////////////////
@@ -78,7 +78,7 @@ static void LocalTranslate(View* view, Vec3<float32> translation)
 
 static void ViewControls()
 {
-    View* view = &game.view;
+    View* view = &game_state.view;
 
     // Translation
     static constexpr float32 BASE_TRANSLATION_SPEED = 0.01f;
@@ -99,8 +99,8 @@ static void ViewControls()
     if (MouseButtonDown(1))
     {
         static constexpr float32 ROTATION_SPEED = 0.2f;
-        view->rotation.x -= game.mouse.delta.y * ROTATION_SPEED;
-        view->rotation.y -= game.mouse.delta.x * ROTATION_SPEED;
+        view->rotation.x -= game_state.mouse.delta.y * ROTATION_SPEED;
+        view->rotation.y -= game_state.mouse.delta.x * ROTATION_SPEED;
         view->rotation.x = Clamp(view->rotation.x, -view->max_x_angle, view->max_x_angle);
     }
 }
@@ -119,10 +119,10 @@ static uint32 PushEntity(EntityData* entity_data)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitGame()
+static void InitGameState()
 {
     // View
-    game.view =
+    game_state.view =
     {
         .position     = { 0, 0, -1 },
         .rotation     = { 0, 0, 0 },
@@ -140,8 +140,8 @@ static void InitGame()
     for (uint32 y = 0; y < CUBE_SIZE; ++y)
     for (uint32 z = 0; z < CUBE_SIZE; ++z)
     {
-        uint32 entity = PushEntity(&game.entity_data);
-        game.entity_data.transforms[entity] =
+        uint32 entity = PushEntity(&game_state.entity_data);
+        game_state.entity_data.transforms[entity] =
         {
             .position = { x * 1.5f, y * 1.5f, z * 1.5f },
             .rotation = { 0, 0, 0 },
@@ -168,10 +168,10 @@ static void UpdateGame()
         return;
     }
 
-    UpdateMouse(&game.mouse);
+    UpdateMouse(&game_state.mouse);
     ViewControls();
 
-    CTK_ITERATE_PTR(transform, game.entity_data.transforms, game.entity_data.count)
+    CTK_ITERATE_PTR(transform, game_state.entity_data.transforms, game_state.entity_data.count)
     {
         transform->rotation.y += 0.1f;
     }

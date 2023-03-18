@@ -111,7 +111,7 @@ LogPhysicalDevice(global_ctx.physical_device);
         UpdateGame();
         if (!WindowIsOpen())
         {
-            break; // Controls closed window.
+            break; // Game controls closed window.
         }
 
         if (!WindowIsActive())

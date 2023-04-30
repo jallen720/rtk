@@ -369,7 +369,7 @@ static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint
 
     PrintTabs(tabs);
     Print("memoryTypeBits: ");
-    PrintBits(mem_requirements->memoryTypeBits);
+    PrintBits((uint8*)&mem_requirements->memoryTypeBits, sizeof(mem_requirements->memoryTypeBits));
     PrintLine();
 }
 

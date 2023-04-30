@@ -24,7 +24,7 @@ static void Run()
 {
     Stack* perm_stack = CreateStack(Megabyte32<8>());
     Stack* temp_stack = CreateStack(perm_stack, Megabyte32<1>());
-    FreeList* free_list = CreateFreeList(perm_stack, Kilobyte32<4>());
+    FreeList* free_list = CreateFreeList(Kilobyte32<16>(), 16, 256);
 
     // Make win32 process DPI aware so windows scale properly.
     SetProcessDPIAware();

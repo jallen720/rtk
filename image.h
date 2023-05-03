@@ -58,7 +58,7 @@ static Pool<ImageMemory> global_image_memory_pool;
 ////////////////////////////////////////////////////////////
 static void InitImageMemoryPool(Stack* perm_stack, uint32 size)
 {
-    InitPool(&global_image_memory_pool, perm_stack, size);
+    InitPool(&global_image_memory_pool, &perm_stack->allocator, size);
 }
 
 static ImageMemoryHnd CreateImageMemory(ImageMemoryInfo* info, VkAllocationCallbacks* allocators)

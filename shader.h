@@ -24,9 +24,10 @@ struct Shader
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static VkShaderModule LoadShaderModule(Stack temp_stack, const char* path)
+static VkShaderModule LoadShaderModule(Stack* temp_stack, const char* path)
 {
-    Array<uint32>* bytecode = ReadFile<uint32>(&temp_stack, path);
+    Stack* frame = CreateFrame(temp_stack);
+    Array<uint32>* bytecode = ReadFile<uint32>(&frame->allocator, path);
     VkShaderModuleCreateInfo info =
     {
         .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -45,7 +46,7 @@ static VkShaderModule LoadShaderModule(Stack temp_stack, const char* path)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ShaderHnd CreateShader(Stack temp_stack, const char* path, VkShaderStageFlagBits stage)
+static ShaderHnd CreateShader(Stack* temp_stack, const char* path, VkShaderStageFlagBits stage)
 {
     ShaderHnd shader_hnd = AllocateShader();
     Shader* shader = GetShader(shader_hnd);

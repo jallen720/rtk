@@ -63,14 +63,14 @@ static Resources global_resources;
 ////////////////////////////////////////////////////////////
 static void InitResources(Stack* perm_stack, ResourcesInfo* info)
 {
-    InitPool(&global_resources.buffers,          perm_stack, info->max_buffers);
-    InitPool(&global_resources.shader_datas,     perm_stack, info->max_shader_datas);
-    InitPool(&global_resources.shader_data_sets, perm_stack, info->max_shader_data_sets);
-    InitPool(&global_resources.shaders,          perm_stack, info->max_shaders);
-    InitPool(&global_resources.mesh_datas,       perm_stack, info->max_mesh_datas);
-    InitPool(&global_resources.meshes,           perm_stack, info->max_meshes);
-    InitPool(&global_resources.render_targets,   perm_stack, info->max_render_targets);
-    InitPool(&global_resources.pipelines,        perm_stack, info->max_pipelines);
+    InitPool(&global_resources.buffers,          &perm_stack->allocator, info->max_buffers);
+    InitPool(&global_resources.shader_datas,     &perm_stack->allocator, info->max_shader_datas);
+    InitPool(&global_resources.shader_data_sets, &perm_stack->allocator, info->max_shader_data_sets);
+    InitPool(&global_resources.shaders,          &perm_stack->allocator, info->max_shaders);
+    InitPool(&global_resources.mesh_datas,       &perm_stack->allocator, info->max_mesh_datas);
+    InitPool(&global_resources.meshes,           &perm_stack->allocator, info->max_meshes);
+    InitPool(&global_resources.render_targets,   &perm_stack->allocator, info->max_render_targets);
+    InitPool(&global_resources.pipelines,        &perm_stack->allocator, info->max_pipelines);
 }
 
 /// Allocate Functions

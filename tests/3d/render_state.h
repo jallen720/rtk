@@ -192,7 +192,7 @@ static void InitImageMemory(Stack* perm_stack)
     }
 }
 
-static void InitRenderTargets(Stack temp_stack, FreeList* free_list)
+static void InitRenderTargets(Stack* temp_stack, FreeList* free_list)
 {
     VkClearValue attachment_clear_values[] =
     {
@@ -212,10 +212,10 @@ static void InitVertexLayout(Stack* perm_stack)
     VertexLayout* vertex_layout = &render_state.vertex_layout;
 
     // Init pipeline vertex layout.
-    InitArray(&vertex_layout->bindings, perm_stack, 1);
+    InitArray(&vertex_layout->bindings, &perm_stack->allocator, 1);
     PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
 
-    InitArray(&vertex_layout->attributes, perm_stack, 4);
+    InitArray(&vertex_layout->attributes, &perm_stack->allocator, 4);
     PushAttribute(vertex_layout, 3, ATTRIBUTE_TYPE_FLOAT32); // Position
     PushAttribute(vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // UV
 }
@@ -327,7 +327,7 @@ static void InitShaderDatas(Stack* perm_stack)
     render_state.data.dirt_block_texture = CreateTexture(perm_stack, "images/dirt_block.png");
 }
 
-static void InitShaderDataSets(Stack* perm_stack, Stack temp_stack)
+static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 {
     // data_set.vs_buffer
     {
@@ -357,13 +357,13 @@ static void InitShaderDataSets(Stack* perm_stack, Stack temp_stack)
     }
 }
 
-static void InitShaders(Stack temp_stack)
+static void InitShaders(Stack* temp_stack)
 {
     render_state.shader.vert_3d = CreateShader(temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     render_state.shader.frag_3d = CreateShader(temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
-static void InitPipelines(Stack temp_stack, FreeList* free_list)
+static void InitPipelines(Stack* temp_stack, FreeList* free_list)
 {
     // Pipeline Layout
     ShaderDataSetHnd shader_data_sets[] =
@@ -443,8 +443,8 @@ static void InitMeshes()
 template<typename StateType>
 static void InitThreadPoolJob(Job<StateType>* job, Stack* perm_stack, uint32 thread_count)
 {
-    InitArrayFull(&job->states, perm_stack, thread_count);
-    InitArrayFull(&job->tasks, perm_stack, thread_count);
+    InitArrayFull(&job->states, &perm_stack->allocator, thread_count);
+    InitArrayFull(&job->tasks, &perm_stack->allocator, thread_count);
 }
 
 static void InitThreadPoolJobs(Stack* perm_stack, ThreadPool* thread_pool)
@@ -530,14 +530,14 @@ static void UpdateAllPipelines(FreeList* free_list)
     UpdateViewports(render_state.pipeline.main, free_list, CTK_WRAP_ARRAY(viewports));
 }
 
-static void UpdateAllRenderTargets(Stack temp_stack, FreeList* free_list)
+static void UpdateAllRenderTargets(Stack* temp_stack, FreeList* free_list)
 {
     UpdateRenderTarget(render_state.render_target.main, temp_stack, free_list);
 }
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRenderState(Stack* perm_stack, Stack temp_stack, FreeList* free_list, ThreadPool* thread_pool)
+static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ThreadPool* thread_pool)
 {
     InitBuffers();
     InitImageMemory(perm_stack);

@@ -22,9 +22,9 @@ namespace Test3D
 
 static void Run()
 {
-    Stack* perm_stack = CreateStack(Megabyte32<8>());
-    Stack* temp_stack = CreateStack(perm_stack, Megabyte32<1>());
-    FreeList* free_list = CreateFreeList(Kilobyte32<16>(), 16, 256);
+    Stack* perm_stack = CreateStack(&win32_allocator, Megabyte32<8>());
+    Stack* temp_stack = CreateStack(&perm_stack->allocator, Megabyte32<1>());
+    FreeList* free_list = CreateFreeList(&perm_stack->allocator, Kilobyte32<16>(), 16, 256);
 
     // Make win32 process DPI aware so windows scale properly.
     SetProcessDPIAware();
@@ -78,7 +78,7 @@ static void Run()
     context_info.descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
 
     context_info.render_thread_count = RENDER_THREAD_COUNT,
-    InitContext(perm_stack, *temp_stack, free_list, &context_info);
+    InitContext(perm_stack, temp_stack, free_list, &context_info);
 LogPhysicalDevice(global_ctx.physical_device);
 
     ResourcesInfo resources_info =
@@ -95,9 +95,9 @@ LogPhysicalDevice(global_ctx.physical_device);
     InitResources(perm_stack, &resources_info);
 
     // Initialize other test state.
-    ThreadPool* thread_pool = CreateThreadPool(perm_stack, 8);
+    ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
     InitGameState();
-    InitRenderState(perm_stack, *temp_stack, free_list, thread_pool);
+    InitRenderState(perm_stack, temp_stack, free_list, thread_pool);
 
     // Run game.
     for (;;)
@@ -125,9 +125,9 @@ LogPhysicalDevice(global_ctx.physical_device);
         if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
         {
             WaitIdle();
-            UpdateSwapchain(*temp_stack, free_list);
+            UpdateSwapchain(temp_stack, free_list);
             UpdateAllPipelines(free_list);
-            UpdateAllRenderTargets(*temp_stack, free_list);
+            UpdateAllRenderTargets(temp_stack, free_list);
             continue;
         }
 

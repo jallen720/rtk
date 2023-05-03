@@ -2,6 +2,7 @@
 
 #include "rtk/vulkan.h"
 #include "ctk3/ctk3.h"
+#include "ctk3/string.h"
 #include "ctk3/pair.h"
 #include "ctk3/debug.h"
 

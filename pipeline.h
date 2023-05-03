@@ -73,7 +73,7 @@ struct Pipeline
 static void InitScissors(Pipeline* pipeline, FreeList* free_list)
 {
     // Make all scissors cover their corresponding viewports.
-    InitArray(&pipeline->scissors, free_list, pipeline->viewports.size);
+    InitArray(&pipeline->scissors, &free_list->allocator, pipeline->viewports.size);
     for (uint32 i = 0; i < pipeline->viewports.count; ++i)
     {
         VkViewport* viewport = GetPtr(&pipeline->viewports, i);
@@ -211,9 +211,11 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count, AttributeTyp
     ++layout->attribute_location;
 }
 
-static PipelineHnd CreatePipeline(Stack temp_stack, FreeList* free_list, PipelineInfo* info,
+static PipelineHnd CreatePipeline(Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
                                   PipelineLayoutInfo* layout_info)
 {
+    Stack* frame = CreateFrame(temp_stack);
+
     // Allocate Pipeline
     PipelineHnd pipeline_hnd = AllocatePipeline();
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
@@ -222,7 +224,7 @@ static PipelineHnd CreatePipeline(Stack temp_stack, FreeList* free_list, Pipelin
     Array<VkDescriptorSetLayout> descriptor_set_layouts = {};
     if (layout_info->shader_data_sets.count > 0)
     {
-        InitArray(&descriptor_set_layouts, &temp_stack, layout_info->shader_data_sets.count);
+        InitArray(&descriptor_set_layouts, &frame->allocator, layout_info->shader_data_sets.count);
         for (uint32 i = 0; i < layout_info->shader_data_sets.count; ++i)
         {
             Push(&descriptor_set_layouts, GetShaderDataSet(Get(&layout_info->shader_data_sets, i))->layout);
@@ -239,14 +241,14 @@ static PipelineHnd CreatePipeline(Stack temp_stack, FreeList* free_list, Pipelin
     Validate(res, "vkCreatePipelineLayout() failed");
 
     // Shader Stages
-    InitArray(&pipeline->shader_stage_create_infos, free_list, info->shaders.count);
+    InitArray(&pipeline->shader_stage_create_infos, &free_list->allocator, info->shaders.count);
     for (uint32 i = 0; i < info->shaders.count; ++i)
     {
         Push(&pipeline->shader_stage_create_infos, DefaultShaderStageCreateInfo(Get(&info->shaders, i)));
     }
 
     // Viewports/Scissors
-    InitArray(&pipeline->viewports, free_list, &info->viewports);
+    InitArray(&pipeline->viewports, &free_list->allocator, &info->viewports);
     InitScissors(pipeline, free_list);
 
     pipeline->vertex_layout = info->vertex_layout;
@@ -263,9 +265,9 @@ static void UpdateViewports(PipelineHnd pipeline_hnd, FreeList* free_list, Array
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
 
     // Re-init viewport & scissor arrays.
-    DeinitArray(&pipeline->viewports, free_list);
-    DeinitArray(&pipeline->scissors, free_list);
-    InitArray(&pipeline->viewports, free_list, &viewports);
+    DeinitArray(&pipeline->viewports, &free_list->allocator);
+    DeinitArray(&pipeline->scissors, &free_list->allocator);
+    InitArray(&pipeline->viewports, &free_list->allocator, &viewports);
     InitScissors(pipeline, free_list);
 
     // Re-setup pipeline.

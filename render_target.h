@@ -46,11 +46,11 @@ struct RenderTarget
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void InitRenderPassAttachments(RenderPassAttachments* attachments, Stack temp_stack,
+static void InitRenderPassAttachments(RenderPassAttachments* attachments, const Allocator* allocator,
                                       uint32 max_color_attachments, bool depth_attachment)
 {
-    InitArray(&attachments->descriptions, &temp_stack, max_color_attachments + (depth_attachment ? 1 : 0));
-    InitArray(&attachments->color, &temp_stack, max_color_attachments);
+    InitArray(&attachments->descriptions, allocator, max_color_attachments + (depth_attachment ? 1 : 0));
+    InitArray(&attachments->color, allocator, max_color_attachments);
 }
 
 static void PushColorAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
@@ -75,8 +75,9 @@ static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentD
     });
 }
 
-static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, FreeList* free_list)
+static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
 {
+    Stack* frame = CreateFrame(temp_stack);
     Swapchain* swapchain = &global_ctx.swapchain;
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
@@ -125,7 +126,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
         Validate(res, "vkBindImageMemory() failed");
 
         // Create image views for each array layer.
-        InitArray(&render_target->depth_image_views, free_list, swapchain->image_count);
+        InitArray(&render_target->depth_image_views, &free_list->allocator, swapchain->image_count);
         for (uint32 array_layer_index = 0; array_layer_index < swapchain->image_count; ++array_layer_index)
         {
             VkImageViewCreateInfo image_view_info =
@@ -163,8 +164,8 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
     uint32 depth_attachment_count = render_target->depth_testing ? 1 : 0;
     uint32 color_attachment_count = 1;
     uint32 total_attachment_count = color_attachment_count + depth_attachment_count;
-    InitArray(&render_target->framebuffers, free_list, swapchain->image_count);
-    auto attachments = CreateArray<VkImageView>(&temp_stack, total_attachment_count);
+    InitArray(&render_target->framebuffers, &free_list->allocator, swapchain->image_count);
+    auto attachments = CreateArray<VkImageView>(&frame->allocator, total_attachment_count);
     for (uint32 i = 0; i < swapchain->image_count; ++i)
     {
         Push(attachments, Get(&swapchain->image_views, i));
@@ -184,7 +185,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
             .height          = render_target->extent.height,
             .layers          = 1,
         };
-        VkResult res = vkCreateFramebuffer(global_ctx.device, &info, NULL, Push(&render_target->framebuffers));
+        res = vkCreateFramebuffer(global_ctx.device, &info, NULL, Push(&render_target->framebuffers));
         Validate(res, "vkCreateFramebuffer() failed");
 
         // Clear attachments for next iteration.
@@ -194,8 +195,9 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack temp_stack, Fre
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static RenderTargetHnd CreateRenderTarget(Stack temp_stack, FreeList* free_list, RenderTargetInfo* info)
+static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list, RenderTargetInfo* info)
 {
+    Stack* frame = CreateFrame(temp_stack);
     RenderTargetHnd render_target_hnd = AllocateRenderTarget();
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
 
@@ -203,7 +205,7 @@ static RenderTargetHnd CreateRenderTarget(Stack temp_stack, FreeList* free_list,
 
     // Init Render Pass
     RenderPassAttachments attachments = {};
-    InitRenderPassAttachments(&attachments, temp_stack, 1, render_target->depth_testing);
+    InitRenderPassAttachments(&attachments, &frame->allocator, 1, render_target->depth_testing);
     PushColorAttachment(&attachments,
     {
         .flags          = 0,
@@ -260,15 +262,15 @@ static RenderTargetHnd CreateRenderTarget(Stack temp_stack, FreeList* free_list,
     Validate(res, "vkCreateRenderPass() failed");
 
     // Copy attachment clear values.
-    InitArray(&render_target->attachment_clear_values, free_list, &info->attachment_clear_values);
+    InitArray(&render_target->attachment_clear_values, &free_list->allocator, &info->attachment_clear_values);
 
     // Create depth images and framebuffers based on swapchain extent.
-    SetupRenderTarget(render_target, temp_stack, free_list);
+    SetupRenderTarget(render_target, frame, free_list);
 
     return render_target_hnd;
 }
 
-static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack temp_stack, FreeList* free_list)
+static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack* temp_stack, FreeList* free_list)
 {
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
 
@@ -282,7 +284,7 @@ static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack temp_sta
         {
             vkDestroyImageView(device, Get(&render_target->depth_image_views, i), NULL);
         }
-        DeinitArray(&render_target->depth_image_views, free_list);
+        DeinitArray(&render_target->depth_image_views, &free_list->allocator);
 
         // Destroy image.
         vkDestroyImage(device, render_target->depth_image, NULL);
@@ -294,10 +296,10 @@ static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack temp_sta
     {
         vkDestroyFramebuffer(global_ctx.device, Get(&render_target->framebuffers, i), NULL);
     }
-    DeinitArray(&render_target->framebuffers, free_list);
+    DeinitArray(&render_target->framebuffers, &free_list->allocator);
 
     // Re-create depth images and framebuffers with new swapchain extent.
-    SetupRenderTarget(render_target, temp_stack, free_list);;
+    SetupRenderTarget(render_target, temp_stack, free_list);
 }
 
 }

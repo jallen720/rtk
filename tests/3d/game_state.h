@@ -32,9 +32,16 @@ struct Transform
     Vec3<float32> rotation;
 };
 
+struct Entity
+{
+    uint8 rotate_axis;
+    sint8 rotate_direction;
+};
+
 struct EntityData
 {
     Transform transforms[MAX_ENTITIES];
+    Entity    entities  [MAX_ENTITIES];
     uint32    count;
 };
 
@@ -136,15 +143,21 @@ static void InitGameState()
     static constexpr uint32 CUBE_SIZE = 64;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
     static_assert(CUBE_ENTITY_COUNT <= MAX_ENTITIES);
+    EntityData* entity_data = &game_state.entity_data;
     for (uint32 x = 0; x < CUBE_SIZE; ++x)
     for (uint32 y = 0; y < CUBE_SIZE; ++y)
     for (uint32 z = 0; z < CUBE_SIZE; ++z)
     {
         uint32 entity = PushEntity(&game_state.entity_data);
-        game_state.entity_data.transforms[entity] =
+        entity_data->transforms[entity] =
         {
             .position = { x * 1.5f, y * 1.5f, z * 1.5f },
             .rotation = { 0, 0, 0 },
+        };
+        entity_data->entities[entity] =
+        {
+            .rotate_axis      = RandomRange<uint8>(0u, 3u),
+            .rotate_direction = RandomRange(0u, 2u) ? -1 : 1,
         };
     }
 }
@@ -171,9 +184,26 @@ static void UpdateGame()
     UpdateMouse(&game_state.mouse);
     ViewControls();
 
-    CTK_ITERATE_PTR(transform, game_state.entity_data.transforms, game_state.entity_data.count)
+    EntityData* entity_data = &game_state.entity_data;
+    for (uint32 entity_index = 0; entity_index < entity_data->count; ++entity_index)
     {
-        transform->rotation.y += 0.1f;
+        Transform* transform = entity_data->transforms + entity_index;
+        Entity* entity = entity_data->entities + entity_index;
+
+        static constexpr float32 ROTATION_SPEED = 0.1f;
+        float32 rotation = entity->rotate_direction * ROTATION_SPEED;
+        if (entity->rotate_axis == 0)
+        {
+            transform->rotation.x += rotation;
+        }
+        else if (entity->rotate_axis == 1)
+        {
+            transform->rotation.y += rotation;
+        }
+        else
+        {
+            transform->rotation.z += rotation;
+        }
     }
 }
 

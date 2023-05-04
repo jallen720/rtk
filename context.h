@@ -113,7 +113,7 @@ static VkSurfaceCapabilitiesKHR GetSurfaceCapabilities();
 ////////////////////////////////////////////////////////////
 static QueueFamilies FindQueueFamilies(Stack* temp_stack, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
-    Stack* frame = CreateFrame(temp_stack);
+    Stack frame = CreateFrame(temp_stack);
 
     QueueFamilies queue_families =
     {
@@ -121,7 +121,7 @@ static QueueFamilies FindQueueFamilies(Stack* temp_stack, VkPhysicalDevice physi
         .present  = UNSET_INDEX,
     };
     Array<VkQueueFamilyProperties> queue_family_properties = {};
-    LoadVkQueueFamilyProperties(&queue_family_properties, &frame->allocator, physical_device);
+    LoadVkQueueFamilyProperties(&queue_family_properties, &frame.allocator, physical_device);
 
     // Find first graphics queue family.
     for (uint32 queue_family_index = 0; queue_family_index < queue_family_properties.count; ++queue_family_index)
@@ -193,7 +193,7 @@ static VkDeviceQueueCreateInfo GetSingleQueueInfo(uint32 queue_family_index)
 
 static void InitInstance(InstanceInfo* info, Stack* temp_stack)
 {
-    Stack* frame = CreateFrame(temp_stack);
+    Stack frame = CreateFrame(temp_stack);
     VkResult res = VK_SUCCESS;
 
 #ifdef RTK_ENABLE_VALIDATION
@@ -229,7 +229,7 @@ static void InitInstance(InstanceInfo* info, Stack* temp_stack)
 #endif
     };
     Array<const char*> extensions = {};
-    InitArray(&extensions, &frame->allocator, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS) + info->extensions.count);
+    InitArray(&extensions, &frame.allocator, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS) + info->extensions.count);
     PushRange(&extensions, REQUIRED_EXTENSIONS, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS));
     PushRange(&extensions, &info->extensions);
 
@@ -277,11 +277,11 @@ static void InitSurface()
 
 static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures* required_features)
 {
-    Stack* frame = CreateFrame(temp_stack);
+    Stack frame = CreateFrame(temp_stack);
 
     // Get system physical devices and ensure atleast 1 physical device was found.
     Array<VkPhysicalDevice> vk_physical_devices = {};
-    LoadVkPhysicalDevices(&vk_physical_devices, &frame->allocator, global_ctx.instance);
+    LoadVkPhysicalDevices(&vk_physical_devices, &frame.allocator, global_ctx.instance);
     if (vk_physical_devices.count == 0)
     {
         CTK_FATAL("failed to find any physical devices");
@@ -299,7 +299,7 @@ static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Dev
         PhysicalDevice physical_device =
         {
             .hnd                = vk_physical_device,
-            .queue_families     = FindQueueFamilies(frame, vk_physical_device, global_ctx.surface),
+            .queue_families     = FindQueueFamilies(&frame, vk_physical_device, global_ctx.surface),
             .depth_image_format = FindDepthImageFormat(vk_physical_device),
         };
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
@@ -414,7 +414,7 @@ static void InitMainCommandState()
 
 static void SetupSwapchain(Stack* temp_stack, FreeList* free_list)
 {
-    Stack* frame = CreateFrame(temp_stack);
+    Stack frame = CreateFrame(temp_stack);
 
     Swapchain* swapchain = &global_ctx.swapchain;
     VkDevice device = global_ctx.device;
@@ -452,7 +452,7 @@ static void SetupSwapchain(Stack* temp_stack, FreeList* free_list)
 
     // Create swapchain image views.
     Array<VkImage> swapchain_images = {};
-    LoadVkSwapchainImages(&swapchain_images, &frame->allocator, device, swapchain->hnd);
+    LoadVkSwapchainImages(&swapchain_images, &frame.allocator, device, swapchain->hnd);
     InitArrayFull(&swapchain->image_views, &free_list->allocator, swapchain_images.count);
     swapchain->image_count = swapchain_images.count;
     for (uint32 i = 0; i < swapchain_images.count; ++i)
@@ -487,7 +487,7 @@ static void SetupSwapchain(Stack* temp_stack, FreeList* free_list)
 
 static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
 {
-    Stack* frame = CreateFrame(temp_stack);
+    Stack frame = CreateFrame(temp_stack);
 
     VkSurfaceKHR surface = global_ctx.surface;
     PhysicalDevice* physical_device = global_ctx.physical_device;
@@ -496,8 +496,8 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
     // Get surface info.
     Array<VkSurfaceFormatKHR> formats = {};
     Array<VkPresentModeKHR> present_modes = {};
-    LoadVkSurfaceFormats(&formats, &frame->allocator, physical_device->hnd, surface);
-    LoadVkSurfacePresentModes(&present_modes, &frame->allocator, physical_device->hnd, surface);
+    LoadVkSurfaceFormats(&formats, &frame.allocator, physical_device->hnd, surface);
+    LoadVkSurfacePresentModes(&present_modes, &frame.allocator, physical_device->hnd, surface);
     VkSurfaceCapabilitiesKHR surface_capabilities = GetSurfaceCapabilities();
 
     // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
@@ -554,7 +554,7 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
         swapchain->queue_family_indexes     = NULL;
     }
 
-    SetupSwapchain(frame, free_list);
+    SetupSwapchain(&frame, free_list);
 }
 
 static void InitRenderCommandPools(Stack* perm_stack, uint32 render_thread_count)

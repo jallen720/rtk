@@ -214,7 +214,7 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count, AttributeTyp
 static PipelineHnd CreatePipeline(Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
                                   PipelineLayoutInfo* layout_info)
 {
-    Stack* frame = CreateFrame(temp_stack);
+    Stack frame = CreateFrame(temp_stack);
 
     // Allocate Pipeline
     PipelineHnd pipeline_hnd = AllocatePipeline();
@@ -224,7 +224,7 @@ static PipelineHnd CreatePipeline(Stack* temp_stack, FreeList* free_list, Pipeli
     Array<VkDescriptorSetLayout> descriptor_set_layouts = {};
     if (layout_info->shader_data_sets.count > 0)
     {
-        InitArray(&descriptor_set_layouts, &frame->allocator, layout_info->shader_data_sets.count);
+        InitArray(&descriptor_set_layouts, &frame.allocator, layout_info->shader_data_sets.count);
         for (uint32 i = 0; i < layout_info->shader_data_sets.count; ++i)
         {
             Push(&descriptor_set_layouts, GetShaderDataSet(Get(&layout_info->shader_data_sets, i))->layout);

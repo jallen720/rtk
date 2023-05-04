@@ -77,7 +77,7 @@ static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentD
 
 static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
 {
-    Stack* frame = CreateFrame(temp_stack);
+    Stack frame = CreateFrame(temp_stack);
     Swapchain* swapchain = &global_ctx.swapchain;
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
@@ -165,7 +165,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
     uint32 color_attachment_count = 1;
     uint32 total_attachment_count = color_attachment_count + depth_attachment_count;
     InitArray(&render_target->framebuffers, &free_list->allocator, swapchain->image_count);
-    auto attachments = CreateArray<VkImageView>(&frame->allocator, total_attachment_count);
+    auto attachments = CreateArray<VkImageView>(&frame.allocator, total_attachment_count);
     for (uint32 i = 0; i < swapchain->image_count; ++i)
     {
         Push(attachments, Get(&swapchain->image_views, i));
@@ -197,7 +197,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
 ////////////////////////////////////////////////////////////
 static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list, RenderTargetInfo* info)
 {
-    Stack* frame = CreateFrame(temp_stack);
+    Stack frame = CreateFrame(temp_stack);
     RenderTargetHnd render_target_hnd = AllocateRenderTarget();
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
 
@@ -205,7 +205,7 @@ static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list
 
     // Init Render Pass
     RenderPassAttachments attachments = {};
-    InitRenderPassAttachments(&attachments, &frame->allocator, 1, render_target->depth_testing);
+    InitRenderPassAttachments(&attachments, &frame.allocator, 1, render_target->depth_testing);
     PushColorAttachment(&attachments,
     {
         .flags          = 0,
@@ -265,7 +265,7 @@ static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list
     InitArray(&render_target->attachment_clear_values, &free_list->allocator, &info->attachment_clear_values);
 
     // Create depth images and framebuffers based on swapchain extent.
-    SetupRenderTarget(render_target, frame, free_list);
+    SetupRenderTarget(render_target, &frame, free_list);
 
     return render_target_hnd;
 }

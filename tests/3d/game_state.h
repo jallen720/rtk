@@ -41,7 +41,7 @@ struct Entity
 struct EntityData
 {
     Transform transforms[MAX_ENTITIES];
-    Entity    entities  [MAX_ENTITIES];
+    Entity    entities[MAX_ENTITIES];
     uint32    count;
 };
 

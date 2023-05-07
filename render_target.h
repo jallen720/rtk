@@ -36,9 +36,9 @@ struct RenderTarget
     Array<VkFramebuffer> framebuffers;
     Array<VkClearValue>  attachment_clear_values;
 
-    VkImage              depth_image;
-    VkDeviceMemory       depth_image_mem;
-    Array<VkImageView>   depth_image_views;
+    VkImage            depth_image;
+    VkDeviceMemory     depth_image_mem;
+    Array<VkImageView> depth_image_views;
 
     // Cached Init State
     bool depth_testing;

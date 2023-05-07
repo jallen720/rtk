@@ -414,78 +414,6 @@ static void InitMainCommandState()
     Validate(res, "vkAllocateCommandBuffers() failed");
 }
 
-static void LoadSwapchainSurface(Stack* temp_stack)
-{
-    Stack frame = CreateFrame(temp_stack);
-
-    Swapchain* swapchain = &global_ctx.swapchain;
-    VkSurfaceKHR surface = global_ctx.surface;
-    PhysicalDevice* physical_device = global_ctx.physical_device;
-
-    // Get surface info.
-    Array<VkSurfaceFormatKHR> formats = {};
-    Array<VkPresentModeKHR> present_modes = {};
-    LoadVkSurfaceFormats(&formats, &frame.allocator, physical_device->hnd, surface);
-    LoadVkSurfacePresentModes(&present_modes, &frame.allocator, physical_device->hnd, surface);
-    VkSurfaceCapabilitiesKHR surface_capabilities = GetSurfaceCapabilities();
-
-    // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
-    // color space.
-    swapchain->surface_format = Get(&formats, 0);
-    for (uint32 i = 0; i < formats.count; ++i)
-    {
-        VkSurfaceFormatKHR surface_format = Get(&formats, i);
-        if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM &&
-            surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
-        {
-            swapchain->surface_format = surface_format;
-            break;
-        }
-    }
-
-    // Default to FIFO (only present mode with guarenteed availability), check for preferred mailbox present mode.
-    swapchain->surface_present_mode = VK_PRESENT_MODE_FIFO_KHR;
-    for (uint32 i = 0; i < present_modes.count; ++i)
-    {
-        VkPresentModeKHR surface_present_mode = Get(&present_modes, i);
-        if (surface_present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
-        {
-            swapchain->surface_present_mode = surface_present_mode;
-            break;
-        }
-    }
-
-    // Set surface extent and transform.
-    swapchain->surface_extent    = surface_capabilities.currentExtent;
-    swapchain->surface_transform = surface_capabilities.currentTransform;
-
-    // Set image count to min image count + 1 or max image count (whichever is smaller).
-    swapchain->surface_min_image_count = surface_capabilities.minImageCount + 1;
-    if (surface_capabilities.maxImageCount > 0 && swapchain->surface_min_image_count > surface_capabilities.maxImageCount)
-    {
-        swapchain->surface_min_image_count = surface_capabilities.maxImageCount;
-    }
-}
-
-static void LoadSwapchainImageSharingMode()
-{
-    Swapchain* swapchain = &global_ctx.swapchain;
-
-    // Check if image sharing mode needs to be concurrent due to separate graphics & present queue families.
-    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
-    if (queue_families->graphics != queue_families->present)
-    {
-        swapchain->image_sharing_mode       = VK_SHARING_MODE_CONCURRENT;
-        swapchain->queue_family_index_count = sizeof(QueueFamilies) / sizeof(uint32);
-        swapchain->queue_family_indexes     = (uint32*)queue_families;
-    }
-    else
-    {
-        swapchain->image_sharing_mode       = VK_SHARING_MODE_EXCLUSIVE;
-        swapchain->queue_family_index_count = 0;
-        swapchain->queue_family_indexes     = NULL;
-    }
-}
 
 static void CreateSwapchain(Stack* temp_stack, FreeList* free_list)
 {
@@ -556,9 +484,77 @@ static void CreateSwapchain(Stack* temp_stack, FreeList* free_list)
 
 static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
 {
-    LoadSwapchainSurface(temp_stack);
-    LoadSwapchainImageSharingMode();
-    CreateSwapchain(temp_stack, free_list);
+    Stack frame = CreateFrame(temp_stack);
+
+    Swapchain* swapchain = &global_ctx.swapchain;
+    VkSurfaceKHR surface = global_ctx.surface;
+    PhysicalDevice* physical_device = global_ctx.physical_device;
+
+    /// Configure Swapchain
+    ////////////////////////////////////////////////////////////
+
+    // Get surface info.
+    Array<VkSurfaceFormatKHR> formats = {};
+    Array<VkPresentModeKHR> present_modes = {};
+    LoadVkSurfaceFormats(&formats, &frame.allocator, physical_device->hnd, surface);
+    LoadVkSurfacePresentModes(&present_modes, &frame.allocator, physical_device->hnd, surface);
+    VkSurfaceCapabilitiesKHR surface_capabilities = GetSurfaceCapabilities();
+
+    // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
+    // color space.
+    swapchain->surface_format = Get(&formats, 0);
+    for (uint32 i = 0; i < formats.count; ++i)
+    {
+        VkSurfaceFormatKHR surface_format = Get(&formats, i);
+        if (surface_format.format == VK_FORMAT_R8G8B8A8_UNORM &&
+            surface_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+        {
+            swapchain->surface_format = surface_format;
+            break;
+        }
+    }
+
+    // Default to FIFO (only present mode with guarenteed availability), check for preferred mailbox present mode.
+    swapchain->surface_present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    for (uint32 i = 0; i < present_modes.count; ++i)
+    {
+        VkPresentModeKHR surface_present_mode = Get(&present_modes, i);
+        if (surface_present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
+        {
+            swapchain->surface_present_mode = surface_present_mode;
+            break;
+        }
+    }
+
+    // Set surface extent and transform.
+    swapchain->surface_extent    = surface_capabilities.currentExtent;
+    swapchain->surface_transform = surface_capabilities.currentTransform;
+
+    // Set image count to min image count + 1 or max image count (whichever is smaller).
+    swapchain->surface_min_image_count = surface_capabilities.minImageCount + 1;
+    if (surface_capabilities.maxImageCount > 0 && swapchain->surface_min_image_count > surface_capabilities.maxImageCount)
+    {
+        swapchain->surface_min_image_count = surface_capabilities.maxImageCount;
+    }
+
+    // Check if image sharing mode needs to be concurrent due to separate graphics & present queue families.
+    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
+    if (queue_families->graphics != queue_families->present)
+    {
+        swapchain->image_sharing_mode       = VK_SHARING_MODE_CONCURRENT;
+        swapchain->queue_family_index_count = sizeof(QueueFamilies) / sizeof(uint32);
+        swapchain->queue_family_indexes     = (uint32*)queue_families;
+    }
+    else
+    {
+        swapchain->image_sharing_mode       = VK_SHARING_MODE_EXCLUSIVE;
+        swapchain->queue_family_index_count = 0;
+        swapchain->queue_family_indexes     = NULL;
+    }
+
+    /// Create Swapchain
+    ////////////////////////////////////////////////////////////
+    CreateSwapchain(&frame, free_list);
 }
 
 static void InitRenderCommandPools(Stack* perm_stack, uint32 render_thread_count)
@@ -750,23 +746,22 @@ static void SubmitTempCommandBuffer()
     vkQueueWaitIdle(global_ctx.graphics_queue);
 }
 
-static void DestroySwapchain(FreeList* free_list)
+static void UpdateSwapchainSurfaceExtent(Stack* temp_stack, FreeList* free_list)
 {
     Swapchain* swapchain = &global_ctx.swapchain;
 
-    // Destroy images and handle.
+    // Destroy image views.
     for (uint32 i = 0; i < swapchain->image_views.count; ++i)
     {
         vkDestroyImageView(global_ctx.device, Get(&swapchain->image_views, i), NULL);
     }
     DeinitArray(&swapchain->image_views, &free_list->allocator);
-    vkDestroySwapchainKHR(global_ctx.device, swapchain->hnd, NULL);
-}
 
-static void UpdateSwapchainExtent(Stack* temp_stack, FreeList* free_list)
-{
-    DestroySwapchain(free_list);
+    // Update swapchain surface extent.
     global_ctx.swapchain.surface_extent = GetSurfaceCapabilities().currentExtent;
+
+    // Recreate swapchain.
+    vkDestroySwapchainKHR(global_ctx.device, swapchain->hnd, NULL);
     CreateSwapchain(temp_stack, free_list);
 }
 

@@ -31,6 +31,11 @@ struct RenderTargetInfo
 
 struct RenderTarget
 {
+    // Config
+    bool   depth_testing;
+    uint32 total_attachment_count;
+
+    // State
     VkRenderPass         render_pass;
     VkExtent2D           extent;
     Array<VkFramebuffer> framebuffers;
@@ -39,20 +44,10 @@ struct RenderTarget
     VkImage            depth_image;
     VkDeviceMemory     depth_image_mem;
     Array<VkImageView> depth_image_views;
-
-    // Cached Init State
-    bool depth_testing;
 };
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void InitRenderPassAttachments(RenderPassAttachments* attachments, const Allocator* allocator,
-                                      uint32 max_color_attachments, bool depth_attachment)
-{
-    InitArray(&attachments->descriptions, allocator, max_color_attachments + (depth_attachment ? 1 : 0));
-    InitArray(&attachments->color, allocator, max_color_attachments);
-}
-
 static void PushColorAttachment(RenderPassAttachments* attachments, VkAttachmentDescription description)
 {
     uint32 attachment_index = attachments->descriptions.count;
@@ -78,6 +73,7 @@ static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentD
 static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
 {
     Stack frame = CreateFrame(temp_stack);
+
     Swapchain* swapchain = &global_ctx.swapchain;
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
@@ -161,11 +157,8 @@ static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, F
     }
 
     // Init framebuffers.
-    uint32 depth_attachment_count = render_target->depth_testing ? 1 : 0;
-    uint32 color_attachment_count = 1;
-    uint32 total_attachment_count = color_attachment_count + depth_attachment_count;
     InitArray(&render_target->framebuffers, &free_list->allocator, swapchain->image_views.count);
-    auto attachments = CreateArray<VkImageView>(&frame.allocator, total_attachment_count);
+    auto attachments = CreateArray<VkImageView>(&frame.allocator, render_target->total_attachment_count);
     for (uint32 i = 0; i < swapchain->image_views.count; ++i)
     {
         Push(attachments, Get(&swapchain->image_views, i));
@@ -203,40 +196,41 @@ static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list
 
     render_target->depth_testing = info->depth_testing;
 
+    uint32 depth_attachment_count = render_target->depth_testing ? 1 : 0;
+    uint32 color_attachment_count = 1;
+    render_target->total_attachment_count = depth_attachment_count + color_attachment_count;
+
     // Init Render Pass
     RenderPassAttachments attachments = {};
-    InitRenderPassAttachments(&attachments, &frame.allocator, 1, render_target->depth_testing);
+    InitArray(&attachments.descriptions, &frame.allocator, render_target->total_attachment_count);
+    InitArray(&attachments.color, &frame.allocator, color_attachment_count);
     PushColorAttachment(&attachments,
-    {
-        .flags          = 0,
-        .format         = global_ctx.swapchain.surface_format.format,
-        .samples        = VK_SAMPLE_COUNT_1_BIT,
-
-        .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-        .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-        .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-        .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-
-        .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-        .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-    });
+                        {
+                            .flags          = 0,
+                            .format         = global_ctx.swapchain.surface_format.format,
+                            .samples        = VK_SAMPLE_COUNT_1_BIT,
+                            .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                            .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+                            .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                            .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+                            .finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                        });
 
     if (render_target->depth_testing)
     {
         SetDepthAttachment(&attachments,
-        {
-            .flags          = 0,
-            .format         = global_ctx.physical_device->depth_image_format,
-            .samples        = VK_SAMPLE_COUNT_1_BIT,
-
-            .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
-            .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
-            .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-            .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-
-            .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
-            .finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        });
+                           {
+                               .flags          = 0,
+                               .format         = global_ctx.physical_device->depth_image_format,
+                               .samples        = VK_SAMPLE_COUNT_1_BIT,
+                               .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
+                               .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
+                               .stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+                               .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+                               .initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED,
+                               .finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                           });
     }
 
     VkSubpassDescription subpass_descriptions[] =

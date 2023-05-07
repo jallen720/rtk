@@ -50,19 +50,21 @@ struct ContextInfo
 
 struct Swapchain
 {
+    // Surface Config
+    VkSurfaceFormatKHR            surface_format;
+    VkPresentModeKHR              surface_present_mode;
+    uint32                        surface_min_image_count;
+    VkExtent2D                    surface_extent;
+    VkSurfaceTransformFlagBitsKHR surface_transform;
+
+    // Image Sharing Mode Config
+    VkSharingMode image_sharing_mode;
+    uint32        queue_family_index_count;
+    uint32*       queue_family_indexes;
+
+    // State
     VkSwapchainKHR     hnd;
     Array<VkImageView> image_views;
-    uint32             image_count;
-    VkFormat           image_format;
-    VkExtent2D         extent;
-
-    // Configuration
-    VkSurfaceFormatKHR surface_format;
-    VkPresentModeKHR   surface_present_mode;
-    uint32             min_image_count;
-    VkSharingMode      image_sharing_mode;
-    uint32             queue_family_index_count;
-    uint32*            queue_family_indexes;
 };
 
 struct Frame
@@ -412,86 +414,13 @@ static void InitMainCommandState()
     Validate(res, "vkAllocateCommandBuffers() failed");
 }
 
-static void SetupSwapchain(Stack* temp_stack, FreeList* free_list)
+static void LoadSwapchainSurface(Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);
 
     Swapchain* swapchain = &global_ctx.swapchain;
-    VkDevice device = global_ctx.device;
-    VkResult res = VK_SUCCESS;
-    VkSurfaceCapabilitiesKHR surface_capabilities = GetSurfaceCapabilities();
-
-    // Store surface format and extent for future reference.
-    swapchain->image_format = swapchain->surface_format.format;
-    swapchain->extent       = surface_capabilities.currentExtent;
-
-    // Create swapchain handle.
-    VkSwapchainCreateInfoKHR info =
-    {
-        .sType                 = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .flags                 = 0,
-        .surface               = global_ctx.surface,
-        .minImageCount         = swapchain->min_image_count,
-        .imageFormat           = swapchain->surface_format.format,
-        .imageColorSpace       = swapchain->surface_format.colorSpace,
-        .imageExtent           = surface_capabilities.currentExtent,
-        .imageArrayLayers      = 1, // Always 1 for standard images
-        .imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
-                                 VK_IMAGE_USAGE_TRANSFER_DST_BIT,
-        .imageSharingMode      = swapchain->image_sharing_mode,
-        .queueFamilyIndexCount = swapchain->queue_family_index_count,
-        .pQueueFamilyIndices   = swapchain->queue_family_indexes,
-        .preTransform          = surface_capabilities.currentTransform,
-        .compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
-        .presentMode           = swapchain->surface_present_mode,
-        .clipped               = VK_TRUE,
-        .oldSwapchain          = VK_NULL_HANDLE,
-    };
-    res = vkCreateSwapchainKHR(global_ctx.device, &info, NULL, &swapchain->hnd);
-    Validate(res, "vkCreateSwapchainKHR() failed");
-
-    // Create swapchain image views.
-    Array<VkImage> swapchain_images = {};
-    LoadVkSwapchainImages(&swapchain_images, &frame.allocator, device, swapchain->hnd);
-    InitArrayFull(&swapchain->image_views, &free_list->allocator, swapchain_images.count);
-    swapchain->image_count = swapchain_images.count;
-    for (uint32 i = 0; i < swapchain_images.count; ++i)
-    {
-        VkImageViewCreateInfo view_info =
-        {
-            .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .flags    = 0,
-            .image    = Get(&swapchain_images, i),
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format   = swapchain->image_format,
-            .components =
-            {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-            },
-            .subresourceRange =
-            {
-                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel   = 0,
-                .levelCount     = VK_REMAINING_MIP_LEVELS,
-                .baseArrayLayer = 0,
-                .layerCount     = VK_REMAINING_ARRAY_LAYERS,
-            },
-        };
-        res = vkCreateImageView(device, &view_info, NULL, GetPtr(&swapchain->image_views, i));
-        Validate(res, "vkCreateImageView() failed");
-    }
-}
-
-static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
-{
-    Stack frame = CreateFrame(temp_stack);
-
     VkSurfaceKHR surface = global_ctx.surface;
     PhysicalDevice* physical_device = global_ctx.physical_device;
-    Swapchain* swapchain = &global_ctx.swapchain;
 
     // Get surface info.
     Array<VkSurfaceFormatKHR> formats = {};
@@ -526,21 +455,24 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
         }
     }
 
+    // Set surface extent and transform.
+    swapchain->surface_extent    = surface_capabilities.currentExtent;
+    swapchain->surface_transform = surface_capabilities.currentTransform;
+
     // Set image count to min image count + 1 or max image count (whichever is smaller).
-    swapchain->min_image_count = surface_capabilities.minImageCount + 1;
-    if (surface_capabilities.maxImageCount > 0 && swapchain->min_image_count > surface_capabilities.maxImageCount)
+    swapchain->surface_min_image_count = surface_capabilities.minImageCount + 1;
+    if (surface_capabilities.maxImageCount > 0 && swapchain->surface_min_image_count > surface_capabilities.maxImageCount)
     {
-        swapchain->min_image_count = surface_capabilities.maxImageCount;
+        swapchain->surface_min_image_count = surface_capabilities.maxImageCount;
     }
+}
 
-    // Verify current extent has been set for surface.
-    if (surface_capabilities.currentExtent.width == UINT32_MAX)
-    {
-        CTK_FATAL("current extent not set for surface");
-    }
+static void LoadSwapchainImageSharingMode()
+{
+    Swapchain* swapchain = &global_ctx.swapchain;
 
-    // Determine image sharing mode based on queue family indexes.
-    QueueFamilies* queue_families = &physical_device->queue_families;
+    // Check if image sharing mode needs to be concurrent due to separate graphics & present queue families.
+    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
     if (queue_families->graphics != queue_families->present)
     {
         swapchain->image_sharing_mode       = VK_SHARING_MODE_CONCURRENT;
@@ -553,8 +485,80 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
         swapchain->queue_family_index_count = 0;
         swapchain->queue_family_indexes     = NULL;
     }
+}
 
-    SetupSwapchain(&frame, free_list);
+static void CreateSwapchain(Stack* temp_stack, FreeList* free_list)
+{
+    Stack frame = CreateFrame(temp_stack);
+
+    Swapchain* swapchain = &global_ctx.swapchain;
+    VkDevice device = global_ctx.device;
+    VkResult res = VK_SUCCESS;
+
+    // Create swapchain.
+    VkSwapchainCreateInfoKHR info =
+    {
+        .sType                 = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+        .flags                 = 0,
+        .surface               = global_ctx.surface,
+        .minImageCount         = swapchain->surface_min_image_count,
+        .imageFormat           = swapchain->surface_format.format,
+        .imageColorSpace       = swapchain->surface_format.colorSpace,
+        .imageExtent           = swapchain->surface_extent,
+        .imageArrayLayers      = 1, // Always 1 for standard image
+        .imageUsage            = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+                                 VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+        .imageSharingMode      = swapchain->image_sharing_mode,
+        .queueFamilyIndexCount = swapchain->queue_family_index_count,
+        .pQueueFamilyIndices   = swapchain->queue_family_indexes,
+        .preTransform          = swapchain->surface_transform,
+        .compositeAlpha        = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        .presentMode           = swapchain->surface_present_mode,
+        .clipped               = VK_TRUE,
+        .oldSwapchain          = VK_NULL_HANDLE,
+    };
+    res = vkCreateSwapchainKHR(device, &info, NULL, &swapchain->hnd);
+    Validate(res, "vkCreateSwapchainKHR() failed");
+
+    // Create swapchain image views.
+    Array<VkImage> swapchain_images = {};
+    LoadVkSwapchainImages(&swapchain_images, &frame.allocator, device, swapchain->hnd);
+    InitArrayFull(&swapchain->image_views, &free_list->allocator, swapchain_images.count);
+    for (uint32 i = 0; i < swapchain_images.count; ++i)
+    {
+        VkImageViewCreateInfo view_info =
+        {
+            .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .flags    = 0,
+            .image    = Get(&swapchain_images, i),
+            .viewType = VK_IMAGE_VIEW_TYPE_2D,
+            .format   = swapchain->surface_format.format,
+            .components =
+            {
+                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+            },
+            .subresourceRange =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = VK_REMAINING_MIP_LEVELS,
+                .baseArrayLayer = 0,
+                .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+            },
+        };
+        res = vkCreateImageView(device, &view_info, NULL, GetPtr(&swapchain->image_views, i));
+        Validate(res, "vkCreateImageView() failed");
+    }
+}
+
+static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
+{
+    LoadSwapchainSurface(temp_stack);
+    LoadSwapchainImageSharingMode();
+    CreateSwapchain(temp_stack, free_list);
 }
 
 static void InitRenderCommandPools(Stack* perm_stack, uint32 render_thread_count)
@@ -607,7 +611,7 @@ static void InitFrames(Stack* perm_stack)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = global_ctx.device;
-    uint32 frame_count = global_ctx.swapchain.image_count + 1;
+    uint32 frame_count = global_ctx.swapchain.image_views.count + 1;
 
     InitRingBuffer(&global_ctx.frames, &perm_stack->allocator, frame_count);
     for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
@@ -746,7 +750,7 @@ static void SubmitTempCommandBuffer()
     vkQueueWaitIdle(global_ctx.graphics_queue);
 }
 
-static void UpdateSwapchain(Stack* temp_stack, FreeList* free_list)
+static void DestroySwapchain(FreeList* free_list)
 {
     Swapchain* swapchain = &global_ctx.swapchain;
 
@@ -757,9 +761,13 @@ static void UpdateSwapchain(Stack* temp_stack, FreeList* free_list)
     }
     DeinitArray(&swapchain->image_views, &free_list->allocator);
     vkDestroySwapchainKHR(global_ctx.device, swapchain->hnd, NULL);
+}
 
-    // Re-initialize swapchain.
-    SetupSwapchain(temp_stack, free_list);
+static void UpdateSwapchainExtent(Stack* temp_stack, FreeList* free_list)
+{
+    DestroySwapchain(free_list);
+    global_ctx.swapchain.surface_extent = GetSurfaceCapabilities().currentExtent;
+    CreateSwapchain(temp_stack, free_list);
 }
 
 static void WaitIdle()

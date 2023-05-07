@@ -83,7 +83,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
     VkResult res = VK_SUCCESS;
 
     // Set render target to cover entire swapchain extent.
-    render_target->extent = global_ctx.swapchain.extent;
+    render_target->extent = global_ctx.swapchain.surface_extent;
 
     // Init depth image/views if depth testing is enabled.
     if (render_target->depth_testing)
@@ -104,7 +104,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
                 .depth  = 1
             },
             .mipLevels             = 1,
-            .arrayLayers           = swapchain->image_count,
+            .arrayLayers           = swapchain->image_views.count,
             .samples               = VK_SAMPLE_COUNT_1_BIT,
             .tiling                = VK_IMAGE_TILING_OPTIMAL,
             .usage                 = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
@@ -126,8 +126,8 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
         Validate(res, "vkBindImageMemory() failed");
 
         // Create image views for each array layer.
-        InitArray(&render_target->depth_image_views, &free_list->allocator, swapchain->image_count);
-        for (uint32 array_layer_index = 0; array_layer_index < swapchain->image_count; ++array_layer_index)
+        InitArray(&render_target->depth_image_views, &free_list->allocator, swapchain->image_views.count);
+        for (uint32 array_layer_index = 0; array_layer_index < swapchain->image_views.count; ++array_layer_index)
         {
             VkImageViewCreateInfo image_view_info =
             {
@@ -164,9 +164,9 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
     uint32 depth_attachment_count = render_target->depth_testing ? 1 : 0;
     uint32 color_attachment_count = 1;
     uint32 total_attachment_count = color_attachment_count + depth_attachment_count;
-    InitArray(&render_target->framebuffers, &free_list->allocator, swapchain->image_count);
+    InitArray(&render_target->framebuffers, &free_list->allocator, swapchain->image_views.count);
     auto attachments = CreateArray<VkImageView>(&frame.allocator, total_attachment_count);
-    for (uint32 i = 0; i < swapchain->image_count; ++i)
+    for (uint32 i = 0; i < swapchain->image_views.count; ++i)
     {
         Push(attachments, Get(&swapchain->image_views, i));
 
@@ -209,7 +209,7 @@ static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list
     PushColorAttachment(&attachments,
     {
         .flags          = 0,
-        .format         = global_ctx.swapchain.image_format,
+        .format         = global_ctx.swapchain.surface_format.format,
         .samples        = VK_SAMPLE_COUNT_1_BIT,
 
         .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,

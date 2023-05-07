@@ -167,7 +167,7 @@ static void InitImageMemory(Stack* perm_stack)
                 .pNext     = NULL,
                 .flags     = 0,
                 .imageType = VK_IMAGE_TYPE_2D,
-                .format    = GetSwapchain()->image_format,
+                .format    = GetSwapchain()->surface_format.format,
                 .extent =
                 {
                     .width  = 64,
@@ -264,7 +264,7 @@ static ShaderDataInfo DefaultTextureInfo(VkSampler sampler)
                 .flags    = 0,
                 .image    = VK_NULL_HANDLE,
                 .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format   = GetSwapchain()->image_format,
+                .format   = GetSwapchain()->surface_format.format,
                 .components =
                 {
                     .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -386,7 +386,7 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
     };
 
     // Pipeline Info
-    VkExtent2D swapchain_extent = GetSwapchain()->extent;
+    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
     VkViewport viewports[] =
     {
         {
@@ -469,7 +469,7 @@ static Matrix GetViewProjectionMatrix(View* view)
     Matrix view_matrix = LookAt(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
 
     // Projection Matrix
-    VkExtent2D swapchain_extent = GetSwapchain()->extent;
+    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
     float32 swapchain_aspect_ratio = (float32)swapchain_extent.width / swapchain_extent.height;
     Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, swapchain_aspect_ratio,
                                                     view->z_near, view->z_far);
@@ -515,7 +515,7 @@ static void RecordRenderCommandsThread(void* data)
 
 static void UpdateAllPipelines(FreeList* free_list)
 {
-    VkExtent2D swapchain_extent = GetSwapchain()->extent;
+    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
     VkViewport viewports[] =
     {
         {

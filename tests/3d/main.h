@@ -125,7 +125,7 @@ LogPhysicalDevice(global_ctx.physical_device);
         if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
         {
             WaitIdle();
-            UpdateSwapchain(temp_stack, free_list);
+            UpdateSwapchainExtent(temp_stack, free_list);
             UpdateAllPipelines(free_list);
             UpdateAllRenderTargets(temp_stack, free_list);
             continue;

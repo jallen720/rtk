@@ -270,7 +270,7 @@ static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list
     return render_target_hnd;
 }
 
-static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack* temp_stack, FreeList* free_list)
+static void UpdateRenderTargetAttachments(RenderTargetHnd render_target_hnd, Stack* temp_stack, FreeList* free_list)
 {
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
 

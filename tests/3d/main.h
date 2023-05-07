@@ -127,7 +127,7 @@ LogPhysicalDevice(global_ctx.physical_device);
             WaitIdle();
             UpdateSwapchainSurfaceExtent(temp_stack, free_list);
             UpdateAllPipelineViewports(free_list);
-            UpdateAllRenderTargets(temp_stack, free_list);
+            UpdateAllRenderTargetAttachments(temp_stack, free_list);
             continue;
         }
 

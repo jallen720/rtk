@@ -530,9 +530,9 @@ static void UpdateAllPipelineViewports(FreeList* free_list)
     UpdatePipelineViewports(render_state.pipeline.main, free_list, CTK_WRAP_ARRAY(viewports));
 }
 
-static void UpdateAllRenderTargets(Stack* temp_stack, FreeList* free_list)
+static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_list)
 {
-    UpdateRenderTarget(render_state.render_target.main, temp_stack, free_list);
+    UpdateRenderTargetAttachments(render_state.render_target.main, temp_stack, free_list);
 }
 
 /// Interface

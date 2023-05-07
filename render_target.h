@@ -75,7 +75,7 @@ static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentD
     });
 }
 
-static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
+static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
 {
     Stack frame = CreateFrame(temp_stack);
     Swapchain* swapchain = &global_ctx.swapchain;
@@ -265,7 +265,7 @@ static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list
     InitArray(&render_target->attachment_clear_values, &free_list->allocator, &info->attachment_clear_values);
 
     // Create depth images and framebuffers based on swapchain extent.
-    SetupRenderTarget(render_target, &frame, free_list);
+    CreateRenderTarget(render_target, &frame, free_list);
 
     return render_target_hnd;
 }
@@ -274,7 +274,7 @@ static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack* temp_st
 {
     RenderTarget* render_target = GetRenderTarget(render_target_hnd);
 
-    // Destory depth images.
+    // Destroy depth images.
     if (render_target->depth_testing)
     {
         VkDevice device = global_ctx.device;
@@ -291,7 +291,7 @@ static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack* temp_st
         vkFreeMemory(device, render_target->depth_image_mem, NULL);
     }
 
-    // Destory framebuffers.
+    // Destroy framebuffers.
     for (uint32 i = 0; i < render_target->framebuffers.count; ++i)
     {
         vkDestroyFramebuffer(global_ctx.device, Get(&render_target->framebuffers, i), NULL);
@@ -299,7 +299,7 @@ static void UpdateRenderTarget(RenderTargetHnd render_target_hnd, Stack* temp_st
     DeinitArray(&render_target->framebuffers, &free_list->allocator);
 
     // Re-create depth images and framebuffers with new swapchain extent.
-    SetupRenderTarget(render_target, temp_stack, free_list);
+    CreateRenderTarget(render_target, temp_stack, free_list);
 }
 
 }

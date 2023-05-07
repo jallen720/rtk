@@ -56,9 +56,6 @@ struct PipelineLayoutInfo
 
 struct Pipeline
 {
-    VkPipelineLayout layout;
-    VkPipeline       hnd;
-
     // Configuration
     Array<VkPipelineShaderStageCreateInfo> shader_stage_create_infos;
     Array<VkViewport>                      viewports;
@@ -66,14 +63,17 @@ struct Pipeline
     VertexLayout*                          vertex_layout;
     bool                                   depth_testing;
     VkRenderPass                           render_pass;
+
+    // State
+    VkPipelineLayout layout;
+    VkPipeline       hnd;
 };
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void InitScissors(Pipeline* pipeline, FreeList* free_list)
+static void InitScissors(Pipeline* pipeline)
 {
     // Make all scissors cover their corresponding viewports.
-    InitArray(&pipeline->scissors, &free_list->allocator, pipeline->viewports.size);
     for (uint32 i = 0; i < pipeline->viewports.count; ++i)
     {
         VkViewport* viewport = GetPtr(&pipeline->viewports, i);
@@ -93,7 +93,7 @@ static void InitScissors(Pipeline* pipeline, FreeList* free_list)
     }
 }
 
-static void SetupPipeline(Pipeline* pipeline)
+static void CreatePipeline(Pipeline* pipeline)
 {
     // Vertex Input
     VkPipelineVertexInputStateCreateInfo vertex_input_state = DEFAULT_VERTEX_INPUT_STATE;
@@ -216,9 +216,11 @@ static PipelineHnd CreatePipeline(Stack* temp_stack, FreeList* free_list, Pipeli
 {
     Stack frame = CreateFrame(temp_stack);
 
-    // Allocate Pipeline
     PipelineHnd pipeline_hnd = AllocatePipeline();
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
+
+    /// Configure Pipeline
+    ////////////////////////////////////////////////////////////
 
     // Layout
     Array<VkDescriptorSetLayout> descriptor_set_layouts = {};
@@ -249,30 +251,38 @@ static PipelineHnd CreatePipeline(Stack* temp_stack, FreeList* free_list, Pipeli
 
     // Viewports/Scissors
     InitArray(&pipeline->viewports, &free_list->allocator, &info->viewports);
-    InitScissors(pipeline, free_list);
+    InitArray(&pipeline->scissors, &free_list->allocator, pipeline->viewports.size);
+    InitScissors(pipeline);
 
     pipeline->vertex_layout = info->vertex_layout;
     pipeline->depth_testing = info->depth_testing;
     pipeline->render_pass   = GetRenderTarget(info->render_target_hnd)->render_pass;
 
-    SetupPipeline(pipeline);
+    /// Create Pipeline
+    ////////////////////////////////////////////////////////////
+    CreatePipeline(pipeline);
 
     return pipeline_hnd;
 }
 
-static void UpdateViewports(PipelineHnd pipeline_hnd, FreeList* free_list, Array<VkViewport> viewports)
+static void UpdatePipelineViewports(PipelineHnd pipeline_hnd, FreeList* free_list, Array<VkViewport> viewports)
 {
     Pipeline* pipeline = GetPipeline(pipeline_hnd);
 
-    // Re-init viewport & scissor arrays.
-    DeinitArray(&pipeline->viewports, &free_list->allocator);
-    DeinitArray(&pipeline->scissors, &free_list->allocator);
-    InitArray(&pipeline->viewports, &free_list->allocator, &viewports);
-    InitScissors(pipeline, free_list);
+    // Update viewports and scissors arrays.
+    Clear(&pipeline->viewports);
+    Clear(&pipeline->scissors);
+    if (!CanPush(&pipeline->viewports, viewports.count))
+    {
+        Resize(&pipeline->viewports, &free_list->allocator, viewports.count);
+        Resize(&pipeline->scissors, &free_list->allocator, viewports.count);
+    }
+    PushRange(&pipeline->viewports, &viewports);
+    InitScissors(pipeline);
 
-    // Re-setup pipeline.
+    // Recreate pipeline.
     vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
-    SetupPipeline(pipeline);
+    CreatePipeline(pipeline);
 }
 
 }

@@ -513,7 +513,7 @@ static void RecordRenderCommandsThread(void* data)
     EndRenderCommands(command_buffer);
 }
 
-static void UpdateAllPipelines(FreeList* free_list)
+static void UpdateAllPipelineViewports(FreeList* free_list)
 {
     VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
     VkViewport viewports[] =
@@ -527,7 +527,7 @@ static void UpdateAllPipelines(FreeList* free_list)
             .maxDepth = 1
         },
     };
-    UpdateViewports(render_state.pipeline.main, free_list, CTK_WRAP_ARRAY(viewports));
+    UpdatePipelineViewports(render_state.pipeline.main, free_list, CTK_WRAP_ARRAY(viewports));
 }
 
 static void UpdateAllRenderTargets(Stack* temp_stack, FreeList* free_list)

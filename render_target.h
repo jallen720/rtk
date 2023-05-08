@@ -196,7 +196,7 @@ static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list
 
     render_target->depth_testing = info->depth_testing;
 
-    uint32 depth_attachment_count = render_target->depth_testing ? 1 : 0;
+    uint32 depth_attachment_count = render_target->depth_testing ? 1u : 0u;
     uint32 color_attachment_count = 1;
     render_target->total_attachment_count = depth_attachment_count + color_attachment_count;
 

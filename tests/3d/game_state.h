@@ -156,7 +156,7 @@ static void InitGameState()
         };
         entity_data->entities[entity] =
         {
-            .rotate_axis      = RandomRange<uint8>(0u, 3u),
+            .rotate_axis      = (uint8)RandomRange(0u, 3u),
             .rotate_direction = RandomRange(0u, 2u) ? -1 : 1,
         };
     }

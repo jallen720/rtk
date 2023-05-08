@@ -19,6 +19,9 @@
     <Filter Include="Source Files\tests\3d">
       <UniqueIdentifier>{f2ced265-dfe8-4063-a5fa-dd2901a1a182}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\stb">
+      <UniqueIdentifier>{3b9becab-374a-476a-9be6-0a5de93eec9e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="tests\shared.h">
@@ -86,6 +89,12 @@
     </ClInclude>
     <ClInclude Include="tests\3d\render_state.h">
       <Filter>Source Files\tests\3d</Filter>
+    </ClInclude>
+    <ClInclude Include="stb\stb_image.h">
+      <Filter>Source Files\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -115,7 +115,7 @@ static void DrawMesh(VkCommandBuffer command_buffer, MeshHnd mesh_hnd, uint32 in
                      mesh->index_count,   // Index Count
                      instance_count,      // Instance Count
                      mesh->index_offset,  // Index Offset
-                     mesh->vertex_offset, // Vertex Offset
+                     mesh->vertex_offset, // Vertex Offset (sint32)
                      instance_start);     // First Instance
 }
 

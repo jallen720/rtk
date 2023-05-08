@@ -5,9 +5,7 @@
 #include "ctk3/pool.h"
 #include "rtk/vulkan.h"
 #include "rtk/context.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "rtk/stb/stb_image.h"
+#include "rtk/stb_image.h"
 
 using namespace CTK;
 

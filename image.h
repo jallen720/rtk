@@ -115,7 +115,7 @@ static void LoadImageData(ImageData* image_data, const char* path)
     image_data->data = stbi_load(path, &image_data->width, &image_data->height, &image_data->channel_count, 0);
     if (image_data->data == NULL)
     {
-        CTK_FATAL("failed to open image file from path '%s'", path);
+        CTK_FATAL("failed to load image data from path '%s'", path);
     }
 
     image_data->size = image_data->width * image_data->height * image_data->channel_count;

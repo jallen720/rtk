@@ -55,8 +55,8 @@ static MeshHnd CreateMesh(MeshDataHnd mesh_data_hnd, Array<VertexType> vertexes,
     mesh->index_offset  = mesh_data->index_buffer.index / sizeof(uint32);
     mesh->index_count   = indexes.count;
 
-    Write(&mesh_data->vertex_buffer, vertexes.data, ByteSize(&vertexes));
-    Write(&mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
+    WriteHostBuffer(&mesh_data->vertex_buffer, vertexes.data, ByteSize(&vertexes));
+    WriteHostBuffer(&mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
 
     return mesh_hnd;
 }

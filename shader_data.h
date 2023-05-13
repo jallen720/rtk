@@ -3,7 +3,6 @@
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/context.h"
-#include "rtk/resources.h"
 #include "rtk/buffer.h"
 #include "rtk/image.h"
 #include "ctk3/ctk3.h"
@@ -19,13 +18,13 @@ namespace RTK
 ////////////////////////////////////////////////////////////
 struct BufferShaderDataInfo
 {
-    BufferHnd parent_hnd;
-    uint32    size;
+    Buffer* parent;
+    uint32  size;
 };
 
 struct ImageShaderDataInfo
 {
-    ImageMemoryHnd        memory;
+    ImageMemory*          memory;
     VkSampler             sampler;
     VkImageViewCreateInfo view;
 };
@@ -73,10 +72,9 @@ struct ShaderDataSet
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ShaderDataHnd CreateShaderData(Stack* perm_stack, ShaderDataInfo* info)
+static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* info)
 {
-    ShaderDataHnd shader_data_hnd = AllocateShaderData();
-    ShaderData* shader_data = GetShaderData(shader_data_hnd);
+    auto shader_data = Allocate<ShaderData>(allocator, 1);
 
     shader_data->stages    = info->stages;
     shader_data->type      = info->type;
@@ -90,10 +88,10 @@ static ShaderDataHnd CreateShaderData(Stack* perm_stack, ShaderDataInfo* info)
         BufferShaderDataInfo* buffer_info = &info->buffer;
         BufferShaderData* buffer_shader_data = &shader_data->buffer;
 
-        InitArray(&buffer_shader_data->array, &perm_stack->allocator, instance_count);
+        InitArray(&buffer_shader_data->array, allocator, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
         {
-            InitBuffer(Push(&buffer_shader_data->array), GetBuffer(buffer_info->parent_hnd), buffer_info->size);
+            InitBuffer(Push(&buffer_shader_data->array), buffer_info->parent, buffer_info->size);
         }
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
@@ -102,7 +100,7 @@ static ShaderDataHnd CreateShaderData(Stack* perm_stack, ShaderDataInfo* info)
         ImageShaderData* image_shader_data = &shader_data->image;
 
         image_shader_data->sampler = image_info->sampler;
-        InitArray(&image_shader_data->array, &perm_stack->allocator, instance_count);
+        InitArray(&image_shader_data->array, allocator, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
         {
             InitImage(Push(&image_shader_data->array), image_info->memory, &image_info->view);
@@ -113,24 +111,20 @@ static ShaderDataHnd CreateShaderData(Stack* perm_stack, ShaderDataInfo* info)
         CTK_FATAL("can't init shader data: data type %u is unsupported", shader_data->type);
     }
 
-    return shader_data_hnd;
+    return shader_data;
 }
 
 template<typename Type>
-static Type* GetBufferMem(ShaderDataHnd shader_data_hnd)
+static Type* GetBufferMem(ShaderData* shader_data)
 {
-    ShaderData* shader_data = GetShaderData(shader_data_hnd);
     CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
     return (Type*)GetPtr(&shader_data->buffer.array, global_ctx.frames.index)->mapped_mem;
 }
 
-static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instance_index,
-                                   BufferHnd image_data_buffer_hnd)
+static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, Buffer* image_data_buffer)
 {
-    ShaderData* shader_data = GetShaderData(shader_data_hnd);
-    Buffer* image_data_buffer = GetBuffer(image_data_buffer_hnd);
     Image* image = GetPtr(&shader_data->image.array, instance_index);
 
     // Copy image data from buffer memory to image memory.
@@ -222,11 +216,11 @@ static void WriteToShaderDataImage(ShaderDataHnd shader_data_hnd, uint32 instanc
     SubmitTempCommandBuffer();
 }
 
-static ShaderDataSetHnd CreateShaderDataSet(Stack* perm_stack, Stack* temp_stack, Array<ShaderDataHnd> datas)
+static ShaderDataSet* CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderData*> datas)
 {
     Stack frame = CreateFrame(temp_stack);
-    ShaderDataSetHnd shader_data_set_hnd = AllocateShaderDataSet();
-    ShaderDataSet* shader_data_set = GetShaderDataSet(shader_data_set_hnd);
+
+    auto shader_data_set = Allocate<ShaderDataSet>(allocator, 1);
 
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
@@ -236,7 +230,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* perm_stack, Stack* temp_stack
     auto bindings = CreateArray<VkDescriptorSetLayoutBinding>(&frame.allocator, datas.count);
     for (uint32 i = 0; i < datas.count; ++i)
     {
-        ShaderData* data = GetShaderData(Get(&datas, i));
+        ShaderData* data = Get(&datas, i);
         Push(bindings,
         {
             .binding            = i,
@@ -275,7 +269,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* perm_stack, Stack* temp_stack
         .descriptorSetCount = instance_count,
         .pSetLayouts        = desc_set_alloc_layouts->data,
     };
-    InitArrayFull(&shader_data_set->instances, &perm_stack->allocator, instance_count);
+    InitArrayFull(&shader_data_set->instances, allocator, instance_count);
     res = vkAllocateDescriptorSets(device, &allocate_info, shader_data_set->instances.data);
     Validate(res, "vkAllocateDescriptorSets() failed");
 
@@ -290,7 +284,7 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* perm_stack, Stack* temp_stack
         VkDescriptorSet instance_desc_set = Get(&shader_data_set->instances, instance_index);
         for (uint32 data_binding = 0; data_binding < datas.count; ++data_binding)
         {
-            ShaderData* shader_data = GetShaderData(Get(&datas, data_binding));
+            ShaderData* shader_data = Get(&datas, data_binding);
             uint32 data_instance_index = shader_data->per_frame ? instance_index : 0;
 
             VkWriteDescriptorSet* write = Push(writes);
@@ -328,12 +322,12 @@ static ShaderDataSetHnd CreateShaderDataSet(Stack* perm_stack, Stack* temp_stack
 
     vkUpdateDescriptorSets(device, writes->count, writes->data, 0, NULL);
 
-    return shader_data_set_hnd;
+    return shader_data_set;
 }
 
-static uint32 GetImageCount(ShaderDataHnd shader_data_hnd)
+static uint32 GetImageCount(ShaderData* shader_data)
 {
-    return GetShaderData(shader_data_hnd)->image.array.count;
+    return shader_data->image.array.count;
 }
 
 }

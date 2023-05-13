@@ -3,7 +3,6 @@
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/context.h"
-#include "rtk/resources.h"
 #include "ctk3/ctk3.h"
 #include "ctk3/stack.h"
 #include "ctk3/array.h"
@@ -46,13 +45,15 @@ static VkShaderModule LoadShaderModule(Stack* temp_stack, const char* path)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ShaderHnd CreateShader(Stack* temp_stack, const char* path, VkShaderStageFlagBits stage)
+static Shader* CreateShader(const Allocator* allocator, Stack* temp_stack, const char* path,
+                            VkShaderStageFlagBits stage)
 {
-    ShaderHnd shader_hnd = AllocateShader();
-    Shader* shader = GetShader(shader_hnd);
+    auto shader = Allocate<Shader>(allocator, 1);
+
     shader->module = LoadShaderModule(temp_stack, path);
     shader->stage  = stage;
-    return shader_hnd;
+
+    return shader;
 }
 
 }

@@ -41,16 +41,16 @@ struct VertexLayout
 
 struct PipelineInfo
 {
-    Array<ShaderHnd>  shaders;
+    Array<Shader*>    shaders;
     Array<VkViewport> viewports;
     VertexLayout*     vertex_layout;
     bool              depth_testing;
-    RenderTargetHnd   render_target_hnd;
+    RenderTarget*     render_target;
 };
 
 struct PipelineLayoutInfo
 {
-    Array<ShaderDataSetHnd>    shader_data_sets;
+    Array<ShaderDataSet*>      shader_data_sets;
     Array<VkPushConstantRange> push_constant_ranges;
 };
 
@@ -211,13 +211,12 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count, AttributeTyp
     ++layout->attribute_location;
 }
 
-static PipelineHnd CreatePipeline(Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
-                                  PipelineLayoutInfo* layout_info)
+static Pipeline* CreatePipeline(const Allocator* allocator, Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
+                                PipelineLayoutInfo* layout_info)
 {
     Stack frame = CreateFrame(temp_stack);
 
-    PipelineHnd pipeline_hnd = AllocatePipeline();
-    Pipeline* pipeline = GetPipeline(pipeline_hnd);
+    auto pipeline = Allocate<Pipeline>(allocator, 1);
 
     /// Configure Pipeline
     ////////////////////////////////////////////////////////////
@@ -229,7 +228,7 @@ static PipelineHnd CreatePipeline(Stack* temp_stack, FreeList* free_list, Pipeli
         InitArray(&descriptor_set_layouts, &frame.allocator, layout_info->shader_data_sets.count);
         for (uint32 i = 0; i < layout_info->shader_data_sets.count; ++i)
         {
-            Push(&descriptor_set_layouts, GetShaderDataSet(Get(&layout_info->shader_data_sets, i))->layout);
+            Push(&descriptor_set_layouts, Get(&layout_info->shader_data_sets, i)->layout);
         }
     }
 
@@ -256,19 +255,17 @@ static PipelineHnd CreatePipeline(Stack* temp_stack, FreeList* free_list, Pipeli
 
     pipeline->vertex_layout = info->vertex_layout;
     pipeline->depth_testing = info->depth_testing;
-    pipeline->render_pass   = GetRenderTarget(info->render_target_hnd)->render_pass;
+    pipeline->render_pass   = info->render_target->render_pass;
 
     /// Create Pipeline
     ////////////////////////////////////////////////////////////
     CreatePipeline(pipeline);
 
-    return pipeline_hnd;
+    return pipeline;
 }
 
-static void UpdatePipelineViewports(PipelineHnd pipeline_hnd, FreeList* free_list, Array<VkViewport> viewports)
+static void UpdatePipelineViewports(Pipeline* pipeline, FreeList* free_list, Array<VkViewport> viewports)
 {
-    Pipeline* pipeline = GetPipeline(pipeline_hnd);
-
     // Update viewports and scissors arrays.
     Clear(&pipeline->viewports);
     Clear(&pipeline->scissors);

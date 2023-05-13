@@ -137,9 +137,8 @@ static constexpr VkPipelineLayoutCreateInfo DEFAULT_LAYOUT_CREATE_INFO =
     .pPushConstantRanges    = NULL,
 };
 
-static VkPipelineShaderStageCreateInfo DefaultShaderStageCreateInfo(ShaderHnd shader_hnd)
+static VkPipelineShaderStageCreateInfo DefaultShaderStageCreateInfo(Shader* shader)
 {
-    Shader* shader = GetShader(shader_hnd);
     return
     {
         .sType               = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,

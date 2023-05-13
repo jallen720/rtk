@@ -81,19 +81,6 @@ static void Run()
     InitContext(perm_stack, temp_stack, free_list, &context_info);
 LogPhysicalDevice(global_ctx.physical_device);
 
-    ResourcesInfo resources_info =
-    {
-        .max_buffers          = 16,
-        .max_shader_datas     = 8,
-        .max_shader_data_sets = 8,
-        .max_shaders          = 2,
-        .max_mesh_datas       = 1,
-        .max_meshes           = 8,
-        .max_render_targets   = 1,
-        .max_pipelines        = 1,
-    };
-    InitResources(perm_stack, &resources_info);
-
     // Initialize other test state.
     ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
     InitGameState();

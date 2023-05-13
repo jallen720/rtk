@@ -5,7 +5,6 @@
 #include "rtk/debug.h"
 #include "rtk/context.h"
 #include "rtk/device.h"
-#include "rtk/resources.h"
 
 using namespace CTK;
 
@@ -100,18 +99,18 @@ static void InitBuffer(Buffer* buffer, Buffer* parent_buffer, VkDeviceSize size)
     parent_buffer->index += size;
 }
 
-static BufferHnd CreateBuffer(BufferInfo* info)
+static Buffer* CreateBuffer(const Allocator* allocator, BufferInfo* info)
 {
-    BufferHnd buffer_hnd = AllocateBuffer();
-    InitBuffer(GetBuffer(buffer_hnd), info);
-    return buffer_hnd;
+    auto buffer = Allocate<Buffer>(allocator, 1);
+    InitBuffer(buffer, info);
+    return buffer;
 }
 
-static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, VkDeviceSize size)
+static Buffer* CreateBuffer(const Allocator* allocator, Buffer* parent_buffer, VkDeviceSize size)
 {
-    BufferHnd buffer_hnd = AllocateBuffer();
-    InitBuffer(GetBuffer(buffer_hnd), GetBuffer(parent_buffer_hnd), size);
-    return buffer_hnd;
+    auto buffer = Allocate<Buffer>(allocator, 1);
+    InitBuffer(buffer, parent_buffer, size);
+    return buffer;
 }
 
 static void WriteHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
@@ -131,15 +130,9 @@ static void WriteHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
     buffer->index += data_size;
 }
 
-static void WriteHostBuffer(BufferHnd buffer_hnd, void* data, VkDeviceSize data_size)
+static void Clear(Buffer* buffer)
 {
-    Buffer* buffer = GetBuffer(buffer_hnd);
-    WriteHostBuffer(buffer, data, data_size);
-}
-
-static void Clear(BufferHnd buffer_hnd)
-{
-    GetBuffer(buffer_hnd)->index = 0;
+    buffer->index = 0;
 }
 
 }

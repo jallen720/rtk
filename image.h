@@ -46,25 +46,14 @@ struct ImageData
     uint8* data;
 };
 
-using ImageMemoryHnd = PoolHnd<ImageMemory>;
-
-/// Pools
-////////////////////////////////////////////////////////////
-static Pool<ImageMemory> global_image_memory_pool;
-
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitImageMemoryPool(Stack* perm_stack, uint32 size)
-{
-    InitPool(&global_image_memory_pool, &perm_stack->allocator, size);
-}
-
-static ImageMemoryHnd CreateImageMemory(ImageMemoryInfo* info, VkAllocationCallbacks* allocators)
+static ImageMemory* CreateImageMemory(const Allocator* allocator, ImageMemoryInfo* info,
+                                      VkAllocationCallbacks* vk_allocators)
 {
     VkDevice device = global_ctx.device;
 
-    ImageMemoryHnd image_memory_hnd = Allocate(&global_image_memory_pool);
-    ImageMemory* image_memory = GetData(&global_image_memory_pool, image_memory_hnd);
+    auto image_memory = Allocate<ImageMemory>(allocator, 1);
 
     // Create temp image with image info to get memory requiremnts, then destroy temp image.
     VkImage temp_image = VK_NULL_HANDLE;
@@ -75,21 +64,19 @@ static ImageMemoryHnd CreateImageMemory(ImageMemoryInfo* info, VkAllocationCallb
 PrintResourceMemoryInfo("image memory", &image_memory->requirements, info->mem_property_flags);
 
     // Allocate image memory.
-    image_memory->hnd = AllocateDeviceMemory(&image_memory->requirements, info->mem_property_flags, allocators,
+    image_memory->hnd = AllocateDeviceMemory(&image_memory->requirements, info->mem_property_flags, vk_allocators,
                                              info->max_image_count);
 
     image_memory->size = info->max_image_count;
     image_memory->image_info = info->image_info;
 
-    return image_memory_hnd;
+    return image_memory;
 }
 
-static void InitImage(Image* image, ImageMemoryHnd image_memory_hnd, VkImageViewCreateInfo* view_info)
+static void InitImage(Image* image, ImageMemory* image_memory, VkImageViewCreateInfo* view_info)
 {
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
-
-    ImageMemory* image_memory = GetData(&global_image_memory_pool, image_memory_hnd);
 
     // Create image.
     res = vkCreateImage(device, &image_memory->image_info, NULL, &image->hnd);

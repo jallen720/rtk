@@ -60,9 +60,6 @@
     <ClInclude Include="rendering.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="resources.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="rtk.h">
       <Filter>Source Files</Filter>
     </ClInclude>

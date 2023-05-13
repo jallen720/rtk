@@ -34,10 +34,10 @@ struct MVPMatrixState
 
 struct RenderCommandState
 {
-    uint32           thread_index;
-    ShaderDataSetHnd texture;
-    BatchRange       batch_range;
-    MeshHnd          mesh;
+    uint32         thread_index;
+    ShaderDataSet* texture;
+    BatchRange     batch_range;
+    Mesh*          mesh;
 };
 
 template<typename StateType>
@@ -62,51 +62,51 @@ struct RenderState
     // Resources
     struct
     {
-        BufferHnd host;
-        BufferHnd device;
-        BufferHnd staging;
+        Buffer* host;
+        Buffer* device;
+        Buffer* staging;
     }
     buffer;
     struct
     {
-        ImageMemoryHnd texture;
+        ImageMemory* texture;
     }
     image_memory;
     struct
     {
-        RenderTargetHnd main;
+        RenderTarget* main;
     }
     render_target;
     struct
     {
-        ShaderDataHnd vs_buffer;
-        ShaderDataHnd axis_cube_texture;
-        ShaderDataHnd dirt_block_texture;
+        ShaderData* vs_buffer;
+        ShaderData* axis_cube_texture;
+        ShaderData* dirt_block_texture;
     }
     data;
     struct
     {
-        ShaderDataSetHnd entity_data;
-        ShaderDataSetHnd axis_cube_texture;
-        ShaderDataSetHnd dirt_block_texture;
+        ShaderDataSet* entity_data;
+        ShaderDataSet* axis_cube_texture;
+        ShaderDataSet* dirt_block_texture;
     }
     data_set;
     struct
     {
-        ShaderHnd vert_3d;
-        ShaderHnd frag_3d;
+        Shader* vert_3d;
+        Shader* frag_3d;
     }
     shader;
     struct
     {
-        PipelineHnd main;
+        Pipeline* main;
     }
     pipeline;
     struct
     {
-        MeshDataHnd data;
-        MeshHnd     cube;
-        MeshHnd     quad;
+        MeshData* data;
+        Mesh*     cube;
+        Mesh*     quad;
     }
     mesh;
 };
@@ -125,7 +125,7 @@ static RenderState render_state;
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void InitBuffers()
+static void InitBuffers(Stack* perm_stack)
 {
     BufferInfo host_buffer_info =
     {
@@ -137,7 +137,7 @@ static void InitBuffers()
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    render_state.buffer.host = CreateBuffer(&host_buffer_info);
+    render_state.buffer.host = CreateBuffer(&perm_stack->allocator, &host_buffer_info);
 
     BufferInfo device_buffer_info =
     {
@@ -148,15 +148,13 @@ static void InitBuffers()
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    render_state.buffer.device = CreateBuffer(&device_buffer_info);
+    render_state.buffer.device = CreateBuffer(&perm_stack->allocator, &device_buffer_info);
 
-    render_state.buffer.staging = CreateBuffer(render_state.buffer.host, Megabyte32<4>());
+    render_state.buffer.staging = CreateBuffer(&perm_stack->allocator, render_state.buffer.host, Megabyte32<4>());
 }
 
 static void InitImageMemory(Stack* perm_stack)
 {
-    InitImageMemoryPool(perm_stack, 4);
-
     // texture
     {
         ImageMemoryInfo info =
@@ -188,11 +186,11 @@ static void InitImageMemory(Stack* perm_stack)
             .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             .max_image_count    = 4,
         };
-        render_state.image_memory.texture = CreateImageMemory(&info, NULL);
+        render_state.image_memory.texture = CreateImageMemory(&perm_stack->allocator, &info, NULL);
     }
 }
 
-static void InitRenderTargets(Stack* temp_stack, FreeList* free_list)
+static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
     VkClearValue attachment_clear_values[] =
     {
@@ -204,7 +202,7 @@ static void InitRenderTargets(Stack* temp_stack, FreeList* free_list)
         .depth_testing           = true,
         .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
     };
-    render_state.render_target.main = CreateRenderTarget(temp_stack, free_list, &info);
+    render_state.render_target.main = CreateRenderTarget(&perm_stack->allocator, temp_stack, free_list, &info);
 }
 
 static void InitVertexLayout(Stack* perm_stack)
@@ -285,24 +283,24 @@ static ShaderDataInfo DefaultTextureInfo(VkSampler sampler)
     };
 }
 
-static ShaderDataHnd CreateTexture(Stack* perm_stack, const char* image_path)
+static ShaderData* CreateTexture(Stack* perm_stack, const char* image_path)
 {
     ShaderDataInfo info = DefaultTextureInfo(render_state.sampler);
-    ShaderDataHnd shader_data_hnd = CreateShaderData(perm_stack, &info);
+    ShaderData* shader_data = CreateShaderData(&perm_stack->allocator, &info);
 
     // Copy image data into staging buffer, write to shader data images, then destroy image data.
     ImageData image_data = {};
     LoadImageData(&image_data, image_path);
     Clear(render_state.buffer.staging);
     WriteHostBuffer(render_state.buffer.staging, image_data.data, image_data.size);
-    uint32 image_count = GetImageCount(shader_data_hnd);
+    uint32 image_count = GetImageCount(shader_data);
     for (uint32 i = 0; i < image_count; ++i)
     {
-        WriteToShaderDataImage(shader_data_hnd, i, render_state.buffer.staging);
+        WriteToShaderDataImage(shader_data, i, render_state.buffer.staging);
     }
     DestroyImageData(&image_data);
 
-    return shader_data_hnd;
+    return shader_data;
 }
 
 static void InitShaderDatas(Stack* perm_stack)
@@ -316,11 +314,11 @@ static void InitShaderDatas(Stack* perm_stack)
             .per_frame = true,
             .buffer=
             {
-                .parent_hnd = render_state.buffer.host,
-                .size       = sizeof(VSBuffer),
+                .parent = render_state.buffer.host,
+                .size   = sizeof(VSBuffer),
             }
         };
-        render_state.data.vs_buffer = CreateShaderData(perm_stack, &info);
+        render_state.data.vs_buffer = CreateShaderData(&perm_stack->allocator, &info);
     }
 
     render_state.data.axis_cube_texture  = CreateTexture(perm_stack, "images/axis_cube.png");
@@ -331,42 +329,42 @@ static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 {
     // data_set.vs_buffer
     {
-        ShaderDataHnd datas[] =
+        ShaderData* datas[] =
         {
             render_state.data.vs_buffer,
         };
-        render_state.data_set.entity_data = CreateShaderDataSet(perm_stack, temp_stack, CTK_WRAP_ARRAY(datas));
+        render_state.data_set.entity_data = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 
     // data_set.axis_cube_texture
     {
-        ShaderDataHnd datas[] =
+        ShaderData* datas[] =
         {
             render_state.data.axis_cube_texture,
         };
-        render_state.data_set.axis_cube_texture = CreateShaderDataSet(perm_stack, temp_stack, CTK_WRAP_ARRAY(datas));
+        render_state.data_set.axis_cube_texture = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 
     // data_set.dirt_block_texture
     {
-        ShaderDataHnd datas[] =
+        ShaderData* datas[] =
         {
             render_state.data.dirt_block_texture,
         };
-        render_state.data_set.dirt_block_texture = CreateShaderDataSet(perm_stack, temp_stack, CTK_WRAP_ARRAY(datas));
+        render_state.data_set.dirt_block_texture = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 }
 
-static void InitShaders(Stack* temp_stack)
+static void InitShaders(Stack* perm_stack, Stack* temp_stack)
 {
-    render_state.shader.vert_3d = CreateShader(temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    render_state.shader.frag_3d = CreateShader(temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    render_state.shader.vert_3d = CreateShader(&perm_stack->allocator, temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    render_state.shader.frag_3d = CreateShader(&perm_stack->allocator, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
-static void InitPipelines(Stack* temp_stack, FreeList* free_list)
+static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
     // Pipeline Layout
-    ShaderDataSetHnd shader_data_sets[] =
+    ShaderDataSet* shader_data_sets[] =
     {
         render_state.data_set.entity_data,
         render_state.data_set.axis_cube_texture,
@@ -398,45 +396,43 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
             .maxDepth = 1
         },
     };
-    ShaderHnd shaders[] =
+    Shader* shaders[] =
     {
         render_state.shader.vert_3d,
         render_state.shader.frag_3d,
     };
     PipelineInfo pipeline_info =
     {
-        .shaders           = CTK_WRAP_ARRAY(shaders),
-        .viewports         = CTK_WRAP_ARRAY(viewports),
-        .vertex_layout     = &render_state.vertex_layout,
-        .depth_testing     = true,
-        .render_target_hnd = render_state.render_target.main,
+        .shaders       = CTK_WRAP_ARRAY(shaders),
+        .viewports     = CTK_WRAP_ARRAY(viewports),
+        .vertex_layout = &render_state.vertex_layout,
+        .depth_testing = true,
+        .render_target = render_state.render_target.main,
     };
 
-    render_state.pipeline.main = CreatePipeline(temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
+    render_state.pipeline.main = CreatePipeline(&perm_stack->allocator, temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
 }
 
-static void InitMeshes()
+static void InitMeshes(Stack* perm_stack)
 {
     MeshDataInfo mesh_data_info =
     {
-        .parent_buffer_hnd  = render_state.buffer.host,
+        .parent_buffer      = render_state.buffer.host,
         .vertex_buffer_size = Megabyte32<1>(),
         .index_buffer_size  = Megabyte32<1>(),
     };
-    render_state.mesh.data = CreateMeshData(&mesh_data_info);
+    render_state.mesh.data = CreateMeshData(&perm_stack->allocator, &mesh_data_info);
 
     {
         #include "rtk/meshes/cube.h"
-        render_state.mesh.cube = CreateMesh(render_state.mesh.data,
-                                            CTK_WRAP_ARRAY(vertexes),
-                                            CTK_WRAP_ARRAY(indexes));
+        render_state.mesh.cube = CreateMesh(&perm_stack->allocator, render_state.mesh.data,
+                                            CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes));
     }
 
     {
         #include "rtk/meshes/quad_3d.h"
-        render_state.mesh.quad = CreateMesh(render_state.mesh.data,
-                                            CTK_WRAP_ARRAY(vertexes),
-                                            CTK_WRAP_ARRAY(indexes));
+        render_state.mesh.quad = CreateMesh(&perm_stack->allocator, render_state.mesh.data,
+                                            CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes));
     }
 }
 
@@ -504,7 +500,7 @@ static void RecordRenderCommandsThread(void* data)
 {
     auto state = (RenderCommandState*)data;
     VkCommandBuffer command_buffer = BeginRenderCommands(render_state.render_target.main, state->thread_index);
-        PipelineHnd pipeline = render_state.pipeline.main;
+        Pipeline* pipeline = render_state.pipeline.main;
         BindPipeline(command_buffer, pipeline);
         BindShaderDataSet(command_buffer, render_state.data_set.entity_data, pipeline, 0);
         BindShaderDataSet(command_buffer, state->texture, pipeline, 1);
@@ -539,16 +535,16 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ThreadPool* thread_pool)
 {
-    InitBuffers();
+    InitBuffers(perm_stack);
     InitImageMemory(perm_stack);
-    InitRenderTargets(temp_stack, free_list);
+    InitRenderTargets(perm_stack, temp_stack, free_list);
     InitVertexLayout(perm_stack);
     InitSampler();
     InitShaderDatas(perm_stack);
     InitShaderDataSets(perm_stack, temp_stack);
-    InitShaders(temp_stack);
-    InitPipelines(temp_stack, free_list);
-    InitMeshes();
+    InitShaders(perm_stack, temp_stack);
+    InitPipelines(perm_stack, temp_stack, free_list);
+    InitMeshes(perm_stack);
     InitThreadPoolJobs(perm_stack, thread_pool);
 }
 
@@ -583,12 +579,12 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
     Job<RenderCommandState>* job = &render_state.job.record_render_commands;
 
     // Initialize thread states and submit tasks.
-    static ShaderDataSetHnd textures[] =
+    static ShaderDataSet* textures[] =
     {
         render_state.data_set.axis_cube_texture,
         render_state.data_set.dirt_block_texture,
     };
-    static MeshHnd meshes[] =
+    static Mesh* meshes[] =
     {
         render_state.mesh.cube,
         render_state.mesh.quad,

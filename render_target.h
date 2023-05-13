@@ -188,11 +188,12 @@ static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, F
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list, RenderTargetInfo* info)
+static RenderTarget* CreateRenderTarget(const Allocator* allocator, Stack* temp_stack, FreeList* free_list,
+                                        RenderTargetInfo* info)
 {
     Stack frame = CreateFrame(temp_stack);
-    RenderTargetHnd render_target_hnd = AllocateRenderTarget();
-    RenderTarget* render_target = GetRenderTarget(render_target_hnd);
+
+    auto render_target = Allocate<RenderTarget>(allocator, 1);
 
     render_target->depth_testing = info->depth_testing;
 
@@ -261,13 +262,11 @@ static RenderTargetHnd CreateRenderTarget(Stack* temp_stack, FreeList* free_list
     // Create depth images and framebuffers based on swapchain extent.
     CreateRenderTarget(render_target, &frame, free_list);
 
-    return render_target_hnd;
+    return render_target;
 }
 
-static void UpdateRenderTargetAttachments(RenderTargetHnd render_target_hnd, Stack* temp_stack, FreeList* free_list)
+static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
 {
-    RenderTarget* render_target = GetRenderTarget(render_target_hnd);
-
     // Destroy depth images.
     if (render_target->depth_testing)
     {

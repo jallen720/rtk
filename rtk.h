@@ -2,7 +2,6 @@
 
 #include "rtk/vulkan.h"
 #include "rtk/context.h"
-#include "rtk/resources.h"
 #include "rtk/mesh.h"
 #include "rtk/buffer.h"
 #include "rtk/image.h"

@@ -6,9 +6,10 @@
 #include "rtk/shader_data.h"
 #include "rtk/render_target.h"
 #include "ctk3/ctk3.h"
+#include "ctk3/allocator.h"
 #include "ctk3/stack.h"
-#include "ctk3/array.h"
 #include "ctk3/free_list.h"
+#include "ctk3/array.h"
 
 using namespace CTK;
 

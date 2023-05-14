@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ctk3/ctk3.h"
+#include "ctk3/allocator.h"
 #include "rtk/vulkan.h"
 #include "rtk/debug.h"
 #include "rtk/context.h"

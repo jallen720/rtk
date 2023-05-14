@@ -1,8 +1,10 @@
 #pragma once
 
-#include "ctk3/ctk3.h"
 #include "rtk/vulkan.h"
 #include "rtk/buffer.h"
+#include "ctk3/ctk3.h"
+#include "ctk3/allocator.h"
+#include "ctk3/array.h"
 
 using namespace CTK;
 

@@ -6,6 +6,7 @@
 #include "rtk/buffer.h"
 #include "rtk/image.h"
 #include "ctk3/ctk3.h"
+#include "ctk3/allocator.h"
 #include "ctk3/stack.h"
 #include "ctk3/array.h"
 

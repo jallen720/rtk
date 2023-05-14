@@ -1,20 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/debug.h"
-#include "rtk/vk_array.h"
-#include "rtk/device.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/stack.h"
-#include "ctk3/free_list.h"
-#include "ctk3/array.h"
-#include "ctk3/ring_buffer.h"
-#include "ctk3/file.h"
-#include "ctk3/thread_pool.h"
-#include "ctk3/window.h"
-
-using namespace CTK;
-
 /// Macros
 ////////////////////////////////////////////////////////////
 #define RTK_LOAD_INSTANCE_EXTENSION_FUNCTION(INSTANCE, FUNC_NAME) \
@@ -24,12 +7,10 @@ using namespace CTK;
         CTK_FATAL("failed to load instance extension function \"%s\"", #FUNC_NAME); \
     }
 
-namespace RTK
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
-static constexpr uint32 UNSET_INDEX = UINT32_MAX;
+static constexpr uint32 UNSET_INDEX         = UINT32_MAX;
+static constexpr uint32 MAX_DEVICE_FEATURES = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
 
 struct InstanceInfo
 {
@@ -40,12 +21,34 @@ struct InstanceInfo
     Array<const char*>                  extensions;
 };
 
+union DeviceFeatures
+{
+    VkPhysicalDeviceFeatures as_struct;
+    VkBool32                 as_array[MAX_DEVICE_FEATURES];
+};
+
 struct ContextInfo
 {
     InstanceInfo                instance_info;
     DeviceFeatures              required_features;
     uint32                      render_thread_count;
     Array<VkDescriptorPoolSize> descriptor_pool_sizes;
+};
+
+struct QueueFamilies
+{
+    uint32 graphics;
+    uint32 present;
+};
+
+struct PhysicalDevice
+{
+    VkPhysicalDevice                 hnd;
+    QueueFamilies                    queue_families;
+    VkPhysicalDeviceProperties       properties;
+    DeviceFeatures                   features;
+    VkPhysicalDeviceMemoryProperties mem_properties;
+    VkFormat                         depth_image_format;
 };
 
 struct Swapchain
@@ -293,9 +296,9 @@ static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Dev
     InitArray(&global_ctx.physical_devices, &perm_stack->allocator, vk_physical_devices.count);
 
     // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
-    for (uint32 i = 0; i < vk_physical_devices.count; ++i)
+    for (uint32 physical_device_index = 0; physical_device_index < vk_physical_devices.count; ++physical_device_index)
     {
-        VkPhysicalDevice vk_physical_device = Get(&vk_physical_devices, i);
+        VkPhysicalDevice vk_physical_device = Get(&vk_physical_devices, physical_device_index);
 
         // Collect all info about physical device.
         PhysicalDevice physical_device =
@@ -322,7 +325,17 @@ static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Dev
         }
 
         // All required features must be supported.
-        if (!HasRequiredFeatures(&physical_device, required_features))
+        bool has_required_features = true;
+        for (uint32 feature_index = 0; feature_index < MAX_DEVICE_FEATURES; ++feature_index)
+        {
+            if (required_features->as_array[feature_index] == VK_TRUE &&
+                physical_device.features.as_array[feature_index] == VK_FALSE)
+            {
+                has_required_features = false;
+                break;
+            }
+        }
+        if (!has_required_features)
         {
             continue;
         }
@@ -820,4 +833,49 @@ AllocateDeviceMemory(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFla
     return mem;
 }
 
+/// Debugging
+////////////////////////////////////////////////////////////
+static void ListMemoryTypes(PhysicalDevice* physical_device, uint32 tabs = 0)
+{
+    VkPhysicalDeviceMemoryProperties* mem_properties = &physical_device->mem_properties;
+    CTK_ITERATE_PTR(type, mem_properties->memoryTypes, mem_properties->memoryTypeCount)
+    {
+        PrintLine();
+
+        PrintTabs(tabs);
+        PrintLine("VkMemoryType (%p):", type);
+
+        PrintTabs(tabs + 1);
+        PrintLine("heapIndex: %u", type->heapIndex);
+
+        PrintTabs(tabs + 1);
+        PrintLine("propertyFlags:");
+
+        PrintMemoryProperties(type->propertyFlags, tabs + 2);
+    }
+}
+
+static void LogPhysicalDevice(PhysicalDevice* physical_device)
+{
+    VkPhysicalDeviceType type = physical_device->properties.deviceType;
+    VkFormat depth_image_format = physical_device->depth_image_format;
+
+    PrintLine("%s:", physical_device->properties.deviceName);
+    PrintLine("    type: %s",
+        type == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU   ? "VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU" :
+        type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? "VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU" :
+        "invalid");
+    PrintLine("    queue_families:");
+    PrintLine("        graphics: %u", physical_device->queue_families.graphics);
+    PrintLine("        present: %u", physical_device->queue_families.present);
+    PrintLine("    depth_image_format: %s",
+        depth_image_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? "VK_FORMAT_D32_SFLOAT_S8_UINT" :
+        depth_image_format == VK_FORMAT_D32_SFLOAT         ? "VK_FORMAT_D32_SFLOAT"         :
+        depth_image_format == VK_FORMAT_D24_UNORM_S8_UINT  ? "VK_FORMAT_D24_UNORM_S8_UINT"  :
+        depth_image_format == VK_FORMAT_D16_UNORM_S8_UINT  ? "VK_FORMAT_D16_UNORM_S8_UINT"  :
+        depth_image_format == VK_FORMAT_D16_UNORM          ? "VK_FORMAT_D16_UNORM"          :
+        "UNKNWON");
+    Print("    memory types:");
+    ListMemoryTypes(physical_device, 2);
+    PrintLine();
 }

@@ -1,16 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/context.h"
-#include "rtk/stb_image.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/allocator.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
 struct ImageMemoryInfo
@@ -119,6 +106,4 @@ static VkSampler CreateSampler(VkSamplerCreateInfo* info)
     VkResult res = vkCreateSampler(global_ctx.device, info, NULL, &sampler);
     Validate(res, "vkCreateSampler() failed");
     return sampler;
-}
-
 }

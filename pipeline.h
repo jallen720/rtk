@@ -1,21 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/context.h"
-#include "rtk/shader.h"
-#include "rtk/shader_data.h"
-#include "rtk/render_target.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/allocator.h"
-#include "ctk3/stack.h"
-#include "ctk3/free_list.h"
-#include "ctk3/array.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
 static constexpr VkColorComponentFlags COLOR_COMPONENT_RGBA = VK_COLOR_COMPONENT_R_BIT |
@@ -281,6 +263,4 @@ static void UpdatePipelineViewports(Pipeline* pipeline, FreeList* free_list, Arr
     // Recreate pipeline.
     vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
     CreatePipeline(pipeline);
-}
-
 }

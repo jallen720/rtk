@@ -1,13 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/string.h"
-#include "ctk3/pair.h"
-#include "ctk3/debug.h"
-
-using namespace CTK;
-
 /// Macros
 ////////////////////////////////////////////////////////////
 #define RTK_VK_RESULT_NAME(VK_RESULT) VK_RESULT, #VK_RESULT
@@ -17,9 +7,6 @@ using namespace CTK;
         PrintTabs(tabs); \
         PrintLine(#FLAG); \
     }
-
-namespace RTK
-{
 
 /// Data
 ////////////////////////////////////////////////////////////
@@ -397,6 +384,4 @@ static void PrintResourceMemoryInfo(const char* type, VkMemoryRequirements* mem_
     PrintTabs(1);
     PrintLine("properties:");
     PrintMemoryProperties(mem_property_flags, 2);
-}
-
 }

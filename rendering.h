@@ -1,19 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/context.h"
-#include "rtk/render_target.h"
-#include "rtk/pipeline.h"
-#include "rtk/shader_data.h"
-#include "rtk/mesh.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/array.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Interface
 ////////////////////////////////////////////////////////////
 static VkResult NextFrame()
@@ -197,6 +181,4 @@ static void SubmitRenderCommands(RenderTarget* render_target)
     {
         Validate(res, "vkQueuePresentKHR() failed");
     }
-}
-
 }

@@ -1,16 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/buffer.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/allocator.h"
-#include "ctk3/array.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
 struct MeshDataInfo
@@ -58,6 +45,4 @@ static Mesh* CreateMesh(const Allocator* allocator, MeshData* mesh_data, Array<V
     WriteHostBuffer(&mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
 
     return mesh;
-}
-
 }

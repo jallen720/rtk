@@ -1,20 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/debug.h"
-#include "rtk/context.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/allocator.h"
-#include "ctk3/stack.h"
-#include "ctk3/free_list.h"
-#include "ctk3/array.h"
-#include "ctk3/optional.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
 struct RenderPassAttachments
@@ -294,6 +277,4 @@ static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* te
 
     // Re-create depth images and framebuffers with new swapchain extent.
     CreateRenderTarget(render_target, temp_stack, free_list);
-}
-
 }

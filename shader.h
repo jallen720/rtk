@@ -1,18 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/debug.h"
-#include "rtk/context.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/stack.h"
-#include "ctk3/array.h"
-#include "ctk3/file.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
 struct Shader
@@ -54,6 +39,4 @@ static Shader* CreateShader(const Allocator* allocator, Stack* temp_stack, const
     shader->stage  = stage;
 
     return shader;
-}
-
 }

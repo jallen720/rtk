@@ -1,10 +1,3 @@
-#pragma once
-
-#include <time.h>
-#include "ctk3/ctk3.h"
-
-using namespace CTK;
-
 /// Data
 ////////////////////////////////////////////////////////////
 struct FrameMetrics

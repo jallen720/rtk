@@ -1,20 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/debug.h"
-#include "rtk/context.h"
-#include "rtk/buffer.h"
-#include "rtk/image.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/allocator.h"
-#include "ctk3/stack.h"
-#include "ctk3/array.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
 struct BufferShaderDataInfo
@@ -329,6 +312,4 @@ static ShaderDataSet* CreateShaderDataSet(const Allocator* allocator, Stack* tem
 static uint32 GetImageCount(ShaderData* shader_data)
 {
     return shader_data->image.array.count;
-}
-
 }

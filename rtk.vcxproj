@@ -146,7 +146,6 @@
     <ClInclude Include="buffer.h" />
     <ClInclude Include="context.h" />
     <ClInclude Include="debug.h" />
-    <ClInclude Include="device.h" />
     <ClInclude Include="frame_metrics.h" />
     <ClInclude Include="image.h" />
     <ClInclude Include="mesh.h" />
@@ -158,14 +157,12 @@
     <ClInclude Include="shader.h" />
     <ClInclude Include="shader_data.h" />
     <ClInclude Include="stb\stb_image.h" />
-    <ClInclude Include="stb_image.h" />
     <ClInclude Include="tests\3d\defs.h" />
     <ClInclude Include="tests\3d\game_state.h" />
     <ClInclude Include="tests\3d\main.h" />
     <ClInclude Include="tests\3d\render_state.h" />
     <ClInclude Include="tests\shared.h" />
     <ClInclude Include="vk_array.h" />
-    <ClInclude Include="vulkan.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="test.cc" />

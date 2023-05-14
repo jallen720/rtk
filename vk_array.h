@@ -1,16 +1,3 @@
-#pragma once
-
-#include "rtk/vulkan.h"
-#include "rtk/debug.h"
-#include "ctk3/ctk3.h"
-#include "ctk3/allocator.h"
-#include "ctk3/array.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Interface
 ////////////////////////////////////////////////////////////
 template<typename Type, typename VkFunc, typename... Args>
@@ -76,6 +63,4 @@ static void LoadVkSurfacePresentModes(Array<VkPresentModeKHR>* array, const Allo
                                       VkPhysicalDevice physical_device, VkSurfaceKHR surface)
 {
     LoadVkArray(array, allocator, vkGetPhysicalDeviceSurfacePresentModesKHR, physical_device, surface);
-}
-
 }

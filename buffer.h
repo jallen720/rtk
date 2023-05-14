@@ -1,17 +1,3 @@
-#pragma once
-
-#include "ctk3/ctk3.h"
-#include "ctk3/allocator.h"
-#include "rtk/vulkan.h"
-#include "rtk/debug.h"
-#include "rtk/context.h"
-#include "rtk/device.h"
-
-using namespace CTK;
-
-namespace RTK
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
 struct BufferInfo
@@ -134,6 +120,4 @@ static void WriteHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
 static void Clear(Buffer* buffer)
 {
     buffer->index = 0;
-}
-
 }

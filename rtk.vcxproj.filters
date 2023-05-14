@@ -36,9 +36,6 @@
     <ClInclude Include="debug.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="device.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="frame_metrics.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -72,9 +69,6 @@
     <ClInclude Include="vk_array.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="vulkan.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="tests\3d\defs.h">
       <Filter>Source Files\tests\3d</Filter>
     </ClInclude>
@@ -89,9 +83,6 @@
     </ClInclude>
     <ClInclude Include="stb\stb_image.h">
       <Filter>Source Files\stb</Filter>
-    </ClInclude>
-    <ClInclude Include="stb_image.h">
-      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

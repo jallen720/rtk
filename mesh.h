@@ -15,7 +15,7 @@ struct MeshData
 
 struct Mesh
 {
-    uint32 vertex_offset;
+    sint32 vertex_offset;
     uint32 index_offset;
     uint32 index_count;
 };
@@ -38,9 +38,10 @@ static Mesh* CreateMesh(const Allocator* allocator, MeshData* mesh_data, Array<V
 {
     auto mesh = Allocate<Mesh>(allocator, 1);
 
-    mesh->vertex_offset = mesh_data->vertex_buffer.index / sizeof(VertexType);
-    mesh->index_offset  = mesh_data->index_buffer.index / sizeof(uint32);
+    mesh->vertex_offset = (sint32)(mesh_data->vertex_buffer.index / sizeof(VertexType));
+    mesh->index_offset  = (uint32)(mesh_data->index_buffer.index / sizeof(uint32));
     mesh->index_count   = indexes.count;
+
     WriteHostBuffer(&mesh_data->vertex_buffer, vertexes.data, ByteSize(&vertexes));
     WriteHostBuffer(&mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
 

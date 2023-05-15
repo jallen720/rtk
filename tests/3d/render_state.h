@@ -292,7 +292,7 @@ static ShaderData* CreateTexture(Stack* perm_stack, const char* image_path)
     ImageData image_data = {};
     LoadImageData(&image_data, image_path);
     Clear(render_state.buffer.staging);
-    WriteHostBuffer(render_state.buffer.staging, image_data.data, image_data.size);
+    WriteHostBuffer(render_state.buffer.staging, image_data.data, (VkDeviceSize)image_data.size);
     uint32 image_count = GetImageCount(shader_data);
     for (uint32 i = 0; i < image_count; ++i)
     {

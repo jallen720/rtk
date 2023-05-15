@@ -24,9 +24,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="tests\shared.h">
-      <Filter>Source Files\tests</Filter>
-    </ClInclude>
     <ClInclude Include="buffer.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -68,6 +65,9 @@
     </ClInclude>
     <ClInclude Include="vk_array.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\shared.h">
+      <Filter>Source Files\tests</Filter>
     </ClInclude>
     <ClInclude Include="tests\3d\defs.h">
       <Filter>Source Files\tests\3d</Filter>

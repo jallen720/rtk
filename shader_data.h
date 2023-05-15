@@ -2,8 +2,8 @@
 ////////////////////////////////////////////////////////////
 struct BufferShaderDataInfo
 {
-    Buffer* parent;
-    uint32  size;
+    DeviceStack* stack;
+    VkDeviceSize size;
 };
 
 struct ImageShaderDataInfo
@@ -75,7 +75,7 @@ static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* 
         InitArray(&buffer_shader_data->array, allocator, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
         {
-            InitBuffer(Push(&buffer_shader_data->array), buffer_info->parent, buffer_info->size);
+            InitBuffer(Push(&buffer_shader_data->array), buffer_info->stack, buffer_info->size);
         }
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)

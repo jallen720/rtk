@@ -1,3 +1,5 @@
+#pragma once
+
 #include <windows.h>
 #include "ctk3/ctk3.h"
 #include "ctk3/stack.h"

@@ -2,7 +2,6 @@
 ////////////////////////////////////////////////////////////
 struct MeshDataInfo
 {
-    Buffer*      parent_buffer;
     VkDeviceSize vertex_buffer_size;
     VkDeviceSize index_buffer_size;
 };
@@ -22,12 +21,12 @@ struct Mesh
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static MeshData* CreateMeshData(const Allocator* allocator, MeshDataInfo* info)
+static MeshData* CreateMeshData(const Allocator* allocator, DeviceStack* device_stack, MeshDataInfo* info)
 {
     auto mesh_data = Allocate<MeshData>(allocator, 1);
 
-    InitBuffer(&mesh_data->vertex_buffer, info->parent_buffer, info->vertex_buffer_size);
-    InitBuffer(&mesh_data->index_buffer, info->parent_buffer, info->index_buffer_size);
+    InitBuffer(&mesh_data->vertex_buffer, device_stack, info->vertex_buffer_size);
+    InitBuffer(&mesh_data->index_buffer, device_stack, info->index_buffer_size);
 
     return mesh_data;
 }
@@ -42,8 +41,8 @@ static Mesh* CreateMesh(const Allocator* allocator, MeshData* mesh_data, Array<V
     mesh->index_offset  = (uint32)(mesh_data->index_buffer.index / sizeof(uint32));
     mesh->index_count   = indexes.count;
 
-    WriteHostBuffer(&mesh_data->vertex_buffer, vertexes.data, ByteSize(&vertexes));
-    WriteHostBuffer(&mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
+    AppendHostBuffer(&mesh_data->vertex_buffer, vertexes.data, ByteSize(&vertexes));
+    AppendHostBuffer(&mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
 
     return mesh;
 }

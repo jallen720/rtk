@@ -59,14 +59,12 @@ struct RenderState
     }
     job;
 
+    // Memory
+    DeviceStack device_stack;
+    DeviceStack host_stack;
+    Buffer      staging_buffer;
+
     // Resources
-    struct
-    {
-        Buffer* host;
-        Buffer* device;
-        Buffer* staging;
-    }
-    buffer;
     struct
     {
         ImageMemory* texture;
@@ -125,9 +123,9 @@ static RenderState render_state;
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void InitBuffers(Stack* perm_stack)
+static void InitDeviceMemory()
 {
-    BufferInfo host_buffer_info =
+    DeviceStackInfo host_stack_info =
     {
         .size               = Megabyte32<64>(),
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -137,9 +135,9 @@ static void InitBuffers(Stack* perm_stack)
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    render_state.buffer.host = CreateBuffer(&perm_stack->allocator, &host_buffer_info);
+    InitDeviceStack(&render_state.host_stack, &host_stack_info);
 
-    BufferInfo device_buffer_info =
+    DeviceStackInfo device_stack_info =
     {
         .size               = Megabyte32<64>(),
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -148,9 +146,9 @@ static void InitBuffers(Stack* perm_stack)
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    render_state.buffer.device = CreateBuffer(&perm_stack->allocator, &device_buffer_info);
+    InitDeviceStack(&render_state.device_stack, &device_stack_info);
 
-    render_state.buffer.staging = CreateBuffer(&perm_stack->allocator, render_state.buffer.host, Megabyte32<4>());
+    InitBuffer(&render_state.staging_buffer, &render_state.host_stack, Megabyte32<4>());
 }
 
 static void InitImageMemory(Stack* perm_stack)
@@ -283,22 +281,23 @@ static ShaderDataInfo DefaultTextureInfo(VkSampler sampler)
     };
 }
 
-static ShaderData* CreateTexture(Stack* perm_stack, const char* image_path)
+static ShaderData* CreateTextureShaderData(Stack* perm_stack, const char* image_path)
 {
     ShaderDataInfo info = DefaultTextureInfo(render_state.sampler);
     ShaderData* shader_data = CreateShaderData(&perm_stack->allocator, &info);
 
-    // Copy image data into staging buffer, write to shader data images, then destroy image data.
+    // Load image data and write to staging buffer.
     ImageData image_data = {};
     LoadImageData(&image_data, image_path);
-    Clear(render_state.buffer.staging);
-    WriteHostBuffer(render_state.buffer.staging, image_data.data, (VkDeviceSize)image_data.size);
+    WriteHostBuffer(&render_state.staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
+    DestroyImageData(&image_data);
+
+    // Copy image data in staging buffer to shader data images.
     uint32 image_count = GetImageCount(shader_data);
     for (uint32 i = 0; i < image_count; ++i)
     {
-        WriteToShaderDataImage(shader_data, i, render_state.buffer.staging);
+        WriteToShaderDataImage(shader_data, i, &render_state.staging_buffer);
     }
-    DestroyImageData(&image_data);
 
     return shader_data;
 }
@@ -309,20 +308,20 @@ static void InitShaderDatas(Stack* perm_stack)
     {
         ShaderDataInfo info =
         {
-            .stages    = VK_SHADER_STAGE_VERTEX_BIT,
-            .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .per_frame = true,
-            .buffer=
+            .stages      = VK_SHADER_STAGE_VERTEX_BIT,
+            .type        = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .per_frame   = true,
+            .buffer =
             {
-                .parent = render_state.buffer.host,
-                .size   = sizeof(VSBuffer),
-            }
+                .stack = &render_state.host_stack,
+                .size  = sizeof(VSBuffer),
+            },
         };
         render_state.data.vs_buffer = CreateShaderData(&perm_stack->allocator, &info);
     }
 
-    render_state.data.axis_cube_texture  = CreateTexture(perm_stack, "images/axis_cube.png");
-    render_state.data.dirt_block_texture = CreateTexture(perm_stack, "images/dirt_block.png");
+    render_state.data.axis_cube_texture  = CreateTextureShaderData(perm_stack, "images/axis_cube.png");
+    render_state.data.dirt_block_texture = CreateTextureShaderData(perm_stack, "images/dirt_block.png");
 }
 
 static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
@@ -417,11 +416,10 @@ static void InitMeshes(Stack* perm_stack)
 {
     MeshDataInfo mesh_data_info =
     {
-        .parent_buffer      = render_state.buffer.host,
         .vertex_buffer_size = Megabyte32<1>(),
         .index_buffer_size  = Megabyte32<1>(),
     };
-    render_state.mesh.data = CreateMeshData(&perm_stack->allocator, &mesh_data_info);
+    render_state.mesh.data = CreateMeshData(&perm_stack->allocator, &render_state.host_stack, &mesh_data_info);
 
     {
         #include "rtk/meshes/cube.h"
@@ -535,7 +533,7 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ThreadPool* thread_pool)
 {
-    InitBuffers(perm_stack);
+    InitDeviceMemory();
     InitImageMemory(perm_stack);
     InitRenderTargets(perm_stack, temp_stack, free_list);
     InitVertexLayout(perm_stack);

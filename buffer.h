@@ -1,25 +1,33 @@
 /// Data
 ////////////////////////////////////////////////////////////
-struct BufferInfo
+struct DeviceStackInfo
 {
     VkDeviceSize          size;
     VkBufferUsageFlags    usage_flags;
     VkMemoryPropertyFlags mem_property_flags;
 };
 
-struct Buffer
+struct DeviceStack
 {
     VkBuffer       hnd;
-    VkDeviceMemory device_mem;
+    VkDeviceMemory mem;
     uint8*         mapped_mem;
-    VkDeviceSize   offset;
     VkDeviceSize   size;
     VkDeviceSize   index;
 };
 
+struct Buffer
+{
+    VkBuffer     hnd;
+    uint8*       mapped_mem;
+    VkDeviceSize offset;
+    VkDeviceSize size;
+    VkDeviceSize index;
+};
+
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitBuffer(Buffer* buffer, BufferInfo* info)
+static void InitDeviceStack(DeviceStack* device_stack, DeviceStackInfo* info)
 {
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
@@ -44,59 +52,55 @@ static void InitBuffer(Buffer* buffer, BufferInfo* info)
         create_info.pQueueFamilyIndices   = NULL;
     }
 
-    res = vkCreateBuffer(device, &create_info, NULL, &buffer->hnd);
+    res = vkCreateBuffer(device, &create_info, NULL, &device_stack->hnd);
     Validate(res, "vkCreateBuffer() failed");
 
-    // Allocate/bind buffer memory.
+    // Allocate/bind device_stack memory.
     VkMemoryRequirements mem_requirements = {};
-    vkGetBufferMemoryRequirements(device, buffer->hnd, &mem_requirements);
-PrintResourceMemoryInfo("buffer", &mem_requirements, info->mem_property_flags);
+    vkGetBufferMemoryRequirements(device, device_stack->hnd, &mem_requirements);
+PrintResourceMemoryInfo("device_stack", &mem_requirements, info->mem_property_flags);
 
-    buffer->device_mem = AllocateDeviceMemory(&mem_requirements, info->mem_property_flags, NULL);
-    res = vkBindBufferMemory(device, buffer->hnd, buffer->device_mem, 0);
+    device_stack->mem = AllocateDeviceMemory(&mem_requirements, info->mem_property_flags, NULL);
+    res = vkBindBufferMemory(device, device_stack->hnd, device_stack->mem, 0);
     Validate(res, "vkBindBufferMemory() failed");
 
-    buffer->size = mem_requirements.size;
+    device_stack->size = mem_requirements.size;
 
-    // Map host visible buffer memory.
+    // Map host visible device_stack memory.
     if (info->mem_property_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
     {
-        vkMapMemory(device, buffer->device_mem, 0, buffer->size, 0, (void**)&buffer->mapped_mem);
+        vkMapMemory(device, device_stack->mem, 0, device_stack->size, 0, (void**)&device_stack->mapped_mem);
     }
-
-    // Buffers allocated directly from device memory manage the entire region of memory.
-    buffer->offset = 0;
 }
 
-static void InitBuffer(Buffer* buffer, Buffer* parent_buffer, VkDeviceSize size)
+static DeviceStack* CreateDeviceStack(const Allocator* allocator, DeviceStackInfo* info)
 {
-    if (parent_buffer->index + size > parent_buffer->size)
+    auto device_stack = Allocate<DeviceStack>(allocator, 1);
+    InitDeviceStack(device_stack, info);
+    return device_stack;
+}
+
+static void InitBuffer(Buffer* buffer, DeviceStack* device_stack, VkDeviceSize size)
+{
+    if (device_stack->index + size > device_stack->size)
     {
-        CTK_FATAL("can't allocate %u bytes from parent buffer at index %u: allocation would exceed parent buffer size "
-                  "of %u", size, parent_buffer->index, parent_buffer->size);
+        CTK_FATAL("can't allocate %u-byte buffer from device-stack at index %u: allocation would exceed device-stack "
+                  "size of %u", size, device_stack->index, device_stack->size);
     }
 
-    buffer->hnd        = parent_buffer->hnd;
-    buffer->device_mem = parent_buffer->device_mem;
-    buffer->mapped_mem = parent_buffer->mapped_mem == NULL ? NULL : parent_buffer->mapped_mem + parent_buffer->index;
-    buffer->offset     = parent_buffer->index;
+    buffer->hnd        = device_stack->hnd;
+    buffer->mapped_mem = device_stack->mapped_mem == NULL ? NULL : device_stack->mapped_mem + device_stack->index;
+    buffer->offset     = device_stack->index;
     buffer->size       = size;
     buffer->index      = 0;
 
-    parent_buffer->index += size;
+    device_stack->index += size;
 }
 
-static Buffer* CreateBuffer(const Allocator* allocator, BufferInfo* info)
+static Buffer* CreateBuffer(const Allocator* allocator, DeviceStack* device_stack, VkDeviceSize size)
 {
     auto buffer = Allocate<Buffer>(allocator, 1);
-    InitBuffer(buffer, info);
-    return buffer;
-}
-
-static Buffer* CreateBuffer(const Allocator* allocator, Buffer* parent_buffer, VkDeviceSize size)
-{
-    auto buffer = Allocate<Buffer>(allocator, 1);
-    InitBuffer(buffer, parent_buffer, size);
+    InitBuffer(buffer, device_stack, size);
     return buffer;
 }
 
@@ -107,9 +111,25 @@ static void WriteHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
         CTK_FATAL("can't write to host-buffer: mapped_mem == NULL");
     }
 
+    if (data_size > buffer->size)
+    {
+        CTK_FATAL("can't write %u bytes to host-buffer: write would exceed buffer size of %u", data_size, buffer->size);
+    }
+
+    memcpy(buffer->mapped_mem, data, data_size);
+    buffer->index = data_size;
+}
+
+static void AppendHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
+{
+    if (buffer->mapped_mem == NULL)
+    {
+        CTK_FATAL("can't append to host-buffer: mapped_mem == NULL");
+    }
+
     if (buffer->index + data_size > buffer->size)
     {
-        CTK_FATAL("can't write %u bytes to host-buffer at index %u: write would exceed buffer size of %u", data_size,
+        CTK_FATAL("can't append %u bytes to host-buffer at index %u: append would exceed buffer size of %u", data_size,
                   buffer->index, buffer->size);
     }
 

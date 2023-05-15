@@ -73,13 +73,6 @@ PrintResourceMemoryInfo("device_stack", &mem_requirements, info->mem_property_fl
     }
 }
 
-static DeviceStack* CreateDeviceStack(const Allocator* allocator, DeviceStackInfo* info)
-{
-    auto device_stack = Allocate<DeviceStack>(allocator, 1);
-    InitDeviceStack(device_stack, info);
-    return device_stack;
-}
-
 static void InitBuffer(Buffer* buffer, DeviceStack* device_stack, VkDeviceSize size)
 {
     if (device_stack->index + size > device_stack->size)
@@ -95,13 +88,6 @@ static void InitBuffer(Buffer* buffer, DeviceStack* device_stack, VkDeviceSize s
     buffer->index      = 0;
 
     device_stack->index += size;
-}
-
-static Buffer* CreateBuffer(const Allocator* allocator, DeviceStack* device_stack, VkDeviceSize size)
-{
-    auto buffer = Allocate<Buffer>(allocator, 1);
-    InitBuffer(buffer, device_stack, size);
-    return buffer;
 }
 
 static void WriteHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)

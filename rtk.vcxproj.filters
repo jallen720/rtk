@@ -14,14 +14,19 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="Source Files\tests">
-      <UniqueIdentifier>{c6961729-08dd-41ae-aee2-f2d2a17fa84c}</UniqueIdentifier>
+      <UniqueIdentifier>{4d937ae3-df71-4401-9056-c2f191d22aad}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\tests\3d">
-      <UniqueIdentifier>{f2ced265-dfe8-4063-a5fa-dd2901a1a182}</UniqueIdentifier>
+      <UniqueIdentifier>{7d88a2c0-bcf6-4761-8075-efe07dad8005}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\stb">
-      <UniqueIdentifier>{3b9becab-374a-476a-9be6-0a5de93eec9e}</UniqueIdentifier>
+      <UniqueIdentifier>{6a02a9eb-d329-4e1c-b12e-88b6494a345b}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="test.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="buffer.h">
@@ -84,10 +89,5 @@
     <ClInclude Include="stb\stb_image.h">
       <Filter>Source Files\stb</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="test.cc">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
 </Project>

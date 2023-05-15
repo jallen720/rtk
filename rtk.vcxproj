@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{afd75b5c-75ac-4c0f-811c-9936b6d6d065}</ProjectGuid>
+    <ProjectGuid>{a0ff2c3d-b3ff-4f0f-b5f5-c2443be988e6}</ProjectGuid>
     <RootNamespace>rtk</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
@@ -44,6 +44,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -51,6 +52,7 @@
     <PlatformToolset>v143</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -113,8 +115,8 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <TreatSpecificWarningsAsErrors>4100;4715;4456</TreatSpecificWarningsAsErrors>
       <DisableSpecificWarnings>4668;4311;4312;4774;4505;5039;4820;5045;4711;4710;5219</DisableSpecificWarnings>
+      <TreatSpecificWarningsAsErrors>4100;4715;4456</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -131,8 +133,8 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <TreatSpecificWarningsAsErrors>4100;4715;4456</TreatSpecificWarningsAsErrors>
       <DisableSpecificWarnings>4668;4311;4312;4774;4505;5039;4820;5045;4711;4710;5219</DisableSpecificWarnings>
+      <TreatSpecificWarningsAsErrors>4100;4715;4456</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -142,6 +144,9 @@
       <AdditionalDependencies>vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="test.cc" />
+  </ItemGroup>
   <ItemGroup>
     <ClInclude Include="buffer.h" />
     <ClInclude Include="context.h" />
@@ -163,9 +168,6 @@
     <ClInclude Include="tests\3d\render_state.h" />
     <ClInclude Include="tests\shared.h" />
     <ClInclude Include="vk_array.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="test.cc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -192,8 +192,8 @@ static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* fr
 {
     VkClearValue attachment_clear_values[] =
     {
-        { .color = { 0.0f, 0.1f, 0.2f, 1.0f } },
-        { .depthStencil = { 1.0f, 0u } },
+        { .color        = { 0.0f, 0.1f, 0.2f, 1.0f } },
+        { .depthStencil = { 1.0f, 0u }               },
     };
     RenderTargetInfo info =
     {

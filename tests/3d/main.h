@@ -122,7 +122,7 @@ LogPhysicalDevice(global_ctx.physical_device);
 
         UpdateMVPMatrixes(thread_pool);
         RecordRenderCommands(thread_pool);
-        SubmitRenderCommands(render_state.render_target.main);
+        SubmitRenderCommands(render_state.render_target);
     }
 }
 

@@ -65,16 +65,8 @@ struct RenderState
     Buffer      staging_buffer;
 
     // Resources
-    struct
-    {
-        ImageMemory* texture;
-    }
-    image_memory;
-    struct
-    {
-        RenderTarget* main;
-    }
-    render_target;
+    ImageMemory*  texture_memory;
+    RenderTarget* render_target;
     struct
     {
         ShaderData* vs_buffer;
@@ -95,11 +87,7 @@ struct RenderState
         Shader* frag_3d;
     }
     shader;
-    struct
-    {
-        Pipeline* main;
-    }
-    pipeline;
+    Pipeline* pipeline;
     struct
     {
         MeshData* data;
@@ -184,7 +172,7 @@ static void InitImageMemory(Stack* perm_stack)
             .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             .max_image_count    = 4,
         };
-        render_state.image_memory.texture = CreateImageMemory(&perm_stack->allocator, &info, NULL);
+        render_state.texture_memory = CreateImageMemory(&perm_stack->allocator, &info, NULL);
     }
 }
 
@@ -200,7 +188,7 @@ static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* fr
         .depth_testing           = true,
         .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
     };
-    render_state.render_target.main = CreateRenderTarget(&perm_stack->allocator, temp_stack, free_list, &info);
+    render_state.render_target = CreateRenderTarget(&perm_stack->allocator, temp_stack, free_list, &info);
 }
 
 static void InitVertexLayout(Stack* perm_stack)
@@ -251,7 +239,7 @@ static ShaderDataInfo DefaultTextureInfo(VkSampler sampler)
         .per_frame = false,
         .image =
         {
-            .memory  = render_state.image_memory.texture,
+            .memory  = render_state.texture_memory,
             .sampler = sampler,
             .view =
             {
@@ -406,10 +394,10 @@ static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_l
         .viewports     = CTK_WRAP_ARRAY(viewports),
         .vertex_layout = &render_state.vertex_layout,
         .depth_testing = true,
-        .render_target = render_state.render_target.main,
+        .render_target = render_state.render_target,
     };
 
-    render_state.pipeline.main = CreatePipeline(&perm_stack->allocator, temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
+    render_state.pipeline = CreatePipeline(&perm_stack->allocator, temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
 }
 
 static void InitMeshes(Stack* perm_stack)
@@ -499,8 +487,8 @@ static void UpdateMVPMatrixesThread(void* data)
 static void RecordRenderCommandsThread(void* data)
 {
     auto state = (RenderCommandState*)data;
-    VkCommandBuffer command_buffer = BeginRenderCommands(render_state.render_target.main, state->thread_index);
-        Pipeline* pipeline = render_state.pipeline.main;
+    VkCommandBuffer command_buffer = BeginRenderCommands(render_state.render_target, state->thread_index);
+        Pipeline* pipeline = render_state.pipeline;
         BindPipeline(command_buffer, pipeline);
         BindShaderDataSet(command_buffer, render_state.data_set.entity_data, pipeline, 0);
         BindShaderDataSet(command_buffer, state->texture, pipeline, 1);
@@ -523,12 +511,12 @@ static void UpdateAllPipelineViewports(FreeList* free_list)
             .maxDepth = 1
         },
     };
-    UpdatePipelineViewports(render_state.pipeline.main, free_list, CTK_WRAP_ARRAY(viewports));
+    UpdatePipelineViewports(render_state.pipeline, free_list, CTK_WRAP_ARRAY(viewports));
 }
 
 static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_list)
 {
-    UpdateRenderTargetAttachments(render_state.render_target.main, temp_stack, free_list);
+    UpdateRenderTargetAttachments(render_state.render_target, temp_stack, free_list);
 }
 
 /// Interface

@@ -92,14 +92,11 @@ static void InitBuffer(Buffer* buffer, DeviceStack* device_stack, VkDeviceSize s
 
 static void WriteHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
 {
-    if (buffer->mapped_mem == NULL)
-    {
-        CTK_FATAL("can't write to host-buffer: mapped_mem == NULL");
-    }
+    CTK_ASSERT(buffer->mapped_mem != NULL);
 
     if (data_size > buffer->size)
     {
-        CTK_FATAL("can't write %u bytes to host-buffer: write would exceed buffer size of %u", data_size, buffer->size);
+        CTK_FATAL("can't write %u bytes to host-buffer: write would exceed size of %u", data_size, buffer->size);
     }
 
     memcpy(buffer->mapped_mem, data, data_size);
@@ -108,19 +105,63 @@ static void WriteHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
 
 static void AppendHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
 {
-    if (buffer->mapped_mem == NULL)
-    {
-        CTK_FATAL("can't append to host-buffer: mapped_mem == NULL");
-    }
+    CTK_ASSERT(buffer->mapped_mem != NULL);
 
     if (buffer->index + data_size > buffer->size)
     {
-        CTK_FATAL("can't append %u bytes to host-buffer at index %u: append would exceed buffer size of %u", data_size,
+        CTK_FATAL("can't append %u bytes to host-buffer at index %u: append would exceed size of %u", data_size,
                   buffer->index, buffer->size);
     }
 
     memcpy(buffer->mapped_mem + buffer->index, data, data_size);
     buffer->index += data_size;
+}
+
+static void WriteDeviceBufferCmd(Buffer* buffer, Buffer* staging_buffer, VkDeviceSize offset = 0, VkDeviceSize size = 0)
+{
+    if (size == 0)
+    {
+        size = staging_buffer->index;
+    }
+
+    if (size > buffer->size)
+    {
+        CTK_FATAL("can't write %u bytes to device-buffer: write would exceed size of %u", size,
+                  buffer->size);
+    }
+
+    VkBufferCopy copy =
+    {
+        .srcOffset = staging_buffer->offset + offset,
+        .dstOffset = buffer->offset,
+        .size      = size,
+    };
+    vkCmdCopyBuffer(global_ctx.temp_command_buffer, staging_buffer->hnd, buffer->hnd, 1, &copy);
+    buffer->index = size;
+}
+
+static void AppendDeviceBufferCmd(Buffer* buffer, Buffer* staging_buffer, VkDeviceSize offset = 0,
+                                  VkDeviceSize size = 0)
+{
+    if (size == 0)
+    {
+        size = staging_buffer->index;
+    }
+
+    if (buffer->index + size > buffer->size)
+    {
+        CTK_FATAL("can't append %u bytes to device-buffer at index %u: append would exceed size of %u",
+                  size, buffer->index, buffer->size);
+    }
+
+    VkBufferCopy copy =
+    {
+        .srcOffset = staging_buffer->offset + offset,
+        .dstOffset = buffer->offset + buffer->index,
+        .size      = size,
+    };
+    vkCmdCopyBuffer(global_ctx.temp_command_buffer, staging_buffer->hnd, buffer->hnd, 1, &copy);
+    buffer->index += size;
 }
 
 static void Clear(Buffer* buffer)

@@ -419,18 +419,20 @@ static void InitMeshes(Stack* perm_stack)
         .vertex_buffer_size = Megabyte32<1>(),
         .index_buffer_size  = Megabyte32<1>(),
     };
-    render_state.mesh.data = CreateMeshData(&perm_stack->allocator, &render_state.host_stack, &mesh_data_info);
+    render_state.mesh.data = CreateMeshData(&perm_stack->allocator, &render_state.device_stack, &mesh_data_info);
 
     {
         #include "rtk/meshes/cube.h"
-        render_state.mesh.cube = CreateMesh(&perm_stack->allocator, render_state.mesh.data,
-                                            CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes));
+        render_state.mesh.cube = CreateDeviceMesh(&perm_stack->allocator, render_state.mesh.data,
+                                                  CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                                                  &render_state.staging_buffer);
     }
 
     {
         #include "rtk/meshes/quad_3d.h"
-        render_state.mesh.quad = CreateMesh(&perm_stack->allocator, render_state.mesh.data,
-                                            CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes));
+        render_state.mesh.quad = CreateDeviceMesh(&perm_stack->allocator, render_state.mesh.data,
+                                                  CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                                                  &render_state.staging_buffer);
     }
 }
 

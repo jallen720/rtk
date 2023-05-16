@@ -32,8 +32,8 @@ static MeshData* CreateMeshData(const Allocator* allocator, DeviceStack* device_
 }
 
 template<typename VertexType>
-static Mesh* CreateMesh(const Allocator* allocator, MeshData* mesh_data, Array<VertexType> vertexes,
-                        Array<uint32> indexes)
+static Mesh* CreateHostMesh(const Allocator* allocator, MeshData* mesh_data, Array<VertexType> vertexes,
+                            Array<uint32> indexes)
 {
     auto mesh = Allocate<Mesh>(allocator, 1);
 
@@ -43,6 +43,29 @@ static Mesh* CreateMesh(const Allocator* allocator, MeshData* mesh_data, Array<V
 
     AppendHostBuffer(&mesh_data->vertex_buffer, vertexes.data, ByteSize(&vertexes));
     AppendHostBuffer(&mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
+
+    return mesh;
+}
+
+template<typename VertexType>
+static Mesh* CreateDeviceMesh(const Allocator* allocator, MeshData* mesh_data, Array<VertexType> vertexes,
+                              Array<uint32> indexes, Buffer* staging_buffer)
+{
+    auto mesh = Allocate<Mesh>(allocator, 1);
+
+    mesh->vertex_offset = (sint32)(mesh_data->vertex_buffer.index / sizeof(VertexType));
+    mesh->index_offset  = (uint32)(mesh_data->index_buffer.index / sizeof(uint32));
+    mesh->index_count   = indexes.count;
+
+    Clear(staging_buffer);
+    VkDeviceSize vertexes_size = ByteSize(&vertexes);
+    VkDeviceSize indexes_size  = ByteSize(&indexes);
+    AppendHostBuffer(staging_buffer, vertexes.data, vertexes_size);
+    AppendHostBuffer(staging_buffer, indexes.data,  indexes_size);
+    BeginTempCommandBuffer();
+        AppendDeviceBufferCmd(&mesh_data->vertex_buffer, staging_buffer, 0,             vertexes_size);
+        AppendDeviceBufferCmd(&mesh_data->index_buffer,  staging_buffer, vertexes_size, indexes_size);
+    SubmitTempCommandBuffer();
 
     return mesh;
 }

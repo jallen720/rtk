@@ -83,8 +83,8 @@ struct RenderState
     data_set;
     struct
     {
-        Shader* vert_3d;
-        Shader* frag_3d;
+        Shader* vert;
+        Shader* frag;
     }
     shader;
     Pipeline* pipeline;
@@ -344,8 +344,10 @@ static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 
 static void InitShaders(Stack* perm_stack, Stack* temp_stack)
 {
-    render_state.shader.vert_3d = CreateShader(&perm_stack->allocator, temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    render_state.shader.frag_3d = CreateShader(&perm_stack->allocator, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    render_state.shader.vert =
+        CreateShader(&perm_stack->allocator, temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    render_state.shader.frag =
+        CreateShader(&perm_stack->allocator, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
 static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
@@ -385,8 +387,8 @@ static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_l
     };
     Shader* shaders[] =
     {
-        render_state.shader.vert_3d,
-        render_state.shader.frag_3d,
+        render_state.shader.vert,
+        render_state.shader.frag,
     };
     PipelineInfo pipeline_info =
     {

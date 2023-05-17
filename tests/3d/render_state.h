@@ -260,9 +260,9 @@ static ShaderDataInfo DefaultTextureInfo(VkSampler sampler)
                 {
                     .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
                     .baseMipLevel   = 0,
-                    .levelCount     = VK_REMAINING_MIP_LEVELS,
+                    .levelCount     = 1,
                     .baseArrayLayer = 0,
-                    .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+                    .layerCount     = 1,
                 },
             },
         },

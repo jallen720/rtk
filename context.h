@@ -838,12 +838,13 @@ AllocateDeviceMemory(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFla
 static void ListMemoryTypes(PhysicalDevice* physical_device, uint32 tabs = 0)
 {
     VkPhysicalDeviceMemoryProperties* mem_properties = &physical_device->mem_properties;
-    CTK_ITERATE_PTR(type, mem_properties->memoryTypes, mem_properties->memoryTypeCount)
+    for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
     {
+        VkMemoryType* type = mem_properties->memoryTypes + i;
         PrintLine();
 
         PrintTabs(tabs);
-        PrintLine("VkMemoryType (%p):", type);
+        PrintLine("VkMemoryType [%u]:", i);
 
         PrintTabs(tabs + 1);
         PrintLine("heapIndex: %u", type->heapIndex);
@@ -867,7 +868,7 @@ static void LogPhysicalDevice(PhysicalDevice* physical_device)
         "invalid");
     PrintLine("    queue_families:");
     PrintLine("        graphics: %u", physical_device->queue_families.graphics);
-    PrintLine("        present: %u", physical_device->queue_families.present);
+    PrintLine("        present:  %u", physical_device->queue_families.present);
     PrintLine("    depth_image_format: %s",
         depth_image_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? "VK_FORMAT_D32_SFLOAT_S8_UINT" :
         depth_image_format == VK_FORMAT_D32_SFLOAT         ? "VK_FORMAT_D32_SFLOAT"         :

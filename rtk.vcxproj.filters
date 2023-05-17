@@ -22,6 +22,9 @@
     <Filter Include="Source Files\stb">
       <UniqueIdentifier>{6a02a9eb-d329-4e1c-b12e-88b6494a345b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\tests\debug">
+      <UniqueIdentifier>{5b97d46a-1cce-4d99-8a8b-f8a9115c39b0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="test.cc">
@@ -88,6 +91,9 @@
     </ClInclude>
     <ClInclude Include="stb\stb_image.h">
       <Filter>Source Files\stb</Filter>
+    </ClInclude>
+    <ClInclude Include="tests\debug\main.h">
+      <Filter>Source Files\tests\debug</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

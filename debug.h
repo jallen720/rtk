@@ -36,6 +36,7 @@ static uint32 PrintToChar(const char* msg, uint32 msg_size, char end_char, uint3
         }
         ++index;
     }
+
     if (color != NULL)
     {
         Print("%s%.*s" CTK_ANSI_RESET, color, index - start, msg + start);
@@ -44,6 +45,7 @@ static uint32 PrintToChar(const char* msg, uint32 msg_size, char end_char, uint3
     {
         Print("%.*s" CTK_ANSI_RESET, index - start, msg + start);
     }
+
     return index;
 }
 

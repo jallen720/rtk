@@ -313,7 +313,6 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
         }
         PrintLine();
 
-        // Kill process.
         throw 0;
     }
     else if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT & message_severity_flag_bit)

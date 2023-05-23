@@ -34,12 +34,9 @@ struct ImageData
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ImageMemory* CreateImageMemory(const Allocator* allocator, ImageMemoryInfo* info,
-                                      VkAllocationCallbacks* vk_allocators)
+static void InitImageMemory(ImageMemory* image_memory, ImageMemoryInfo* info, VkAllocationCallbacks* vk_allocators)
 {
     VkDevice device = global_ctx.device;
-
-    auto image_memory = Allocate<ImageMemory>(allocator, 1);
 
     // Create temp image with image info to get memory requiremnts, then destroy temp image.
     VkImage temp_image = VK_NULL_HANDLE;
@@ -49,14 +46,11 @@ static ImageMemory* CreateImageMemory(const Allocator* allocator, ImageMemoryInf
     vkDestroyImage(device, temp_image, NULL);
 PrintResourceMemoryInfo("image memory", &image_memory->requirements, info->mem_property_flags);
 
-    // Allocate image memory.
-    image_memory->hnd = AllocateDeviceMemory(&image_memory->requirements, info->mem_property_flags, vk_allocators,
-                                             info->max_image_count);
-
-    image_memory->size = info->max_image_count;
+    // Initialize remaining ImageMemory fields.
+    image_memory->hnd        = AllocateDeviceMemory(&image_memory->requirements, info->mem_property_flags,
+                                                    vk_allocators, info->max_image_count);
+    image_memory->size       = info->max_image_count;
     image_memory->image_info = info->image_info;
-
-    return image_memory;
 }
 
 static void InitImage(Image* image, ImageMemory* image_memory, VkImageViewCreateInfo* view_info)

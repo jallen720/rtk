@@ -63,9 +63,9 @@ struct RenderState
     DeviceStack device_stack;
     DeviceStack host_stack;
     Buffer      staging_buffer;
+    ImageMemory texture_memory;
 
     // Resources
-    ImageMemory*  texture_memory;
     RenderTarget* render_target;
     struct
     {
@@ -137,43 +137,37 @@ static void InitDeviceMemory()
     InitDeviceStack(&render_state.device_stack, &device_stack_info);
 
     InitBuffer(&render_state.staging_buffer, &render_state.host_stack, Megabyte32<4>());
-}
 
-static void InitImageMemory(Stack* perm_stack)
-{
-    // texture
+    ImageMemoryInfo info =
     {
-        ImageMemoryInfo info =
+        .image_info =
         {
-            .image_info =
+            .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .pNext     = NULL,
+            .flags     = 0,
+            .imageType = VK_IMAGE_TYPE_2D,
+            .format    = GetSwapchain()->surface_format.format,
+            .extent =
             {
-                .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                .pNext     = NULL,
-                .flags     = 0,
-                .imageType = VK_IMAGE_TYPE_2D,
-                .format    = GetSwapchain()->surface_format.format,
-                .extent =
-                {
-                    .width  = 64,
-                    .height = 32,
-                    .depth  = 1
-                },
-                .mipLevels             = 1,
-                .arrayLayers           = 1,
-                .samples               = VK_SAMPLE_COUNT_1_BIT,
-                .tiling                = VK_IMAGE_TILING_OPTIMAL,
-                .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                         VK_IMAGE_USAGE_SAMPLED_BIT,
-                .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-                .queueFamilyIndexCount = 0,
-                .pQueueFamilyIndices   = NULL,
-                .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+                .width  = 64,
+                .height = 32,
+                .depth  = 1
             },
-            .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            .max_image_count    = 4,
-        };
-        render_state.texture_memory = CreateImageMemory(&perm_stack->allocator, &info, NULL);
-    }
+            .mipLevels             = 1,
+            .arrayLayers           = 1,
+            .samples               = VK_SAMPLE_COUNT_1_BIT,
+            .tiling                = VK_IMAGE_TILING_OPTIMAL,
+            .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                     VK_IMAGE_USAGE_SAMPLED_BIT,
+            .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+            .queueFamilyIndexCount = 0,
+            .pQueueFamilyIndices   = NULL,
+            .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+        },
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .max_image_count    = 4,
+    };
+    InitImageMemory(&render_state.texture_memory, &info, NULL);
 }
 
 static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
@@ -230,17 +224,17 @@ static void InitSampler()
     render_state.sampler = CreateSampler(&info);
 }
 
-static ShaderDataInfo DefaultTextureInfo(VkSampler sampler)
+static ShaderData* CreateTextureShaderData(Stack* perm_stack, const char* image_path)
 {
-    return
+    ShaderDataInfo info =
     {
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .per_frame = false,
         .image =
         {
-            .memory  = render_state.texture_memory,
-            .sampler = sampler,
+            .memory  = &render_state.texture_memory,
+            .sampler = render_state.sampler,
             .view =
             {
                 .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -267,11 +261,6 @@ static ShaderDataInfo DefaultTextureInfo(VkSampler sampler)
             },
         },
     };
-}
-
-static ShaderData* CreateTextureShaderData(Stack* perm_stack, const char* image_path)
-{
-    ShaderDataInfo info = DefaultTextureInfo(render_state.sampler);
     ShaderData* shader_data = CreateShaderData(&perm_stack->allocator, &info);
 
     // Load image data and write to staging buffer.
@@ -526,7 +515,6 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ThreadPool* thread_pool)
 {
     InitDeviceMemory();
-    InitImageMemory(perm_stack);
     InitRenderTargets(perm_stack, temp_stack, free_list);
     InitVertexLayout(perm_stack);
     InitSampler();

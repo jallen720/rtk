@@ -514,10 +514,12 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ThreadPool* thread_pool)
 {
-    InitDeviceMemory();
-    InitRenderTargets(perm_stack, temp_stack, free_list);
     InitVertexLayout(perm_stack);
     InitSampler();
+
+    InitDeviceMemory();
+
+    InitRenderTargets(perm_stack, temp_stack, free_list);
     InitShaderDatas(perm_stack);
     InitShaderDataSets(perm_stack, temp_stack);
     InitShaders(perm_stack, temp_stack);

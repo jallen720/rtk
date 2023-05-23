@@ -22,6 +22,228 @@ using namespace RTK;
 namespace TestDebug
 {
 
+struct RenderState
+{
+    VkSampler      sampler;
+    DeviceStack*   host_stack;
+    DeviceStack*   device_stack;
+    Buffer*        staging_buffer;
+    ImageMemory*   texture_memory;
+    RenderTarget*  render_target;
+    ShaderData*    axis_cube_texture;
+    ShaderDataSet* texture_set;
+    Shader*        vert_shader;
+    Shader*        frag_shader;
+    Pipeline*      pipeline;
+    MeshData*      mesh_data;
+    Mesh*          quad_mesh;
+};
+
+static void WriteImageToTexture(ShaderData* sd, Buffer* staging_buffer, const char* image_path)
+{
+    // Load image data and write to staging buffer.
+    ImageData image_data = {};
+    LoadImageData(&image_data, image_path);
+    WriteHostBuffer(staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
+    DestroyImageData(&image_data);
+
+    // Copy image data in staging buffer to shader data images.
+    uint32 image_count = GetImageCount(sd);
+    for (uint32 i = 0; i < image_count; ++i)
+    {
+        WriteToShaderDataImage(sd, i, staging_buffer);
+    }
+}
+
+static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
+{
+    Stack frame = CreateFrame(temp_stack);
+
+    auto rs = Allocate<RenderState>(perm_stack, 1);
+
+    // Sampler
+    VkSamplerCreateInfo sampler_info =
+    {
+        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext                   = NULL,
+        .flags                   = 0,
+        .magFilter               = VK_FILTER_NEAREST,
+        .minFilter               = VK_FILTER_NEAREST,
+        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .mipLodBias              = 0.0f,
+        .anisotropyEnable        = VK_FALSE,
+        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+        .compareEnable           = VK_FALSE,
+        .compareOp               = VK_COMPARE_OP_ALWAYS,
+        .minLod                  = 0.0f,
+        .maxLod                  = 0.0f,
+        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+    };
+    rs->sampler = CreateSampler(&sampler_info);
+
+    // Device Memory
+    DeviceStackInfo host_stack_info =
+    {
+        .size               = Megabyte32<16>(),
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    };
+    rs->host_stack = CreateDeviceStack(&perm_stack->allocator, &host_stack_info);
+    DeviceStackInfo device_stack_info =
+    {
+        .size               = Megabyte32<16>(),
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    rs->device_stack = CreateDeviceStack(&perm_stack->allocator, &device_stack_info);
+    rs->staging_buffer = CreateBuffer(&perm_stack->allocator, rs->host_stack, Megabyte32<4>());
+    ImageMemoryInfo image_mem_info =
+    {
+        .image_info =
+        {
+            .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .pNext     = NULL,
+            .flags     = 0,
+            .imageType = VK_IMAGE_TYPE_2D,
+            .format    = GetSwapchain()->surface_format.format,
+            .extent =
+            {
+                .width  = 64,
+                .height = 32,
+                .depth  = 1
+            },
+            .mipLevels             = 1,
+            .arrayLayers           = 1,
+            .samples               = VK_SAMPLE_COUNT_1_BIT,
+            .tiling                = VK_IMAGE_TILING_OPTIMAL,
+            .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                     VK_IMAGE_USAGE_SAMPLED_BIT,
+            .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+            .queueFamilyIndexCount = 0,
+            .pQueueFamilyIndices   = NULL,
+            .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+        },
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .max_image_count    = 4,
+    };
+    rs->texture_memory = CreateImageMemory(&perm_stack->allocator, &image_mem_info, NULL);
+
+    // Render Target
+    VkClearValue attachment_clear_values[] = { { .color = { 0.0f, 0.1f, 0.2f, 1.0f } } };
+    RenderTargetInfo rt_info =
+    {
+        .depth_testing           = false,
+        .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
+    };
+    rs->render_target = CreateRenderTarget(&perm_stack->allocator, &frame, free_list, &rt_info);
+
+    // Shader Data
+    ShaderDataInfo texture_info =
+    {
+        .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .per_frame = false,
+        .image =
+        {
+            .memory  = rs->texture_memory,
+            .sampler = rs->sampler,
+            .view =
+            {
+                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .pNext    = NULL,
+                .flags    = 0,
+                .image    = VK_NULL_HANDLE,
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format   = GetSwapchain()->surface_format.format,
+                .components =
+                {
+                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                },
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+            },
+        },
+    };
+    rs->axis_cube_texture = CreateShaderData(&perm_stack->allocator, &texture_info);
+    WriteImageToTexture(rs->axis_cube_texture, rs->staging_buffer, "images/axis_cube.png");
+    ShaderData* textures[] = { rs->axis_cube_texture };
+    rs->texture_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(textures));
+
+    // Shaders
+    rs->vert_shader = CreateShader(&perm_stack->allocator, &frame, "shaders/bin/debug.vert.spv",
+                                   VK_SHADER_STAGE_VERTEX_BIT);
+    rs->frag_shader = CreateShader(&perm_stack->allocator, &frame, "shaders/bin/debug.frag.spv",
+                                   VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    // Pipeline
+    Shader* shaders[] = { rs->vert_shader, rs->frag_shader, };
+    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
+    VkViewport viewports[] =
+    {
+        {
+            .x        = 0,
+            .y        = 0,
+            .width    = (float32)swapchain_extent.width,
+            .height   = (float32)swapchain_extent.height,
+            .minDepth = 0,
+            .maxDepth = 1
+        },
+    };
+    VertexLayout vertex_layout = {};
+    InitArray(&vertex_layout.bindings, &frame.allocator, 1);
+    PushBinding(&vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
+    InitArray(&vertex_layout.attributes, &frame.allocator, 2);
+    PushAttribute(&vertex_layout, 3, ATTRIBUTE_TYPE_FLOAT32); // Position
+    PushAttribute(&vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // UV
+    PipelineInfo pipeline_info =
+    {
+        .shaders       = CTK_WRAP_ARRAY(shaders),
+        .viewports     = CTK_WRAP_ARRAY(viewports),
+        .vertex_layout = &vertex_layout,
+        .depth_testing = false,
+        .render_target = rs->render_target,
+    };
+    ShaderDataSet* shader_data_sets[] = { rs->texture_set };
+    PipelineLayoutInfo pipeline_layout_info = { .shader_data_sets = CTK_WRAP_ARRAY(shader_data_sets) };
+    rs->pipeline = CreatePipeline(&perm_stack->allocator, &frame, free_list, &pipeline_info, &pipeline_layout_info);
+
+    // Meshes
+    MeshDataInfo mesh_data_info =
+    {
+        .vertex_buffer_size = Megabyte32<1>(),
+        .index_buffer_size  = Megabyte32<1>(),
+    };
+    rs->mesh_data = CreateMeshData(&perm_stack->allocator, rs->device_stack, &mesh_data_info);
+    {
+        #include "rtk/meshes/quad.h"
+        rs->quad_mesh = CreateDeviceMesh(&perm_stack->allocator, rs->mesh_data,
+                                         CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                                         rs->staging_buffer);
+    }
+
+    return rs;
+}
+
 static void Run()
 {
     Stack* perm_stack = CreateStack(&win32_allocator, Megabyte32<8>());
@@ -87,84 +309,34 @@ static void Run()
     InitContext(perm_stack, temp_stack, free_list, &context_info);
 
     ///
-    /// Debugging
+    /// Test
     ///
-
-    LogPhysicalDevice(global_ctx.physical_device);
-
+    RenderState* rs = CreateRenderState(perm_stack, temp_stack, free_list);
+    for (;;)
     {
-        VkBufferCreateInfo create_info = {};
-        create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        create_info.flags = 0;
-        create_info.size  = Gigabyte32<1>() + 1;
-        create_info.usage = /*VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |*/
-                            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                            VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                            VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-        // Check if image sharing mode needs to be concurrent due to separate graphics & present queue families.
-        QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
-        if (queue_families->graphics != queue_families->present)
+        ProcessWindowEvents();
+        if (!WindowIsOpen())
         {
-            create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-            create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
-            create_info.pQueueFamilyIndices   = (uint32*)queue_families;
-        }
-        else
-        {
-            create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
-            create_info.queueFamilyIndexCount = 0;
-            create_info.pQueueFamilyIndices   = NULL;
+            break; // Quit event closed window.
         }
 
-        VkBuffer buffer = VK_NULL_HANDLE;
-        VkResult res = vkCreateBuffer(global_ctx.device, &create_info, NULL, &buffer);
-        Validate(res, "vkCreateBuffer() failed");
-
-        VkMemoryRequirements mem_requirements = {};
-        vkGetBufferMemoryRequirements(global_ctx.device, buffer, &mem_requirements);
-        PrintMemoryRequirements(&mem_requirements, 0);
-    }
-
-    {
-        VkImageCreateInfo create_info =
+        if (!WindowIsActive())
         {
-            .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-            .pNext     = NULL,
-            .flags     = 0,
-            .imageType = VK_IMAGE_TYPE_2D,
-            // .format    = GetSwapchain()->surface_format.format,
-            .format    = GetPhysicalDevice()->depth_image_format,
-            .extent =
-            {
-                .width  = Megabyte32<1>(),
-                .height = 16,
-                .depth  = 1
-            },
-            .mipLevels             = 1,
-            .arrayLayers           = 1,
-            .samples               = VK_SAMPLE_COUNT_1_BIT,
-            .tiling                = VK_IMAGE_TILING_OPTIMAL,
-            // .usage                 = VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT,
-            .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                     VK_IMAGE_USAGE_SAMPLED_BIT,
-            .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-            .queueFamilyIndexCount = 0,
-            .pQueueFamilyIndices   = NULL,
-            .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-        };
+            Sleep(1);
+            continue;
+        }
 
-        VkImage image = VK_NULL_HANDLE;
-        VkResult res = vkCreateImage(global_ctx.device, &create_info, NULL, &image);
-        Validate(res, "vkCreateImage() failed");
+        VkResult next_frame_result = NextFrame();
 
-        VkMemoryRequirements mem_requirements = {};
-        vkGetImageMemoryRequirements(global_ctx.device, image, &mem_requirements);
-        PrintMemoryRequirements(&mem_requirements, 0);
+        VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
+            BindPipeline(command_buffer, rs->pipeline);
+            BindShaderDataSet(command_buffer, rs->texture_set, rs->pipeline, 0);
+            BindMeshData(command_buffer, rs->mesh_data);
+            DrawMesh(command_buffer, rs->quad_mesh, 0, 1);
+        EndRenderCommands(command_buffer);
+
+        SubmitRenderCommands(rs->render_target);
     }
-
-    // uint32 mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-    //                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 }
 
 }

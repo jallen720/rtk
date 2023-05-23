@@ -53,6 +53,14 @@ PrintResourceMemoryInfo("image memory", &image_memory->requirements, info->mem_p
     image_memory->image_info = info->image_info;
 }
 
+static ImageMemory* CreateImageMemory(const Allocator* allocator, ImageMemoryInfo* info,
+                                      VkAllocationCallbacks* vk_allocators)
+{
+    auto image_memory = Allocate<ImageMemory>(allocator, 1);
+    InitImageMemory(image_memory, info, vk_allocators);
+    return image_memory;
+}
+
 static void InitImage(Image* image, ImageMemory* image_memory, VkImageViewCreateInfo* view_info)
 {
     VkDevice device = global_ctx.device;

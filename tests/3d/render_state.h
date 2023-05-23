@@ -97,12 +97,6 @@ struct RenderState
     mesh;
 };
 
-struct Vertex
-{
-    Vec3<float32> position;
-    Vec2<float32> uv;
-};
-
 static constexpr uint32 RENDER_THREAD_COUNT = 4;
 
 /// Instance
@@ -408,7 +402,7 @@ static void InitMeshes(Stack* perm_stack)
     }
 
     {
-        #include "rtk/meshes/quad_3d.h"
+        #include "rtk/meshes/quad.h"
         render_state.mesh.quad = CreateDeviceMesh(&perm_stack->allocator, render_state.mesh.data,
                                                   CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
                                                   &render_state.staging_buffer);

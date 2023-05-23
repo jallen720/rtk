@@ -1,3 +1,5 @@
+struct Vertex { Vec3<float32> position; Vec2<float32> uv; };
+
 Vertex vertexes[] =
 {
     // +X

@@ -789,14 +789,11 @@ static void WaitIdle()
     // }
 }
 
-static VkDeviceMemory
-AllocateDeviceMemory(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFlags mem_property_flags,
-                     VkAllocationCallbacks* allocators, uint32 allocation_count = 1)
+static uint32 GetMemoryTypeIndex(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFlags mem_properties)
 {
     // Reference: https://registry.khronos.org/vulkan/specs/1.3/html/vkspec.html#memory-device
-    VkPhysicalDeviceMemoryProperties* mem_properties = &global_ctx.physical_device->mem_properties;
-    uint32 mem_type_index = UINT32_MAX;
-    for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
+    VkPhysicalDeviceMemoryProperties* device_mem_properties = &global_ctx.physical_device->mem_properties;
+    for (uint32 i = 0; i < device_mem_properties->memoryTypeCount; ++i)
     {
         // Memory type at index must be supported for resource.
         if ((mem_requirements->memoryTypeBits & (1 << i)) == 0)
@@ -805,25 +802,42 @@ AllocateDeviceMemory(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFla
         }
 
         // Memory type at index must support all resource memory properties.
-        if ((mem_properties->memoryTypes[i].propertyFlags & mem_property_flags) != mem_property_flags)
+        if ((device_mem_properties->memoryTypes[i].propertyFlags & mem_properties) != mem_properties)
         {
             continue;
         }
 
-        mem_type_index = i;
-        break;
+        return i;
     }
 
-    if (mem_type_index == UINT32_MAX)
-    {
-        CTK_FATAL("failed to find memory type that satisfies memory requirements");
-    }
+    CTK_FATAL("failed to find memory type that satisfies memory requirements");
+}
 
+static VkDeviceMemory
+AllocateDeviceMemory(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFlags mem_properties,
+                     VkAllocationCallbacks* allocators, uint32 allocation_count = 1)
+{
     // Allocate memory using selected memory type index.
     VkMemoryAllocateInfo info =
     {
         .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize  = mem_requirements->size * allocation_count,
+        .memoryTypeIndex = GetMemoryTypeIndex(mem_requirements, mem_properties),
+    };
+    VkDeviceMemory mem = VK_NULL_HANDLE;
+    VkResult res = vkAllocateMemory(global_ctx.device, &info, allocators, &mem);
+    Validate(res, "vkAllocateMemory() failed");
+
+    return mem;
+}
+
+static VkDeviceMemory AllocateDeviceMemory(VkDeviceSize size, uint32 mem_type_index, VkAllocationCallbacks* allocators)
+{
+    // Allocate memory using selected memory type index.
+    VkMemoryAllocateInfo info =
+    {
+        .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize  = size,
         .memoryTypeIndex = mem_type_index,
     };
     VkDeviceMemory mem = VK_NULL_HANDLE;

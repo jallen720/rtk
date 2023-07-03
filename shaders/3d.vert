@@ -4,11 +4,11 @@
 
 #include "../tests/3d/defs.h"
 
-layout (location = 0) in vec3 in_vert_pos;
-layout (location = 1) in vec2 in_vert_uv;
-layout (location = 0) out vec2 out_vert_uv;
+layout(location = 0) in vec3 in_vert_pos;
+layout(location = 1) in vec2 in_vert_uv;
+layout(location = 0) out vec2 out_vert_uv;
 
-layout (set = 0, binding = 0) uniform VSBuffer
+layout(set = 0, binding = 0) uniform VSBuffer
 {
     mat4 mvp_matrixes[MAX_ENTITIES];
 }

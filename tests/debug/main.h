@@ -186,7 +186,10 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     };
     rs->axis_cube_texture = CreateShaderData(&perm_stack->allocator, &texture_info);
     WriteImageToTexture(rs->axis_cube_texture, rs->staging_buffer, "images/axis_cube.png");
-    ShaderData* textures[] = { rs->axis_cube_texture };
+    ShaderData* textures[] =
+    {
+        rs->axis_cube_texture,
+    };
     rs->texture_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(textures));
 
     // Shaders
@@ -318,6 +321,12 @@ static void Run()
         if (!WindowIsOpen())
         {
             break; // Quit event closed window.
+        }
+
+        if (KeyPressed(KEY_ESCAPE))
+        {
+            CloseWindow();
+            break;
         }
 
         if (!WindowIsActive())

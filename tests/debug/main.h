@@ -31,6 +31,7 @@ struct RenderState
     ImageMemory*   texture_memory;
     RenderTarget*  render_target;
     ShaderData*    axis_cube_texture;
+    ShaderData*    dirt_block_texture;
     ShaderDataSet* texture_set;
     Shader*        vert_shader;
     Shader*        frag_shader;
@@ -51,7 +52,7 @@ static void WriteImageToTexture(ShaderData* sd, Buffer* staging_buffer, const ch
     uint32 image_count = GetImageCount(sd);
     for (uint32 i = 0; i < image_count; ++i)
     {
-        WriteToShaderDataImage(sd, i, staging_buffer);
+        WriteToShaderDataImage(sd, 0, staging_buffer);
     }
 }
 
@@ -184,10 +185,13 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
             },
         },
     };
-    rs->axis_cube_texture = CreateShaderData(&perm_stack->allocator, &texture_info);
-    WriteImageToTexture(rs->axis_cube_texture, rs->staging_buffer, "images/axis_cube.png");
+    rs->axis_cube_texture  = CreateShaderData(&perm_stack->allocator, &texture_info);
+    rs->dirt_block_texture = CreateShaderData(&perm_stack->allocator, &texture_info);
+    WriteImageToTexture(rs->axis_cube_texture,  rs->staging_buffer, "images/axis_cube.png");
+    WriteImageToTexture(rs->dirt_block_texture, rs->staging_buffer, "images/dirt_block.png");
     ShaderData* textures[] =
     {
+        rs->dirt_block_texture,
         rs->axis_cube_texture,
     };
     rs->texture_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(textures));
@@ -227,7 +231,24 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .render_target = rs->render_target,
     };
     ShaderDataSet* shader_data_sets[] = { rs->texture_set };
-    PipelineLayoutInfo pipeline_layout_info = { .shader_data_sets = CTK_WRAP_ARRAY(shader_data_sets) };
+    VkPushConstantRange push_constant_ranges[] =
+    {
+        {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset     = 0,
+            .size       = 16,
+        },
+        {
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .offset     = 16,
+            .size       = 4,
+        },
+    };
+    PipelineLayoutInfo pipeline_layout_info =
+    {
+        .shader_data_sets     = CTK_WRAP_ARRAY(shader_data_sets),
+        .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
+    };
     rs->pipeline = CreatePipeline(&perm_stack->allocator, &frame, free_list, &pipeline_info, &pipeline_layout_info);
 
     // Meshes
@@ -340,7 +361,21 @@ static void Run()
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
             BindPipeline(command_buffer, rs->pipeline);
             BindShaderDataSet(command_buffer, rs->texture_set, rs->pipeline, 0);
+
             BindMeshData(command_buffer, rs->mesh_data);
+            Vec4<float32> positions[] =
+            {
+                { 0, 1 }
+            };
+            uint32 texture_indexes[] =
+            {
+                0
+            };
+            vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT,
+                               0, 16, positions + 0);
+            vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                               16, 4, texture_indexes + 0);
+
             DrawMesh(command_buffer, rs->quad_mesh, 0, 1);
         EndRenderCommands(command_buffer);
 

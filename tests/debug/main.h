@@ -191,8 +191,8 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     WriteImageToTexture(rs->dirt_block_texture, rs->staging_buffer, "images/dirt_block.png");
     ShaderData* textures[] =
     {
-        rs->dirt_block_texture,
         rs->axis_cube_texture,
+        rs->dirt_block_texture,
     };
     rs->texture_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(textures));
 
@@ -357,6 +357,10 @@ static void Run()
         }
 
         VkResult next_frame_result = NextFrame();
+        if (next_frame_result != VK_SUCCESS)
+        {
+            CTK_FATAL("next_frame_result != VK_SUCCESS");
+        }
 
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
             BindPipeline(command_buffer, rs->pipeline);
@@ -365,7 +369,7 @@ static void Run()
             BindMeshData(command_buffer, rs->mesh_data);
             Vec4<float32> positions[] =
             {
-                { 0, 1 }
+                { .5, .5 }
             };
             uint32 texture_indexes[] =
             {

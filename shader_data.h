@@ -25,17 +25,6 @@ struct ShaderDataInfo
     };
 };
 
-struct BufferShaderData
-{
-    Array<Buffer> array;
-};
-
-struct ImageShaderData
-{
-    Array<Image> array;
-    VkSampler    sampler;
-};
-
 struct ShaderData
 {
     VkShaderStageFlags stages;
@@ -43,8 +32,12 @@ struct ShaderData
     bool               per_frame;
     union
     {
-        BufferShaderData buffer;
-        ImageShaderData  image;
+        Array<Buffer> buffers;
+        struct
+        {
+            Array<Image> images;
+            VkSampler    sampler;
+        };
     };
 };
 
@@ -70,26 +63,21 @@ static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* 
         shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
     {
         BufferShaderDataInfo* buffer_info = &info->buffer;
-        BufferShaderData* buffer_shader_data = &shader_data->buffer;
-
-        InitArray(&buffer_shader_data->array, allocator, instance_count);
+        InitArray(&shader_data->buffers, allocator, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
         {
-            InitBuffer(Push(&buffer_shader_data->array), buffer_info->stack, buffer_info->size);
+            InitBuffer(Push(&shader_data->buffers), buffer_info->stack, buffer_info->size);
         }
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
         ImageShaderDataInfo* image_info = &info->image;
-        ImageShaderData* image_shader_data = &shader_data->image;
-
-        InitArray(&image_shader_data->array, allocator, instance_count);
+        InitArray(&shader_data->images, allocator, instance_count);
         for (uint32 i = 0; i < instance_count; ++i)
         {
-            InitImage(Push(&image_shader_data->array), image_info->memory, &image_info->view);
+            InitImage(Push(&shader_data->images), image_info->memory, &image_info->view);
         }
-
-        image_shader_data->sampler = image_info->sampler;
+        shader_data->sampler = image_info->sampler;
     }
     else
     {
@@ -105,12 +93,12 @@ static Type* GetBufferMem(ShaderData* shader_data)
     CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
-    return (Type*)GetPtr(&shader_data->buffer.array, global_ctx.frames.index)->mapped_mem;
+    return (Type*)GetPtr(&shader_data->buffers, global_ctx.frames.index)->mapped_mem;
 }
 
 static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, Buffer* image_data_buffer)
 {
-    Image* image = GetPtr(&shader_data->image.array, instance_index);
+    Image* image = GetPtr(&shader_data->images, instance_index);
 
     // Copy image data from buffer memory to image memory.
     BeginTempCommandBuffer();
@@ -285,8 +273,7 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
                 shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
             {
                 // Map buffer to buffer info for write.
-                BufferShaderData* buffer_shader_data = &shader_data->buffer;
-                Buffer* buffer = GetPtr(&buffer_shader_data->array, data_instance_index);
+                Buffer* buffer = GetPtr(&shader_data->buffers, data_instance_index);
                 write->pBufferInfo = Push(buffer_infos,
                 {
                     .buffer = buffer->hnd,
@@ -297,11 +284,10 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
             else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
             {
                 // Map combined image sampler to image info for write.
-                ImageShaderData* image_shader_data = &shader_data->image;
-                Image* image = GetPtr(&image_shader_data->array, data_instance_index);
+                Image* image = GetPtr(&shader_data->images, data_instance_index);
                 write->pImageInfo = Push(image_infos,
                 {
-                    .sampler     = image_shader_data->sampler,
+                    .sampler     = shader_data->sampler,
                     .imageView   = image->view,
                     .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                 });
@@ -320,5 +306,5 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
 
 static uint32 GetImageCount(ShaderData* shader_data)
 {
-    return shader_data->image.array.count;
+    return shader_data->images.count;
 }

@@ -18,6 +18,7 @@ struct ShaderDataInfo
     VkShaderStageFlags stages;
     VkDescriptorType   type;
     bool               per_frame;
+    uint32             count;
     union
     {
         BufferShaderDataInfo buffer;
@@ -30,6 +31,7 @@ struct ShaderData
     VkShaderStageFlags stages;
     VkDescriptorType   type;
     bool               per_frame;
+    uint32             count;
     union
     {
         Array<Buffer> buffers;
@@ -56,15 +58,17 @@ static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* 
     shader_data->stages    = info->stages;
     shader_data->type      = info->type;
     shader_data->per_frame = info->per_frame;
+    shader_data->count     = info->count;
 
     uint32 instance_count = shader_data->per_frame ? global_ctx.frames.size : 1;
+    uint32 total_count = instance_count * shader_data->count;
 
     if (shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
         shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
     {
         BufferShaderDataInfo* buffer_info = &info->buffer;
-        InitArray(&shader_data->buffers, allocator, instance_count);
-        for (uint32 i = 0; i < instance_count; ++i)
+        InitArray(&shader_data->buffers, allocator, total_count);
+        for (uint32 i = 0; i < total_count; ++i)
         {
             InitBuffer(Push(&shader_data->buffers), buffer_info->stack, buffer_info->size);
         }
@@ -72,8 +76,8 @@ static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* 
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
         ImageShaderDataInfo* image_info = &info->image;
-        InitArray(&shader_data->images, allocator, instance_count);
-        for (uint32 i = 0; i < instance_count; ++i)
+        InitArray(&shader_data->images, allocator, total_count);
+        for (uint32 i = 0; i < total_count; ++i)
         {
             InitImage(Push(&shader_data->images), image_info->memory, &image_info->view);
         }
@@ -90,15 +94,17 @@ static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* 
 template<typename Type>
 static Type* GetBufferMem(ShaderData* shader_data)
 {
+    CTK_TODO("add index parameter");
     CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
     return (Type*)GetPtr(&shader_data->buffers, global_ctx.frames.index)->mapped_mem;
 }
 
-static void WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, Buffer* image_data_buffer)
+static void
+WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, uint32 image_index, Buffer* image_data_buffer)
 {
-    Image* image = GetPtr(&shader_data->images, instance_index);
+    Image* image = GetPtr(&shader_data->images, (instance_index * shader_data->count) + image_index);
 
     // Copy image data from buffer memory to image memory.
     BeginTempCommandBuffer();
@@ -209,7 +215,7 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
         {
             .binding            = i,
             .descriptorType     = shader_data->type,
-            .descriptorCount    = 1,
+            .descriptorCount    = shader_data->count,
             .stageFlags         = shader_data->stages,
             .pImmutableSamplers = NULL,
         });
@@ -248,10 +254,28 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
     Validate(res, "vkAllocateDescriptorSets() failed");
 
     // Bind descriptor data.
-    uint32 max_writes = shader_datas.count * instance_count;
-    auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, max_writes);
-    auto image_infos  = CreateArray<VkDescriptorImageInfo>(&frame.allocator, max_writes);
-    auto writes       = CreateArray<VkWriteDescriptorSet>(&frame.allocator, max_writes);
+    uint32 buffer_count = 0;
+    uint32 image_count = 0;
+    CTK_ITERATE(shader_data_ptr, &shader_datas)
+    {
+        ShaderData* shader_data = *shader_data_ptr;
+        if (shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+            shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+        {
+            buffer_count += shader_data->count;
+        }
+        else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+        {
+            image_count += shader_data->count;
+        }
+        else
+        {
+            CTK_FATAL("unhandled shader-data type: %u", (uint32)shader_data->type);
+        }
+    }
+    auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, buffer_count * instance_count);
+    auto image_infos = CreateArray<VkDescriptorImageInfo>(&frame.allocator, image_count * instance_count);
+    auto writes = CreateArray<VkWriteDescriptorSet>(&frame.allocator, buffer_infos->size + image_infos->size);
 
     for (uint32 instance_index = 0; instance_index < instance_count; ++instance_index)
     {
@@ -260,6 +284,7 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
         {
             ShaderData* shader_data = Get(&shader_datas, data_binding);
             uint32 data_instance_index = shader_data->per_frame ? instance_index : 0;
+            uint32 data_instance_offset = data_instance_index * shader_data->count;
 
             VkWriteDescriptorSet* write = Push(writes);
             write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -267,30 +292,39 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
             write->dstBinding      = data_binding;
             write->dstArrayElement = 0;
             write->descriptorType  = shader_data->type;
-            write->descriptorCount = 1;
+            write->descriptorCount = shader_data->count;
 
             if (shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                 shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
             {
                 // Map buffer to buffer info for write.
-                Buffer* buffer = GetPtr(&shader_data->buffers, data_instance_index);
-                write->pBufferInfo = Push(buffer_infos,
+                write->pBufferInfo = End(buffer_infos);
+                for (uint32 buffer_index = 0; buffer_index < shader_data->count; ++buffer_index)
                 {
-                    .buffer = buffer->hnd,
-                    .offset = buffer->offset,
-                    .range  = buffer->size,
-                });
+
+                    Buffer* buffer = GetPtr(&shader_data->buffers, data_instance_offset + buffer_index);
+                    Push(buffer_infos,
+                    {
+                        .buffer = buffer->hnd,
+                        .offset = buffer->offset,
+                        .range  = buffer->size,
+                    });
+                }
             }
             else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
             {
                 // Map combined image sampler to image info for write.
-                Image* image = GetPtr(&shader_data->images, data_instance_index);
-                write->pImageInfo = Push(image_infos,
+                write->pImageInfo = End(image_infos);
+                for (uint32 image_index = 0; image_index < shader_data->count; ++image_index)
                 {
-                    .sampler     = shader_data->sampler,
-                    .imageView   = image->view,
-                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                });
+                    Image* image = GetPtr(&shader_data->images, data_instance_offset + image_index);
+                    Push(image_infos,
+                    {
+                        .sampler     = shader_data->sampler,
+                        .imageView   = image->view,
+                        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    });
+                }
             }
             else
             {

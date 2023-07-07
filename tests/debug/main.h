@@ -30,8 +30,7 @@ struct RenderState
     Buffer*        staging_buffer;
     ImageMemory*   texture_memory;
     RenderTarget*  render_target;
-    ShaderData*    axis_cube_texture;
-    ShaderData*    dirt_block_texture;
+    ShaderData*    textures;
     ShaderDataSet* texture_set;
     Shader*        vert_shader;
     Shader*        frag_shader;
@@ -40,7 +39,7 @@ struct RenderState
     Mesh*          quad_mesh;
 };
 
-static void WriteImageToTexture(ShaderData* sd, Buffer* staging_buffer, const char* image_path)
+static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
 {
     // Load image data and write to staging buffer.
     ImageData image_data = {};
@@ -52,7 +51,7 @@ static void WriteImageToTexture(ShaderData* sd, Buffer* staging_buffer, const ch
     uint32 image_count = GetImageCount(sd);
     for (uint32 i = 0; i < image_count; ++i)
     {
-        WriteToShaderDataImage(sd, 0, staging_buffer);
+        WriteToShaderDataImage(sd, 0, index, staging_buffer);
     }
 }
 
@@ -155,6 +154,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .per_frame = false,
+        .count     = 1,
         .image =
         {
             .memory  = rs->texture_memory,
@@ -185,15 +185,10 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
             },
         },
     };
-    rs->axis_cube_texture  = CreateShaderData(&perm_stack->allocator, &texture_info);
-    rs->dirt_block_texture = CreateShaderData(&perm_stack->allocator, &texture_info);
-    WriteImageToTexture(rs->axis_cube_texture,  rs->staging_buffer, "images/axis_cube.png");
-    WriteImageToTexture(rs->dirt_block_texture, rs->staging_buffer, "images/dirt_block.png");
-    ShaderData* textures[] =
-    {
-        rs->axis_cube_texture,
-        rs->dirt_block_texture,
-    };
+    rs->textures = CreateShaderData(&perm_stack->allocator, &texture_info);
+    WriteImageToTexture(rs->textures, 0, rs->staging_buffer, "images/axis_cube.png");
+    WriteImageToTexture(rs->textures, 1, rs->staging_buffer, "images/dirt_block.png");
+    ShaderData* textures[] = { rs->textures };
     rs->texture_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(textures));
 
     // Shaders
@@ -369,7 +364,7 @@ static void Run()
             BindMeshData(command_buffer, rs->mesh_data);
             Vec4<float32> positions[] =
             {
-                { .5, .5 }
+                { 0, 0 }
             };
             uint32 texture_indexes[] =
             {

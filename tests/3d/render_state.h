@@ -267,7 +267,7 @@ static ShaderData* CreateTextureShaderData(Stack* perm_stack, const char* image_
     uint32 image_count = GetImageCount(shader_data);
     for (uint32 i = 0; i < image_count; ++i)
     {
-        WriteToShaderDataImage(shader_data, i, &render_state.staging_buffer);
+        WriteToShaderDataImage(shader_data, i, 0, &render_state.staging_buffer);
     }
 
     return shader_data;

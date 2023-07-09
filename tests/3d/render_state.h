@@ -225,6 +225,7 @@ static ShaderData* CreateTextureShaderData(Stack* perm_stack, const char* image_
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .per_frame = false,
+        .count     = 1,
         .image =
         {
             .memory  = &render_state.texture_memory,
@@ -282,6 +283,7 @@ static void InitShaderDatas(Stack* perm_stack)
             .stages      = VK_SHADER_STAGE_VERTEX_BIT,
             .type        = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .per_frame   = true,
+            .count       = 1,
             .buffer =
             {
                 .stack = &render_state.host_stack,
@@ -526,7 +528,7 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool)
 {
     Job<MVPMatrixState>* job = &render_state.job.update_mvp_matrixes;
     Matrix view_projection_matrix = GetViewProjectionMatrix(&game_state.view);
-    auto frame_vs_buffer = GetBufferMem<VSBuffer>(render_state.data.vs_buffer);
+    auto frame_vs_buffer = GetCurrentFrameBufferMem<VSBuffer>(render_state.data.vs_buffer, 0);
     uint32 thread_count = thread_pool->size;
 
     // Initialize thread states and submit tasks.

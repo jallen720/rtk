@@ -31,7 +31,8 @@ struct RenderState
     ImageMemory*   texture_memory;
     RenderTarget*  render_target;
     ShaderData*    textures;
-    ShaderDataSet* texture_set;
+    ShaderData*    entity_buffers;
+    ShaderDataSet* shader_data_set;
     Shader*        vert_shader;
     Shader*        frag_shader;
     Pipeline*      pipeline;
@@ -149,6 +150,29 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     rs->render_target = CreateRenderTarget(&perm_stack->allocator, &frame, free_list, &rt_info);
 
     // Shader Data
+    struct EntityBuffer
+    {
+        Vec4<float32> pos[2];
+    };
+    ShaderDataInfo entity_buffer_info =
+    {
+        .stages    = VK_SHADER_STAGE_VERTEX_BIT,
+        .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .per_frame = false,
+        .count     = 1,
+        .buffer =
+        {
+            .stack = rs->host_stack,
+            .size  = sizeof(EntityBuffer),
+        },
+    };
+    rs->entity_buffers = CreateShaderData(&perm_stack->allocator, &entity_buffer_info);
+    auto entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffers, 0, 0);
+    for (uint32 i = 0; i < 2; ++i)
+    {
+        entity_buffer->pos[i] = { (float32)i, (float32)i, 0, 0 };
+    }
+
     ShaderDataInfo texture_info =
     {
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -188,8 +212,13 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     rs->textures = CreateShaderData(&perm_stack->allocator, &texture_info);
     WriteImageToTexture(rs->textures, 0, rs->staging_buffer, "images/axis_cube.png");
     WriteImageToTexture(rs->textures, 1, rs->staging_buffer, "images/dirt_block.png");
-    ShaderData* textures[] = { rs->textures };
-    rs->texture_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(textures));
+
+    ShaderData* shader_datas[] =
+    {
+        rs->entity_buffers,
+        rs->textures,
+    };
+    rs->shader_data_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(shader_datas));
 
     // Shaders
     rs->vert_shader = CreateShader(&perm_stack->allocator, &frame, "shaders/bin/debug.vert.spv",
@@ -225,24 +254,19 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .depth_testing = false,
         .render_target = rs->render_target,
     };
-    ShaderDataSet* shader_data_sets[] = { rs->texture_set };
-    VkPushConstantRange push_constant_ranges[] =
-    {
-        {
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-            .offset     = 0,
-            .size       = 16,
-        },
-        {
-            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .offset     = 16,
-            .size       = 4,
-        },
-    };
+    ShaderDataSet* shader_data_sets[] = { rs->shader_data_set };
+    // VkPushConstantRange push_constant_ranges[] =
+    // {
+    //     {
+    //         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+    //         .offset     = 0,
+    //         .size       = 4,
+    //     },
+    // };
     PipelineLayoutInfo pipeline_layout_info =
     {
         .shader_data_sets     = CTK_WRAP_ARRAY(shader_data_sets),
-        .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
+        // .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
     };
     rs->pipeline = CreatePipeline(&perm_stack->allocator, &frame, free_list, &pipeline_info, &pipeline_layout_info);
 
@@ -359,27 +383,9 @@ static void Run()
 
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
             BindPipeline(command_buffer, rs->pipeline);
-            BindShaderDataSet(command_buffer, rs->texture_set, rs->pipeline, 0);
-
+            BindShaderDataSet(command_buffer, rs->shader_data_set, rs->pipeline, 0);
             BindMeshData(command_buffer, rs->mesh_data);
-            Vec4<float32> positions[] =
-            {
-                { 0, 0 },
-                { 1, 1 },
-            };
-            uint32 texture_indexes[] =
-            {
-                0, 1,
-            };
-            for (uint32 i = 0; i < 2; ++i)
-            {
-                vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT,
-                                   0, 16, positions + i);
-                vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                                   16, 4, texture_indexes + i);
-
-                DrawMesh(command_buffer, rs->quad_mesh, 0, 1);
-            }
+            DrawMesh(command_buffer, rs->quad_mesh, 0, 2);
         EndRenderCommands(command_buffer);
 
         SubmitRenderCommands(rs->render_target);

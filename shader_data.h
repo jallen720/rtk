@@ -53,6 +53,8 @@ struct ShaderDataSet
 ////////////////////////////////////////////////////////////
 static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* info)
 {
+    CTK_ASSERT(info->count != 0);
+
     auto shader_data = Allocate<ShaderData>(allocator, 1);
 
     shader_data->stages    = info->stages;
@@ -92,13 +94,19 @@ static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* 
 }
 
 template<typename Type>
-static Type* GetBufferMem(ShaderData* shader_data)
+static Type* GetBufferMem(ShaderData* shader_data, uint32 instance_index, uint32 index)
 {
-    CTK_TODO("add index parameter");
     CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
-    return (Type*)GetPtr(&shader_data->buffers, global_ctx.frames.index)->mapped_mem;
+    uint32 instance_offset = instance_index * shader_data->count;
+    return (Type*)GetPtr(&shader_data->buffers, instance_offset + index)->mapped_mem;
+}
+
+template<typename Type>
+static Type* GetCurrentFrameBufferMem(ShaderData* shader_data, uint32 index)
+{
+    return GetBufferMem<Type>(shader_data, global_ctx.frames.index, index);
 }
 
 static void

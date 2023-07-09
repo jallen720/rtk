@@ -154,7 +154,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .per_frame = false,
-        .count     = 1,
+        .count     = 2,
         .image =
         {
             .memory  = rs->texture_memory,
@@ -364,18 +364,22 @@ static void Run()
             BindMeshData(command_buffer, rs->mesh_data);
             Vec4<float32> positions[] =
             {
-                { 0, 0 }
+                { 0, 0 },
+                { 1, 1 },
             };
             uint32 texture_indexes[] =
             {
-                0
+                0, 1,
             };
-            vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT,
-                               0, 16, positions + 0);
-            vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_FRAGMENT_BIT,
-                               16, 4, texture_indexes + 0);
+            for (uint32 i = 0; i < 2; ++i)
+            {
+                vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT,
+                                   0, 16, positions + i);
+                vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                                   16, 4, texture_indexes + i);
 
-            DrawMesh(command_buffer, rs->quad_mesh, 0, 1);
+                DrawMesh(command_buffer, rs->quad_mesh, 0, 1);
+            }
         EndRenderCommands(command_buffer);
 
         SubmitRenderCommands(rs->render_target);

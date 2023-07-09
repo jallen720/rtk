@@ -82,19 +82,22 @@ static DeviceStack* CreateDeviceStack(const Allocator* allocator, DeviceStackInf
 
 static void InitBuffer(Buffer* buffer, DeviceStack* device_stack, VkDeviceSize size)
 {
+    VkDeviceSize aligned_size =
+        MultipleOf(size, global_ctx.physical_device->properties.limits.minUniformBufferOffsetAlignment);
+
     if (device_stack->index + size > device_stack->size)
     {
         CTK_FATAL("can't allocate %u-byte buffer from device-stack at index %u: allocation would exceed device-stack "
-                  "size of %u", size, device_stack->index, device_stack->size);
+                  "size of %u", aligned_size, device_stack->index, device_stack->size);
     }
 
     buffer->hnd        = device_stack->hnd;
     buffer->mapped_mem = device_stack->mapped_mem == NULL ? NULL : device_stack->mapped_mem + device_stack->index;
     buffer->offset     = device_stack->index;
-    buffer->size       = size;
+    buffer->size       = aligned_size;
     buffer->index      = 0;
 
-    device_stack->index += size;
+    device_stack->index += aligned_size;
 }
 
 static Buffer* CreateBuffer(const Allocator* allocator, DeviceStack* device_stack, VkDeviceSize size)

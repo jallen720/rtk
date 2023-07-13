@@ -95,5 +95,8 @@
     <ClInclude Include="tests\debug\main.h">
       <Filter>Source Files\tests\debug</Filter>
     </ClInclude>
+    <ClInclude Include="tests\debug\defs.h">
+      <Filter>Source Files\tests\debug</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

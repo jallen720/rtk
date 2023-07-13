@@ -212,7 +212,7 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
 
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
-    uint32 instance_count = global_ctx.frames.size;
+    uint32 data_set_instance_count = global_ctx.frames.size;
 
     // Generate descriptor bindings.
     auto bindings = CreateArray<VkDescriptorSetLayoutBinding>(&frame.allocator, shader_datas.count);
@@ -242,8 +242,8 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
     Validate(res, "vkCreateDescriptorSetLayout() failed");
 
     // Duplicate layouts for allocation.
-    auto desc_set_alloc_layouts = CreateArray<VkDescriptorSetLayout>(&frame.allocator, instance_count);
-    for (uint32 i = 0; i < instance_count; ++i)
+    auto desc_set_alloc_layouts = CreateArray<VkDescriptorSetLayout>(&frame.allocator, data_set_instance_count);
+    for (uint32 i = 0; i < data_set_instance_count; ++i)
     {
         Push(desc_set_alloc_layouts, shader_data_set->layout);
     }
@@ -254,10 +254,10 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
         .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext              = NULL,
         .descriptorPool     = global_ctx.descriptor_pool,
-        .descriptorSetCount = instance_count,
+        .descriptorSetCount = data_set_instance_count,
         .pSetLayouts        = desc_set_alloc_layouts->data,
     };
-    InitArrayFull(&shader_data_set->instances, allocator, instance_count);
+    InitArrayFull(&shader_data_set->instances, allocator, data_set_instance_count);
     res = vkAllocateDescriptorSets(device, &allocate_info, shader_data_set->instances.data);
     Validate(res, "vkAllocateDescriptorSets() failed");
 
@@ -281,18 +281,19 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
             CTK_FATAL("unhandled shader-data type: %u", (uint32)shader_data->type);
         }
     }
-    auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, buffer_count * instance_count);
-    auto image_infos = CreateArray<VkDescriptorImageInfo>(&frame.allocator, image_count * instance_count);
+    auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, buffer_count * data_set_instance_count);
+    auto image_infos = CreateArray<VkDescriptorImageInfo>(&frame.allocator, image_count * data_set_instance_count);
     auto writes = CreateArray<VkWriteDescriptorSet>(&frame.allocator, buffer_infos->size + image_infos->size);
 
-    for (uint32 instance_index = 0; instance_index < instance_count; ++instance_index)
+    for (uint32 data_set_instance_index = 0; data_set_instance_index < data_set_instance_count;
+         ++data_set_instance_index)
     {
-        VkDescriptorSet instance_desc_set = Get(&shader_data_set->instances, instance_index);
+        VkDescriptorSet instance_desc_set = Get(&shader_data_set->instances, data_set_instance_index);
         for (uint32 data_binding = 0; data_binding < shader_datas.count; ++data_binding)
         {
             ShaderData* shader_data = Get(&shader_datas, data_binding);
-            uint32 data_instance_index = shader_data->per_frame ? instance_index : 0;
-            uint32 data_instance_offset = data_instance_index * shader_data->count;
+            uint32 data_instance_index = shader_data->per_frame ? data_set_instance_index : 0;
+            uint32 data_instance_index_offset = data_instance_index * shader_data->count;
 
             VkWriteDescriptorSet* write = Push(writes);
             write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -309,8 +310,7 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
                 write->pBufferInfo = End(buffer_infos);
                 for (uint32 buffer_index = 0; buffer_index < shader_data->count; ++buffer_index)
                 {
-
-                    Buffer* buffer = GetPtr(&shader_data->buffers, data_instance_offset + buffer_index);
+                    Buffer* buffer = GetPtr(&shader_data->buffers, data_instance_index_offset + buffer_index);
                     Push(buffer_infos,
                     {
                         .buffer = buffer->hnd,
@@ -325,7 +325,7 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
                 write->pImageInfo = End(image_infos);
                 for (uint32 image_index = 0; image_index < shader_data->count; ++image_index)
                 {
-                    Image* image = GetPtr(&shader_data->images, data_instance_offset + image_index);
+                    Image* image = GetPtr(&shader_data->images, data_instance_index_offset + image_index);
                     Push(image_infos,
                     {
                         .sampler     = shader_data->sampler,

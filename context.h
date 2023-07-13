@@ -313,7 +313,7 @@ static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Dev
 
         // Graphics and present queue families required.
         if (physical_device.queue_families.graphics == UNSET_INDEX ||
-            physical_device.queue_families.present == UNSET_INDEX)
+            physical_device.queue_families.present  == UNSET_INDEX)
         {
             continue;
         }

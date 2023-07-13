@@ -166,6 +166,7 @@
     <ClInclude Include="tests\3d\game_state.h" />
     <ClInclude Include="tests\3d\main.h" />
     <ClInclude Include="tests\3d\render_state.h" />
+    <ClInclude Include="tests\debug\defs.h" />
     <ClInclude Include="tests\debug\main.h" />
     <ClInclude Include="tests\shared.h" />
     <ClInclude Include="vk_array.h" />

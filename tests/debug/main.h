@@ -12,9 +12,7 @@
 #include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
-#include "rtk/tests/3d/defs.h"
-#include "rtk/tests/3d/game_state.h"
-#include "rtk/tests/3d/render_state.h"
+#include "rtk/tests/debug/defs.h"
 
 using namespace CTK;
 using namespace RTK;
@@ -31,13 +29,19 @@ struct RenderState
     ImageMemory*   texture_memory;
     RenderTarget*  render_target;
     ShaderData*    textures;
-    ShaderData*    entity_buffers;
+    ShaderData*    entity_buffer;
     ShaderDataSet* shader_data_set;
     Shader*        vert_shader;
     Shader*        frag_shader;
     Pipeline*      pipeline;
     MeshData*      mesh_data;
     Mesh*          quad_mesh;
+};
+
+struct EntityBuffer
+{
+    Vec4<float32> position[MAX_ENTITIES];
+    uint32        texture_index[MAX_ENTITIES];
 };
 
 static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
@@ -150,13 +154,9 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     rs->render_target = CreateRenderTarget(&perm_stack->allocator, &frame, free_list, &rt_info);
 
     // Shader Data
-    struct EntityBuffer
-    {
-        Vec4<float32> pos[2];
-    };
     ShaderDataInfo entity_buffer_info =
     {
-        .stages    = VK_SHADER_STAGE_VERTEX_BIT,
+        .stages    = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
         .per_frame = false,
         .count     = 1,
@@ -166,12 +166,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
             .size  = sizeof(EntityBuffer),
         },
     };
-    rs->entity_buffers = CreateShaderData(&perm_stack->allocator, &entity_buffer_info);
-    auto entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffers, 0, 0);
-    for (uint32 i = 0; i < 2; ++i)
-    {
-        entity_buffer->pos[i] = { (float32)i, (float32)i, 0, 0 };
-    }
+    rs->entity_buffer = CreateShaderData(&perm_stack->allocator, &entity_buffer_info);
 
     ShaderDataInfo texture_info =
     {
@@ -215,7 +210,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
 
     ShaderData* shader_datas[] =
     {
-        rs->entity_buffers,
+        rs->entity_buffer,
         rs->textures,
     };
     rs->shader_data_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(shader_datas));
@@ -355,6 +350,15 @@ static void Run()
     /// Test
     ///
     RenderState* rs = CreateRenderState(perm_stack, temp_stack, free_list);
+
+    // Initialize entities.
+    auto entity_buffer = GetCurrentFrameBufferMem<EntityBuffer>(rs->entity_buffer, 0u);
+    for (uint32 i = 0; i < 2; ++i)
+    {
+        entity_buffer->position[i] = { (float32)i, (float32)i, 0, 1 };
+        entity_buffer->texture_index[i] = i;
+    }
+
     for (;;)
     {
         ProcessWindowEvents();

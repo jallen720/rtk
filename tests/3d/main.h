@@ -57,11 +57,12 @@ static void Run()
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
 #endif
 
-    context_info.required_features.as_struct =
+    DeviceFeatures required_device_features[] =
     {
-        .geometryShader    = VK_TRUE,
-        .samplerAnisotropy = VK_TRUE,
+        DeviceFeatures::GEOMETRY_SHADER,
+        DeviceFeatures::SAMPLER_ANISOTROPY,
     };
+    context_info.required_features = CTK_WRAP_ARRAY(required_device_features);
 
     VkDescriptorPoolSize descriptor_pool_sizes[] =
     {

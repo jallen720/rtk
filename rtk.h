@@ -33,6 +33,7 @@ namespace RTK
 
 #include "rtk/debug.h"
 #include "rtk/vk_array.h"
+#include "rtk/device_features.h"
 #include "rtk/context.h"
 #include "rtk/buffer.h"
 #include "rtk/image.h"

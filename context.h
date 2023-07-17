@@ -21,16 +21,17 @@ struct InstanceInfo
     Array<const char*>                  extensions;
 };
 
-union DeviceFeatures
-{
-    VkPhysicalDeviceFeatures as_struct;
-    VkBool32                 as_array[MAX_DEVICE_FEATURES];
-};
+// union DeviceFeatures
+// {
+//     VkPhysicalDeviceFeatures as_struct;
+//     VkBool32                 as_array[MAX_DEVICE_FEATURES];
+// };
 
 struct ContextInfo
 {
     InstanceInfo                instance_info;
-    DeviceFeatures              required_features;
+    // DeviceFeatures              required_features;
+    Array<DeviceFeatures>       required_features;
     uint32                      render_thread_count;
     Array<VkDescriptorPoolSize> descriptor_pool_sizes;
 };
@@ -46,7 +47,8 @@ struct PhysicalDevice
     VkPhysicalDevice                 hnd;
     QueueFamilies                    queue_families;
     VkPhysicalDeviceProperties       properties;
-    DeviceFeatures                   features;
+    // DeviceFeatures                   features;
+    DeviceFeatureInfo                feature_info;
     VkPhysicalDeviceMemoryProperties mem_properties;
     VkFormat                         depth_image_format;
 };
@@ -280,7 +282,8 @@ static void InitSurface()
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
-static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures* required_features)
+static void
+LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFeatures>* required_features)
 {
     Stack frame = CreateFrame(temp_stack);
 
@@ -308,7 +311,8 @@ static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Dev
             .depth_image_format = FindDepthImageFormat(vk_physical_device),
         };
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
-        vkGetPhysicalDeviceFeatures(vk_physical_device, &physical_device.features.as_struct);
+        // vkGetPhysicalDeviceFeatures(vk_physical_device, &physical_device.features.as_struct);
+        GetDeviceFeatureInfo(vk_physical_device, &physical_device.feature_info);
         vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
 
         // Graphics and present queue families required.
@@ -326,15 +330,33 @@ static void LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Dev
 
         // All required features must be supported.
         bool has_required_features = true;
-        for (uint32 feature_index = 0; feature_index < MAX_DEVICE_FEATURES; ++feature_index)
+
+        ///
+        /// OLD
+        ///
+        // for (uint32 feature_index = 0; feature_index < MAX_DEVICE_FEATURES; ++feature_index)
+        // {
+        //     if (required_features->as_array[feature_index] == VK_TRUE &&
+        //         physical_device.features.as_array[feature_index] == VK_FALSE)
+        //     {
+        //         has_required_features = false;
+        //         break;
+        //     }
+        // }
+
+        ///
+        /// NEW
+        ///
+        CTK_ITERATE(required_feature, required_features)
         {
-            if (required_features->as_array[feature_index] == VK_TRUE &&
-                physical_device.features.as_array[feature_index] == VK_FALSE)
+            if (physical_device.feature_info.array[*required_feature] == VK_FALSE)
             {
+                PrintError("required physical device feature %s is not supported",
+                           GetPhysicalDeviceFeatureName(*required_feature));
                 has_required_features = false;
-                break;
             }
         }
+
         if (!has_required_features)
         {
             continue;
@@ -361,7 +383,8 @@ static void UsePhysicalDevice(uint32 index)
     global_ctx.physical_device = GetPtr(&global_ctx.physical_devices, index);
 }
 
-static void InitDevice(DeviceFeatures* enabled_features)
+// static void InitDevice(DeviceFeatures* enabled_features)
+static void InitDevice(Array<DeviceFeatures>* required_features)
 {
     QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
 
@@ -380,6 +403,7 @@ static void InitDevice(DeviceFeatures* enabled_features)
     VkDeviceCreateInfo create_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+        .pNext                   =
         .flags                   = 0,
         .queueCreateInfoCount    = queue_infos.count,
         .pQueueCreateInfos       = queue_infos.data,

@@ -44,25 +44,25 @@ static void Run()
 
     // Init RTK Context + Resources
     ContextInfo context_info = {};
-    context_info.instance_info.application_name       = "RTK 3D Test",
+    context_info.instance_info.application_name       = "RTK 3D Test";
     context_info.instance_info.extensions             = {};
 #ifdef RTK_ENABLE_VALIDATION
-    context_info.instance_info.debug_callback         = DefaultDebugCallback,
+    context_info.instance_info.debug_callback         = DefaultDebugCallback;
     context_info.instance_info.debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                                         // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
                                                         VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     context_info.instance_info.debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 #endif
 
-    DeviceFeatures required_device_features[] =
+    DeviceFeatures enabled_features[] =
     {
         DeviceFeatures::GEOMETRY_SHADER,
         DeviceFeatures::SAMPLER_ANISOTROPY,
     };
-    context_info.required_features = CTK_WRAP_ARRAY(required_device_features);
+    context_info.enabled_features = CTK_WRAP_ARRAY(enabled_features);
 
     VkDescriptorPoolSize descriptor_pool_sizes[] =
     {

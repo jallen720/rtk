@@ -308,24 +308,25 @@ static void Run()
 
     // Init RTK Context + Resources
     ContextInfo context_info = {};
-    context_info.instance_info.application_name       = "Debug Test",
+    context_info.instance_info.application_name       = "Debug Test";
     context_info.instance_info.extensions             = {};
 #ifdef RTK_ENABLE_VALIDATION
-    context_info.instance_info.debug_callback         = DefaultDebugCallback,
+    context_info.instance_info.debug_callback         = DefaultDebugCallback;
     context_info.instance_info.debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
                                                         // VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT |
                                                         VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+                                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
     context_info.instance_info.debug_message_type     = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+                                                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 #endif
 
-    context_info.required_features.as_struct =
+    DeviceFeatures enabled_features[] =
     {
-        .geometryShader    = VK_TRUE,
-        .samplerAnisotropy = VK_TRUE,
+        DeviceFeatures::GEOMETRY_SHADER,
+        DeviceFeatures::SAMPLER_ANISOTROPY,
     };
+    context_info.enabled_features = CTK_WRAP_ARRAY(enabled_features);
 
     VkDescriptorPoolSize descriptor_pool_sizes[] =
     {

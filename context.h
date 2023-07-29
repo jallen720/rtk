@@ -21,17 +21,10 @@ struct InstanceInfo
     Array<const char*>                  extensions;
 };
 
-// union DeviceFeatures
-// {
-//     VkPhysicalDeviceFeatures as_struct;
-//     VkBool32                 as_array[MAX_DEVICE_FEATURES];
-// };
-
 struct ContextInfo
 {
     InstanceInfo                instance_info;
-    // DeviceFeatures              required_features;
-    Array<DeviceFeatures>       required_features;
+    Array<DeviceFeatures>       enabled_features;
     uint32                      render_thread_count;
     Array<VkDescriptorPoolSize> descriptor_pool_sizes;
 };
@@ -46,11 +39,10 @@ struct PhysicalDevice
 {
     VkPhysicalDevice                 hnd;
     QueueFamilies                    queue_families;
-    VkPhysicalDeviceProperties       properties;
-    // DeviceFeatures                   features;
-    DeviceFeatureInfo                feature_info;
-    VkPhysicalDeviceMemoryProperties mem_properties;
     VkFormat                         depth_image_format;
+    VkPhysicalDeviceProperties       properties;
+    VkPhysicalDeviceMemoryProperties mem_properties;
+    DeviceFeatureInfo                feature_info;
 };
 
 struct Swapchain
@@ -283,7 +275,7 @@ static void InitSurface()
 }
 
 static void
-LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFeatures>* required_features)
+LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFeatures>* enabled_features)
 {
     Stack frame = CreateFrame(temp_stack);
 
@@ -311,9 +303,10 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFea
             .depth_image_format = FindDepthImageFormat(vk_physical_device),
         };
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
-        // vkGetPhysicalDeviceFeatures(vk_physical_device, &physical_device.features.as_struct);
-        GetDeviceFeatureInfo(vk_physical_device, &physical_device.feature_info);
         vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
+
+        InitDeviceFeatureInfo(&physical_device.feature_info);
+        vkGetPhysicalDeviceFeatures2(physical_device.hnd, &physical_device.feature_info.standard);
 
         // Graphics and present queue families required.
         if (physical_device.queue_families.graphics == UNSET_INDEX ||
@@ -328,36 +321,36 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFea
             continue;
         }
 
-        // All required features must be supported.
-        bool has_required_features = true;
-
-        ///
-        /// OLD
-        ///
-        // for (uint32 feature_index = 0; feature_index < MAX_DEVICE_FEATURES; ++feature_index)
-        // {
-        //     if (required_features->as_array[feature_index] == VK_TRUE &&
-        //         physical_device.features.as_array[feature_index] == VK_FALSE)
-        //     {
-        //         has_required_features = false;
-        //         break;
-        //     }
-        // }
-
-        ///
-        /// NEW
-        ///
-        CTK_ITERATE(required_feature, required_features)
+        // All requested enabled features must be supported.
+        bool all_enabled_features_supported = true;
+        DeviceFeatureInfo* feature_info = &physical_device.feature_info;
+        auto standard_feature_array = GetStandardFeatureArray(feature_info);
+        CTK_ITERATE(enabled_feature, enabled_features)
         {
-            if (physical_device.feature_info.array[*required_feature] == VK_FALSE)
+            bool feature_supported = true;
+            if (*enabled_feature <= DeviceFeatures::INHERITED_QUERIES)
             {
-                PrintError("required physical device feature %s is not supported",
-                           GetPhysicalDeviceFeatureName(*required_feature));
-                has_required_features = false;
+                if (standard_feature_array[(uint32)*enabled_feature] != VK_TRUE)
+                {
+                    feature_supported = false;
+                }
+            }
+            else if (*enabled_feature == DeviceFeatures::SCALAR_BLOCK_LAYOUT)
+            {
+                if (feature_info->scalar_block_layout.scalarBlockLayout != VK_TRUE)
+                {
+                    feature_supported = false;
+                }
+            }
+
+            if (!feature_supported)
+            {
+                PrintError("enabled device feature %s is not supported for device %s",
+                           GetDeviceFeatureName(*enabled_feature), physical_device.properties.deviceName);
+                all_enabled_features_supported = false;
             }
         }
-
-        if (!has_required_features)
+        if (!all_enabled_features_supported)
         {
             continue;
         }
@@ -383,8 +376,7 @@ static void UsePhysicalDevice(uint32 index)
     global_ctx.physical_device = GetPtr(&global_ctx.physical_devices, index);
 }
 
-// static void InitDevice(DeviceFeatures* enabled_features)
-static void InitDevice(Array<DeviceFeatures>* required_features)
+static void InitDevice(Array<DeviceFeatures>* enabled_features)
 {
     QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
 
@@ -398,12 +390,28 @@ static void InitDevice(Array<DeviceFeatures>* required_features)
         Push(&queue_infos, GetSingleQueueInfo(queue_families->present));
     }
 
+    // Create physical device features struct for device creation.
+    DeviceFeatureInfo enabled_feature_info = {};
+    InitDeviceFeatureInfo(&enabled_feature_info);
+    VkBool32* standard_feature_array = GetStandardFeatureArray(&enabled_feature_info);
+    CTK_ITERATE(device_feature, enabled_features)
+    {
+        if (*device_feature <= DeviceFeatures::INHERITED_QUERIES)
+        {
+            standard_feature_array[(uint32)*device_feature] = VK_TRUE;
+        }
+        else if (*device_feature == DeviceFeatures::SCALAR_BLOCK_LAYOUT)
+        {
+            enabled_feature_info.scalar_block_layout.scalarBlockLayout = VK_TRUE;
+        }
+    }
+
     // Create device, specifying enabled extensions and features.
     const char* enabled_extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     VkDeviceCreateInfo create_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext                   =
+        .pNext                   = enabled_feature_info.standard.pNext,
         .flags                   = 0,
         .queueCreateInfoCount    = queue_infos.count,
         .pQueueCreateInfos       = queue_infos.data,
@@ -411,7 +419,7 @@ static void InitDevice(Array<DeviceFeatures>* required_features)
         .ppEnabledLayerNames     = NULL,
         .enabledExtensionCount   = CTK_ARRAY_SIZE(enabled_extensions),
         .ppEnabledExtensionNames = enabled_extensions,
-        .pEnabledFeatures        = &enabled_features->as_struct,
+        .pEnabledFeatures        = &enabled_feature_info.standard.features,
     };
     VkResult res = vkCreateDevice(global_ctx.physical_device->hnd, &create_info, NULL, &global_ctx.device);
     Validate(res, "vkCreateDevice() failed");
@@ -715,11 +723,11 @@ static void InitContext(Stack* perm_stack, Stack* temp_stack, FreeList* free_lis
     InitSurface();
 
     // Load capable physical devices and select the first one.
-    LoadCapablePhysicalDevices(perm_stack, temp_stack, &info->required_features);
+    LoadCapablePhysicalDevices(perm_stack, temp_stack, &info->enabled_features);
     UsePhysicalDevice(0);
 
     // Initialize device state.
-    InitDevice(&info->required_features);
+    InitDevice(&info->enabled_features);
     InitQueues();
     InitMainCommandState();
 
@@ -805,12 +813,6 @@ static void UpdateSwapchainSurfaceExtent(Stack* temp_stack, FreeList* free_list)
 static void WaitIdle()
 {
     vkDeviceWaitIdle(global_ctx.device);
-    // for (uint32 i = 0; i < global_ctx.frames.size; ++i)
-    // {
-    //     Frame* frame = GetPtr(&global_ctx.frames, i);
-    //     VkResult res = vkWaitForFences(global_ctx.device, 1, &frame->in_progress, VK_TRUE, UINT64_MAX);
-    //     Validate(res, "vkWaitForFences() failed");
-    // }
 }
 
 static uint32 GetMemoryTypeIndex(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFlags mem_properties)

@@ -325,6 +325,7 @@ static void Run()
     {
         DeviceFeatures::GEOMETRY_SHADER,
         DeviceFeatures::SAMPLER_ANISOTROPY,
+        DeviceFeatures::SCALAR_BLOCK_LAYOUT,
     };
     context_info.enabled_features = CTK_WRAP_ARRAY(enabled_features);
 

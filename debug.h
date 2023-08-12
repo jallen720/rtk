@@ -321,7 +321,7 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
     }
     else
     {
-        PrintInfo(callback_data->pMessage);
+        // PrintInfo(callback_data->pMessage);
     }
 
     return VK_FALSE;

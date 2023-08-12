@@ -216,7 +216,7 @@ static void InitInstance(InstanceInfo* info, Stack* temp_stack)
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
         .pEngineName        = info->application_name,
         .engineVersion      = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion         = VK_API_VERSION_1_0,
+        .apiVersion         = VK_API_VERSION_1_1,
     };
 
     static constexpr const char* REQUIRED_EXTENSIONS[] =

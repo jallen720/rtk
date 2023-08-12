@@ -353,6 +353,42 @@ static void Run()
     ///
     RenderState* rs = CreateRenderState(perm_stack, temp_stack, free_list);
 
+
+VkImageCreateFlags test_flags  = 0;
+VkFormat           test_format = GetSwapchain()->surface_format.format;
+VkImageTiling      test_tiling = VK_IMAGE_TILING_OPTIMAL;
+VkImageUsageFlags  test_usage  = VK_IMAGE_USAGE_SAMPLED_BIT;
+    VkImageCreateInfo image_create_info =
+    {
+        .sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .pNext                 = NULL,
+        .flags                 = test_flags,
+        .imageType             = VK_IMAGE_TYPE_2D,
+        .format                = test_format,
+        .extent                = { 256, 256, 1 },
+        .mipLevels             = 1,
+        .arrayLayers           = 1,
+        .samples               = VK_SAMPLE_COUNT_1_BIT,
+        .tiling                = test_tiling,
+        .usage                 = test_usage,
+        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices   = NULL,
+        .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    VkImage image = VK_NULL_HANDLE;
+    VkResult res = vkCreateImage(GetDevice(), &image_create_info, NULL, &image);
+    Validate(res, "vkCreateImage() failed");
+
+    VkMemoryRequirements mem_requirements = {};
+    vkGetImageMemoryRequirements(GetDevice(), image, &mem_requirements);
+
+    Print("size:            %llu\n", mem_requirements.size);
+    Print("alignment:       %llu\n", mem_requirements.alignment);
+    Print("memoryTypeBites: ");
+    PrintBits((uint8*)& mem_requirements.memoryTypeBits, 4u);
+    PrintLine();
+
     // Initialize entities.
     auto entity_buffer = GetCurrentFrameBufferMem<EntityBuffer>(rs->entity_buffer, 0u);
     for (uint32 i = 0; i < 2; ++i)

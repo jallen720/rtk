@@ -41,6 +41,7 @@ namespace RTK
 #include "rtk/mesh.h"
 #include "rtk/shader.h"
 #include "rtk/shader_data.h"
+#include "rtk/shader_data2.h"
 #include "rtk/render_target.h"
 #include "rtk/pipeline.h"
 #include "rtk/rendering.h"

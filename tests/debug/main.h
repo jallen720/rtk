@@ -27,8 +27,8 @@ struct RenderState
     Buffer*        staging_buffer;
     ImageMemory*   texture_memory;
     RenderTarget*  render_target;
-    ShaderData*    textures;
-    ShaderData*    entity_buffer;
+    ShaderData2*   textures;
+    ShaderData2*   entity_buffer;
     ShaderDataSet* shader_data_set;
     Shader*        vert_shader;
     Shader*        frag_shader;
@@ -43,7 +43,7 @@ struct EntityBuffer
     uint32        texture_index[MAX_ENTITIES];
 };
 
-static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
+static void WriteImageToTexture(ShaderData2* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
 {
     // Load image data and write to staging buffer.
     ImageData image_data = {};
@@ -129,7 +129,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     rs->render_target = CreateRenderTarget(&perm_stack->allocator, &frame, free_list, &rt_info);
 
     // Shader Data
-    ShaderDataInfo entity_buffer_info =
+    ShaderDataInfo2 entity_buffer_info =
     {
         .stages    = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -165,7 +165,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .unnormalizedCoordinates = VK_FALSE,
     };
     VkSampler texture_sampler = CreateSampler(&texture_sampler_info);
-    ShaderDataInfo texture_info =
+    ShaderDataInfo2 texture_info =
     {
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -205,7 +205,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     WriteImageToTexture(rs->textures, 0, rs->staging_buffer, "images/axis_cube.png");
     WriteImageToTexture(rs->textures, 1, rs->staging_buffer, "images/dirt_block.png");
 
-    ShaderData* shader_datas[] =
+    ShaderData2* shader_datas[] =
     {
         rs->entity_buffer,
         rs->textures,

@@ -117,7 +117,7 @@ WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, uint32 im
     // Copy image data from buffer memory to image memory.
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.
-        VkImageMemoryBarrier image_mem_barrier =
+        VkImageMemoryBarrier pre_copy_mem_barrier =
         {
             .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .srcAccessMask       = 0,
@@ -145,7 +145,7 @@ WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, uint32 im
                              0, // Buffer Memory Barrier Count
                              NULL, // Buffer Memory Barriers
                              1, // Image Memory Barrier Count
-                             &image_mem_barrier); // Image Memory Barriers
+                             &pre_copy_mem_barrier); // Image Memory Barriers
 
         VkBufferImageCopy copy =
         {
@@ -171,7 +171,7 @@ WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, uint32 im
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.
-        VkImageMemoryBarrier image_mem_barrier2 =
+        VkImageMemoryBarrier post_copy_mem_barrier =
         {
             .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -199,7 +199,7 @@ WriteToShaderDataImage(ShaderData* shader_data, uint32 instance_index, uint32 im
                              0, // Buffer Memory Barrier Count
                              NULL, // Buffer Memory Barriers
                              1, // Image Memory Barrier Count
-                             &image_mem_barrier2); // Image Memory Barriers
+                             &post_copy_mem_barrier); // Image Memory Barriers
     SubmitTempCommandBuffer();
 }
 

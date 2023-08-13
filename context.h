@@ -862,7 +862,7 @@ AllocateDeviceMemory(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFla
     return mem;
 }
 
-static VkDeviceMemory AllocateDeviceMemory(VkDeviceSize size, uint32 mem_type_index, VkAllocationCallbacks* allocators)
+static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize size, VkAllocationCallbacks* allocators)
 {
     // Allocate memory using selected memory type index.
     VkMemoryAllocateInfo info =

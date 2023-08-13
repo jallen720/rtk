@@ -22,7 +22,6 @@ namespace TestDebug
 
 struct RenderState
 {
-    VkSampler      sampler;
     DeviceStack*   host_stack;
     DeviceStack*   device_stack;
     Buffer*        staging_buffer;
@@ -65,30 +64,6 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     Stack frame = CreateFrame(temp_stack);
 
     auto rs = Allocate<RenderState>(perm_stack, 1);
-
-    // Sampler
-    VkSamplerCreateInfo sampler_info =
-    {
-        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .pNext                   = NULL,
-        .flags                   = 0,
-        .magFilter               = VK_FILTER_NEAREST,
-        .minFilter               = VK_FILTER_NEAREST,
-        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
-        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .mipLodBias              = 0.0f,
-        .anisotropyEnable        = VK_FALSE,
-        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
-        .compareEnable           = VK_FALSE,
-        .compareOp               = VK_COMPARE_OP_ALWAYS,
-        .minLod                  = 0.0f,
-        .maxLod                  = 0.0f,
-        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-        .unnormalizedCoordinates = VK_FALSE,
-    };
-    rs->sampler = CreateSampler(&sampler_info);
 
     // Device Memory
     DeviceStackInfo host_stack_info =
@@ -168,6 +143,28 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     };
     rs->entity_buffer = CreateShaderData(&perm_stack->allocator, &entity_buffer_info);
 
+    VkSamplerCreateInfo texture_sampler_info =
+    {
+        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext                   = NULL,
+        .flags                   = 0,
+        .magFilter               = VK_FILTER_NEAREST,
+        .minFilter               = VK_FILTER_NEAREST,
+        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .mipLodBias              = 0.0f,
+        .anisotropyEnable        = VK_FALSE,
+        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+        .compareEnable           = VK_FALSE,
+        .compareOp               = VK_COMPARE_OP_ALWAYS,
+        .minLod                  = 0.0f,
+        .maxLod                  = 0.0f,
+        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+    };
+    VkSampler texture_sampler = CreateSampler(&texture_sampler_info);
     ShaderDataInfo texture_info =
     {
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -177,7 +174,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .image =
         {
             .memory  = rs->texture_memory,
-            .sampler = rs->sampler,
+            .sampler = texture_sampler,
             .view =
             {
                 .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -353,41 +350,45 @@ static void Run()
     ///
     RenderState* rs = CreateRenderState(perm_stack, temp_stack, free_list);
 
+// VkImageCreateFlags test_flags  = 0;
+// VkFormat           test_format = GetSwapchain()->surface_format.format;
+// VkImageTiling      test_tiling = VK_IMAGE_TILING_OPTIMAL;
+// VkImageUsageFlags  test_usage  = VK_IMAGE_USAGE_SAMPLED_BIT;
+// VkImageCreateInfo  default_info =
+// {
+//     .sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+//     .pNext                 = NULL,
+//     .flags                 = test_flags,
+//     .imageType             = VK_IMAGE_TYPE_2D,
+//     .format                = test_format,
+//     .extent                = { 16, 16, 1 },
+//     .mipLevels             = 1,
+//     .arrayLayers           = 1,
+//     .samples               = VK_SAMPLE_COUNT_1_BIT,
+//     .tiling                = test_tiling,
+//     .usage                 = test_usage,
+//     .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+//     .queueFamilyIndexCount = 0,
+//     .pQueueFamilyIndices   = NULL,
+//     .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+// };
+// static constexpr uint32 IMAGE_COUNT = 8;
+// VkImageCreateInfo image_create_infos[IMAGE_COUNT] = {};
+// uint32 size = 16;
+// for (uint32 i = 0; i < IMAGE_COUNT; ++i)
+// {
+//     image_create_infos[i] = default_info;
+//     image_create_infos[i].extent = { size, size, 1 };
+//     size *= 2;
+// }
 
-VkImageCreateFlags test_flags  = 0;
-VkFormat           test_format = GetSwapchain()->surface_format.format;
-VkImageTiling      test_tiling = VK_IMAGE_TILING_OPTIMAL;
-VkImageUsageFlags  test_usage  = VK_IMAGE_USAGE_SAMPLED_BIT;
-    VkImageCreateInfo image_create_info =
-    {
-        .sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .pNext                 = NULL,
-        .flags                 = test_flags,
-        .imageType             = VK_IMAGE_TYPE_2D,
-        .format                = test_format,
-        .extent                = { 256, 256, 1 },
-        .mipLevels             = 1,
-        .arrayLayers           = 1,
-        .samples               = VK_SAMPLE_COUNT_1_BIT,
-        .tiling                = test_tiling,
-        .usage                 = test_usage,
-        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 0,
-        .pQueueFamilyIndices   = NULL,
-        .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-    };
-    VkImage image = VK_NULL_HANDLE;
-    VkResult res = vkCreateImage(GetDevice(), &image_create_info, NULL, &image);
-    Validate(res, "vkCreateImage() failed");
-
-    VkMemoryRequirements mem_requirements = {};
-    vkGetImageMemoryRequirements(GetDevice(), image, &mem_requirements);
-
-    Print("size:            %llu\n", mem_requirements.size);
-    Print("alignment:       %llu\n", mem_requirements.alignment);
-    Print("memoryTypeBites: ");
-    PrintBits((uint8*)& mem_requirements.memoryTypeBits, 4u);
-    PrintLine();
+// InitImageState(&perm_stack->allocator, IMAGE_COUNT);
+// CTK_ITERATE_PTR(info, image_create_infos, IMAGE_COUNT)
+// {
+//     CreateImage(info);
+// }
+// BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+// LogImageState();
 
     // Initialize entities.
     auto entity_buffer = GetCurrentFrameBufferMem<EntityBuffer>(rs->entity_buffer, 0u);

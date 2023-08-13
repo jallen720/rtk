@@ -37,6 +37,7 @@ namespace RTK
 #include "rtk/context.h"
 #include "rtk/buffer.h"
 #include "rtk/image.h"
+#include "rtk/image2.h"
 #include "rtk/mesh.h"
 #include "rtk/shader.h"
 #include "rtk/shader_data.h"

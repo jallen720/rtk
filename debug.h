@@ -254,10 +254,15 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
         index += 2;
         Print("]" CTK_ERROR_NL);
 
-        index = PrintToChar(callback_data->pMessage, msg_size, ':', index, CTK_ANSI_COLOR_SKY);
-        index = PrintToChar(callback_data->pMessage, msg_size, '|', index);
+        // Print each object on separate line.
+        while (StringsMatch(callback_data->pMessage + index, "Object", 6))
+        {
+            index = PrintToChar(callback_data->pMessage, msg_size, ':', index, CTK_ANSI_COLOR_SKY);
+            index = PrintToChar(callback_data->pMessage, msg_size, ';', index);
+            index += 2;
+            Print(CTK_ERROR_NL);
+        }
         index += 2;
-        Print(CTK_ERROR_NL);
 
         index = PrintToChar(callback_data->pMessage, msg_size, ' ', index, CTK_ANSI_COLOR_SKY);
         Print(':');

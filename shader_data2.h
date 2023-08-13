@@ -8,9 +8,8 @@ struct BufferShaderDataInfo2
 
 struct ImageShaderDataInfo2
 {
-    ImageMemory*          memory;
-    VkSampler             sampler;
-    VkImageViewCreateInfo view;
+    VkImageCreateInfo image;
+    VkSampler         sampler;
 };
 
 struct ShaderDataInfo2
@@ -37,8 +36,8 @@ struct ShaderData2
         Array<Buffer> buffers;
         struct
         {
-            Array<Image> images;
-            VkSampler    sampler;
+            Array<ImageHnd> image_hnds;
+            VkSampler       sampler;
         };
     };
 };
@@ -72,10 +71,10 @@ static ShaderData2* CreateShaderData(const Allocator* allocator, ShaderDataInfo2
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
     {
         ImageShaderDataInfo2* image_info = &info->image;
-        InitArray(&shader_data->images, allocator, total_count);
+        InitArray(&shader_data->image_hnds, allocator, total_count);
         for (uint32 i = 0; i < total_count; ++i)
         {
-            InitImage(Push(&shader_data->images), image_info->memory, &image_info->view);
+            Push(&shader_data->image_hnds, CreateImage(&image_info->image));
         }
         shader_data->sampler = image_info->sampler;
     }
@@ -106,7 +105,8 @@ static Type* GetCurrentFrameBufferMem(ShaderData2* shader_data, uint32 index)
 static void
 WriteToShaderDataImage(ShaderData2* shader_data, uint32 instance_index, uint32 image_index, Buffer* image_data_buffer)
 {
-    Image* image = GetPtr(&shader_data->images, (instance_index * shader_data->count) + image_index);
+    ImageHnd image_hnd = Get(&shader_data->image_hnds, (instance_index * shader_data->count) + image_index);
+    VkImage image = GetImage(image_hnd);
 
     // Copy image data from buffer memory to image memory.
     BeginTempCommandBuffer();
@@ -120,7 +120,7 @@ WriteToShaderDataImage(ShaderData2* shader_data, uint32 instance_index, uint32 i
             .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image               = image->hnd,
+            .image               = image,
             .subresourceRange =
             {
                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -159,9 +159,9 @@ WriteToShaderDataImage(ShaderData2* shader_data, uint32 instance_index, uint32 i
                 .y = 0,
                 .z = 0,
             },
-            .imageExtent = image->extent,
+            .imageExtent = GetImageExtent(image_hnd),
         };
-        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, image_data_buffer->hnd, image->hnd,
+        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, image_data_buffer->hnd, image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.
@@ -174,7 +174,7 @@ WriteToShaderDataImage(ShaderData2* shader_data, uint32 instance_index, uint32 i
             .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image               = image->hnd,
+            .image               = image,
             .subresourceRange =
             {
                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
@@ -319,11 +319,11 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
                 write->pImageInfo = End(image_infos);
                 for (uint32 image_index = 0; image_index < shader_data->count; ++image_index)
                 {
-                    Image* image = GetPtr(&shader_data->images, data_instance_index_offset + image_index);
+                    ImageHnd image_hnd = Get(&shader_data->image_hnds, data_instance_index_offset + image_index);
                     Push(image_infos,
                     {
                         .sampler     = shader_data->sampler,
-                        .imageView   = image->view,
+                        .imageView   = GetImageView(image_hnd),
                         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     });
                 }
@@ -342,5 +342,5 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
 
 static uint32 GetImageCount(ShaderData2* shader_data)
 {
-    return shader_data->images.count;
+    return shader_data->image_hnds.count;
 }

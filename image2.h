@@ -176,6 +176,12 @@ static VkExtent3D GetImageExtent(ImageHnd hnd)
     return global_image_state.data[hnd].extent;
 }
 
+static VkImageView GetImageView(ImageHnd hnd)
+{
+    ValidateImageHnd(hnd);
+    return global_image_state.data[hnd].default_view;
+}
+
 static void LogImageState()
 {
     PrintLine("images:");

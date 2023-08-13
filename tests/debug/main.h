@@ -88,36 +88,6 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     };
     rs->device_stack = CreateDeviceStack(&perm_stack->allocator, &device_stack_info);
     rs->staging_buffer = CreateBuffer(&perm_stack->allocator, rs->host_stack, Megabyte32<4>());
-    ImageMemoryInfo image_mem_info =
-    {
-        .image_info =
-        {
-            .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-            .pNext     = NULL,
-            .flags     = 0,
-            .imageType = VK_IMAGE_TYPE_2D,
-            .format    = GetSwapchain()->surface_format.format,
-            .extent =
-            {
-                .width  = 64,
-                .height = 32,
-                .depth  = 1
-            },
-            .mipLevels             = 1,
-            .arrayLayers           = 1,
-            .samples               = VK_SAMPLE_COUNT_1_BIT,
-            .tiling                = VK_IMAGE_TILING_OPTIMAL,
-            .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                     VK_IMAGE_USAGE_SAMPLED_BIT,
-            .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-            .queueFamilyIndexCount = 0,
-            .pQueueFamilyIndices   = NULL,
-            .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-        },
-        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        .max_image_count    = 4,
-    };
-    rs->texture_memory = CreateImageMemory(&perm_stack->allocator, &image_mem_info, NULL);
 
     // Render Target
     VkClearValue attachment_clear_values[] = { { .color = { 0.0f, 0.1f, 0.2f, 1.0f } } };
@@ -128,7 +98,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     };
     rs->render_target = CreateRenderTarget(&perm_stack->allocator, &frame, free_list, &rt_info);
 
-    // Shader Data
+    // Entity-Buffer Shader Data
     ShaderDataInfo2 entity_buffer_info =
     {
         .stages    = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -143,6 +113,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     };
     rs->entity_buffer = CreateShaderData(&perm_stack->allocator, &entity_buffer_info);
 
+    // Textures Shader Data
     VkSamplerCreateInfo texture_sampler_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -173,35 +144,38 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .count     = 2,
         .image =
         {
-            .memory  = rs->texture_memory,
-            .sampler = texture_sampler,
-            .view =
+            .image =
             {
-                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .pNext    = NULL,
-                .flags    = 0,
-                .image    = VK_NULL_HANDLE,
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format   = GetSwapchain()->surface_format.format,
-                .components =
+                .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .pNext     = NULL,
+                .flags     = 0,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format    = GetSwapchain()->surface_format.format,
+                .extent =
                 {
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .width  = 64,
+                    .height = 32,
+                    .depth  = 1
                 },
-                .subresourceRange =
-                {
-                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                    .baseMipLevel   = 0,
-                    .levelCount     = 1,
-                    .baseArrayLayer = 0,
-                    .layerCount     = 1,
-                },
+                .mipLevels             = 1,
+                .arrayLayers           = 1,
+                .samples               = VK_SAMPLE_COUNT_1_BIT,
+                .tiling                = VK_IMAGE_TILING_OPTIMAL,
+                .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                         VK_IMAGE_USAGE_SAMPLED_BIT,
+                .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 0,
+                .pQueueFamilyIndices   = NULL,
+                .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
             },
+            .sampler = texture_sampler,
         },
     };
+
+    InitImageState(&perm_stack->allocator, 2);
     rs->textures = CreateShaderData(&perm_stack->allocator, &texture_info);
+    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
     WriteImageToTexture(rs->textures, 0, rs->staging_buffer, "images/axis_cube.png");
     WriteImageToTexture(rs->textures, 1, rs->staging_buffer, "images/dirt_block.png");
 

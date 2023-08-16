@@ -68,9 +68,9 @@ struct RenderState
     RenderTarget* render_target;
     struct
     {
-        ShaderData2* vs_buffer;
-        ShaderData2* axis_cube_texture;
-        ShaderData2* dirt_block_texture;
+        ShaderData* vs_buffer;
+        ShaderData* axis_cube_texture;
+        ShaderData* dirt_block_texture;
     }
     data;
     struct
@@ -190,7 +190,7 @@ static void InitShaderDatas(Stack* perm_stack)
 {
     // Buffers
     {
-        ShaderDataInfo2 info =
+        ShaderDataInfo info =
         {
             .stages      = VK_SHADER_STAGE_VERTEX_BIT,
             .type        = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -207,7 +207,7 @@ static void InitShaderDatas(Stack* perm_stack)
 
     // Textures
     {
-        ShaderDataInfo2 info =
+        ShaderDataInfo info =
         {
             .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
             .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -251,7 +251,7 @@ static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 {
     // data_set.vs_buffer
     {
-        ShaderData2* datas[] =
+        ShaderData* datas[] =
         {
             global_rs.data.vs_buffer,
         };
@@ -261,7 +261,7 @@ static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 
     // data_set.axis_cube_texture
     {
-        ShaderData2* datas[] =
+        ShaderData* datas[] =
         {
             global_rs.data.axis_cube_texture,
         };
@@ -271,7 +271,7 @@ static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 
     // data_set.dirt_block_texture
     {
-        ShaderData2* datas[] =
+        ShaderData* datas[] =
         {
             global_rs.data.dirt_block_texture,
         };
@@ -438,7 +438,7 @@ static void RecordRenderCommandsThread(void* data)
     EndRenderCommands(command_buffer);
 }
 
-static void WriteImageToTexture(ShaderData2* sd, uint32 index, const char* image_path)
+static void WriteImageToTexture(ShaderData* sd, uint32 index, const char* image_path)
 {
     // Load image data and write to staging buffer.
     ImageData image_data = {};

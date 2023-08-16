@@ -25,10 +25,9 @@ struct RenderState
     DeviceStack*   host_stack;
     DeviceStack*   device_stack;
     Buffer*        staging_buffer;
-    ImageMemory*   texture_memory;
     RenderTarget*  render_target;
-    ShaderData2*   textures;
-    ShaderData2*   entity_buffer;
+    ShaderData*    textures;
+    ShaderData*    entity_buffer;
     ShaderDataSet* shader_data_set;
     Shader*        vert_shader;
     Shader*        frag_shader;
@@ -43,7 +42,7 @@ struct EntityBuffer
     uint32        texture_index[MAX_ENTITIES];
 };
 
-static void WriteImageToTexture(ShaderData2* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
+static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
 {
     // Load image data and write to staging buffer.
     ImageData image_data = {};
@@ -99,7 +98,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     rs->render_target = CreateRenderTarget(&perm_stack->allocator, &frame, free_list, &rt_info);
 
     // Entity-Buffer Shader Data
-    ShaderDataInfo2 entity_buffer_info =
+    ShaderDataInfo entity_buffer_info =
     {
         .stages    = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -136,7 +135,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .unnormalizedCoordinates = VK_FALSE,
     };
     VkSampler texture_sampler = CreateSampler(&texture_sampler_info);
-    ShaderDataInfo2 texture_info =
+    ShaderDataInfo texture_info =
     {
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
@@ -176,7 +175,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     rs->textures = CreateShaderData(&perm_stack->allocator, &texture_info);
     BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    ShaderData2* shader_datas[] =
+    ShaderData* shader_datas[] =
     {
         rs->entity_buffer,
         rs->textures,

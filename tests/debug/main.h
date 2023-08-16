@@ -176,9 +176,6 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     rs->textures = CreateShaderData(&perm_stack->allocator, &texture_info);
     BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    WriteImageToTexture(rs->textures, 0, rs->staging_buffer, "images/axis_cube.png");
-    WriteImageToTexture(rs->textures, 1, rs->staging_buffer, "images/dirt_block.png");
-
     ShaderData2* shader_datas[] =
     {
         rs->entity_buffer,
@@ -249,6 +246,10 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
                                          CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
                                          rs->staging_buffer);
     }
+
+    // Write image data to textures.
+    WriteImageToTexture(rs->textures, 0, rs->staging_buffer, "images/axis_cube.png");
+    WriteImageToTexture(rs->textures, 1, rs->staging_buffer, "images/dirt_block.png");
 
     return rs;
 }

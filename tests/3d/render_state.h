@@ -247,6 +247,28 @@ static void InitShaderDatas(Stack* perm_stack)
     }
 }
 
+static void WriteImageToTexture(ShaderData* sd, uint32 index, const char* image_path)
+{
+    // Load image data and write to staging buffer.
+    ImageData image_data = {};
+    LoadImageData(&image_data, image_path);
+    WriteHostBuffer(&global_rs.staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
+    DestroyImageData(&image_data);
+
+    // Copy image data in staging buffer to shader data images.
+    uint32 image_count = GetImageCount(sd);
+    for (uint32 i = 0; i < image_count; ++i)
+    {
+        WriteToShaderDataImage(sd, 0, index, &global_rs.staging_buffer);
+    }
+}
+
+static void LoadTextureData()
+{
+    WriteImageToTexture(global_rs.data.axis_cube_texture,  0, "images/axis_cube.png");
+    WriteImageToTexture(global_rs.data.dirt_block_texture, 0, "images/dirt_block.png");
+}
+
 static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 {
     // data_set.vs_buffer
@@ -436,28 +458,6 @@ static void RecordRenderCommandsThread(void* data)
         BindMeshData(command_buffer, global_rs.mesh.data);
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
     EndRenderCommands(command_buffer);
-}
-
-static void WriteImageToTexture(ShaderData* sd, uint32 index, const char* image_path)
-{
-    // Load image data and write to staging buffer.
-    ImageData image_data = {};
-    LoadImageData(&image_data, image_path);
-    WriteHostBuffer(&global_rs.staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
-    DestroyImageData(&image_data);
-
-    // Copy image data in staging buffer to shader data images.
-    uint32 image_count = GetImageCount(sd);
-    for (uint32 i = 0; i < image_count; ++i)
-    {
-        WriteToShaderDataImage(sd, 0, index, &global_rs.staging_buffer);
-    }
-}
-
-static void LoadTextureData()
-{
-    WriteImageToTexture(global_rs.data.axis_cube_texture,  0, "images/axis_cube.png");
-    WriteImageToTexture(global_rs.data.dirt_block_texture, 0, "images/dirt_block.png");
 }
 
 static void UpdateAllPipelineViewports(FreeList* free_list)

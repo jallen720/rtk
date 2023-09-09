@@ -29,7 +29,7 @@ using ImageHnd = uint32;
 
 static struct ImageState
 {
-    Image*         data;
+    Image*          data;
     uint32*         mem_type_indexes;
     uint32          count;
     uint32          max;

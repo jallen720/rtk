@@ -11,12 +11,13 @@ layout(location = 0) out vec4 out_color;
 
 layout(set = 0, binding = 0, std430) uniform EntityBuffer
 {
-    vec4 position[MAX_ENTITIES];
-    uint texture_index[MAX_ENTITIES];
+    vec4  position[MAX_ENTITIES];
+    float scale[MAX_ENTITIES];
+    uint  texture_index[MAX_ENTITIES];
 }
 entity;
 
-layout(set = 0, binding = 1) uniform sampler2D texture_sampler[2];
+layout(set = 0, binding = 1) uniform sampler2D texture_sampler[3];
 
 void main()
 {

@@ -39,8 +39,17 @@ struct RenderState
 struct EntityBuffer
 {
     Vec4<float32> position[MAX_ENTITIES];
+    float32       scale[MAX_ENTITIES];
     uint32        texture_index[MAX_ENTITIES];
 };
+
+static constexpr const char* TEXTURE_IMAGE_PATHS[] =
+{
+    "images/axis_cube.png",
+    "images/axis_cube_inv.png",
+    "images/dirt_block.png",
+};
+static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
 
 static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
 {
@@ -88,6 +97,9 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     rs->device_stack = CreateDeviceStack(&perm_stack->allocator, &device_stack_info);
     rs->staging_buffer = CreateBuffer(&perm_stack->allocator, rs->host_stack, Megabyte32<4>());
 
+    // Image State
+    InitImageState(&perm_stack->allocator, 8);
+
     // Render Target
     VkClearValue attachment_clear_values[] = { { .color = { 0.0f, 0.1f, 0.2f, 1.0f } } };
     RenderTargetInfo rt_info =
@@ -134,13 +146,12 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    VkSampler texture_sampler = CreateSampler(&texture_sampler_info);
     ShaderDataInfo texture_info =
     {
         .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .per_frame = false,
-        .count     = 2,
+        .count     = TEXTURE_COUNT,
         .image =
         {
             .image =
@@ -167,13 +178,17 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
                 .pQueueFamilyIndices   = NULL,
                 .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
             },
-            .sampler = texture_sampler,
+            .sampler = CreateSampler(&texture_sampler_info),
         },
     };
-
-    InitImageState(&perm_stack->allocator, 2);
     rs->textures = CreateShaderData(&perm_stack->allocator, &texture_info);
+
+    // Write image data to textures.
     BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        WriteImageToTexture(rs->textures, i, rs->staging_buffer, TEXTURE_IMAGE_PATHS[i]);
+    }
 
     ShaderData* shader_datas[] =
     {
@@ -245,10 +260,6 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
                                          CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
                                          rs->staging_buffer);
     }
-
-    // Write image data to textures.
-    WriteImageToTexture(rs->textures, 0, rs->staging_buffer, "images/axis_cube.png");
-    WriteImageToTexture(rs->textures, 1, rs->staging_buffer, "images/dirt_block.png");
 
     return rs;
 }
@@ -324,54 +335,19 @@ static void Run()
     ///
     RenderState* rs = CreateRenderState(perm_stack, temp_stack, free_list);
 
-// VkImageCreateFlags test_flags  = 0;
-// VkFormat           test_format = GetSwapchain()->surface_format.format;
-// VkImageTiling      test_tiling = VK_IMAGE_TILING_OPTIMAL;
-// VkImageUsageFlags  test_usage  = VK_IMAGE_USAGE_SAMPLED_BIT;
-// VkImageCreateInfo  default_info =
-// {
-//     .sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-//     .pNext                 = NULL,
-//     .flags                 = test_flags,
-//     .imageType             = VK_IMAGE_TYPE_2D,
-//     .format                = test_format,
-//     .extent                = { 16, 16, 1 },
-//     .mipLevels             = 1,
-//     .arrayLayers           = 1,
-//     .samples               = VK_SAMPLE_COUNT_1_BIT,
-//     .tiling                = test_tiling,
-//     .usage                 = test_usage,
-//     .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-//     .queueFamilyIndexCount = 0,
-//     .pQueueFamilyIndices   = NULL,
-//     .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-// };
-// static constexpr uint32 IMAGE_COUNT = 8;
-// VkImageCreateInfo image_create_infos[IMAGE_COUNT] = {};
-// uint32 size = 16;
-// for (uint32 i = 0; i < IMAGE_COUNT; ++i)
-// {
-//     image_create_infos[i] = default_info;
-//     image_create_infos[i].extent = { size, size, 1 };
-//     size *= 2;
-// }
-
-// InitImageState(&perm_stack->allocator, IMAGE_COUNT);
-// CTK_ITERATE_PTR(info, image_create_infos, IMAGE_COUNT)
-// {
-//     CreateImage(info);
-// }
-// BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-// LogImageState();
-
     // Initialize entities.
     auto entity_buffer = GetCurrentFrameBufferMem<EntityBuffer>(rs->entity_buffer, 0u);
-    for (uint32 i = 0; i < 2; ++i)
+    static constexpr uint32 ENTITY_COUNT = 4;
+    static_assert(ENTITY_COUNT <= MAX_ENTITIES);
+    static constexpr float32 SCALE = 2.0f / ENTITY_COUNT;
+    for (uint32 i = 0; i < ENTITY_COUNT; ++i)
     {
-        entity_buffer->position[i] = { (float32)i, (float32)i, 0, 1 };
-        entity_buffer->texture_index[i] = i;
+        entity_buffer->position[i] = { SCALE * i, SCALE * i, 0, 1 };
+        entity_buffer->scale[i] = SCALE;
+        entity_buffer->texture_index[i] = i % TEXTURE_COUNT;
     }
 
+    float32 x = 0.0f;
     for (;;)
     {
         ProcessWindowEvents();
@@ -398,11 +374,20 @@ static void Run()
             CTK_FATAL("next_frame_result != VK_SUCCESS");
         }
 
+for (uint32 i = 0; i < ENTITY_COUNT; ++i)
+{
+    entity_buffer->position[i].y = fabs(sinf(((float32)i / ENTITY_COUNT) + x));
+}
+if (KeyDown(KEY_F))
+{
+    x += 0.005f;
+}
+
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
             BindPipeline(command_buffer, rs->pipeline);
             BindShaderDataSet(command_buffer, rs->shader_data_set, rs->pipeline, 0);
             BindMeshData(command_buffer, rs->mesh_data);
-            DrawMesh(command_buffer, rs->quad_mesh, 0, 2);
+            DrawMesh(command_buffer, rs->quad_mesh, 0, ENTITY_COUNT);
         EndRenderCommands(command_buffer);
 
         SubmitRenderCommands(rs->render_target);

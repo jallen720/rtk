@@ -325,7 +325,7 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFea
         bool all_enabled_features_supported = true;
         DeviceFeatureInfo* feature_info = &physical_device.feature_info;
         auto standard_feature_array = GetStandardFeatureArray(feature_info);
-        CTK_ITERATE(enabled_feature, enabled_features)
+        CTK_ITER(enabled_feature, enabled_features)
         {
             bool feature_supported = true;
             if (*enabled_feature <= DeviceFeatures::INHERITED_QUERIES)
@@ -394,7 +394,7 @@ static void InitDevice(Array<DeviceFeatures>* enabled_features)
     DeviceFeatureInfo enabled_feature_info = {};
     InitDeviceFeatureInfo(&enabled_feature_info);
     VkBool32* standard_feature_array = GetStandardFeatureArray(&enabled_feature_info);
-    CTK_ITERATE(device_feature, enabled_features)
+    CTK_ITER(device_feature, enabled_features)
     {
         if (*device_feature <= DeviceFeatures::INHERITED_QUERIES)
         {

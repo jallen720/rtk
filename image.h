@@ -150,7 +150,7 @@ static void BackImagesWithMemory(VkMemoryPropertyFlags mem_properties)
     }
 
     // Create default views now that images have been backed with memory.
-    CTK_ITERATE_PTR(image, global_image_state.data, global_image_state.count)
+    CTK_ITER_PTR(image, global_image_state.data, global_image_state.count)
     {
         // Create default view.
         VkImageViewCreateInfo view_info =

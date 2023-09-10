@@ -264,7 +264,7 @@ CreateShaderDataSet(const Allocator* allocator, Stack* temp_stack, Array<ShaderD
     // Bind descriptor data.
     uint32 buffer_count = 0;
     uint32 image_count = 0;
-    CTK_ITERATE(shader_data_ptr, &shader_datas)
+    CTK_ITER(shader_data_ptr, &shader_datas)
     {
         ShaderData* shader_data = *shader_data_ptr;
         if (shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||

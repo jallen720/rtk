@@ -70,6 +70,7 @@ struct RenderState
     {
         ShaderData* vs_buffer;
         ShaderData* axis_cube_texture;
+        ShaderData* axis_cube_inv_texture;
         ShaderData* dirt_block_texture;
     }
     data;
@@ -77,6 +78,7 @@ struct RenderState
     {
         ShaderDataSet* entity_data;
         ShaderDataSet* axis_cube_texture;
+        ShaderDataSet* axis_cube_inv_texture;
         ShaderDataSet* dirt_block_texture;
     }
     data_set;
@@ -96,7 +98,7 @@ struct RenderState
     mesh;
 };
 
-static constexpr uint32 RENDER_THREAD_COUNT = 4;
+static constexpr uint32 RENDER_THREAD_COUNT = 6;
 
 /// Instance
 ////////////////////////////////////////////////////////////
@@ -242,8 +244,9 @@ static void InitShaderDatas(Stack* perm_stack)
                 .sampler = global_rs.sampler,
             },
         };
-        global_rs.data.axis_cube_texture  = CreateShaderData(&perm_stack->allocator, &info);
-        global_rs.data.dirt_block_texture = CreateShaderData(&perm_stack->allocator, &info);
+        global_rs.data.axis_cube_texture     = CreateShaderData(&perm_stack->allocator, &info);
+        global_rs.data.axis_cube_inv_texture = CreateShaderData(&perm_stack->allocator, &info);
+        global_rs.data.dirt_block_texture    = CreateShaderData(&perm_stack->allocator, &info);
     }
 }
 
@@ -265,8 +268,9 @@ static void WriteImageToTexture(ShaderData* sd, uint32 index, const char* image_
 
 static void LoadTextureData()
 {
-    WriteImageToTexture(global_rs.data.axis_cube_texture,  0, "images/axis_cube.png");
-    WriteImageToTexture(global_rs.data.dirt_block_texture, 0, "images/dirt_block.png");
+    WriteImageToTexture(global_rs.data.axis_cube_texture,     0, "images/axis_cube.png");
+    WriteImageToTexture(global_rs.data.axis_cube_inv_texture, 0, "images/axis_cube_inv.png");
+    WriteImageToTexture(global_rs.data.dirt_block_texture,    0, "images/dirt_block.png");
 }
 
 static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
@@ -288,6 +292,16 @@ static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
             global_rs.data.axis_cube_texture,
         };
         global_rs.data_set.axis_cube_texture =
+            CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+    }
+
+    // data_set.axis_cube_inv_texture
+    {
+        ShaderData* datas[] =
+        {
+            global_rs.data.axis_cube_inv_texture,
+        };
+        global_rs.data_set.axis_cube_inv_texture =
             CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 
@@ -539,6 +553,7 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
     static ShaderDataSet* textures[] =
     {
         global_rs.data_set.axis_cube_texture,
+        global_rs.data_set.axis_cube_inv_texture,
         global_rs.data_set.dirt_block_texture,
     };
     static Mesh* meshes[] =

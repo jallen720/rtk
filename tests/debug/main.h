@@ -337,7 +337,7 @@ static void Run()
 
     // Initialize entities.
     auto entity_buffer = GetCurrentFrameBufferMem<EntityBuffer>(rs->entity_buffer, 0u);
-    static constexpr uint32 ENTITY_COUNT = 4;
+    static constexpr uint32 ENTITY_COUNT = MAX_ENTITIES;
     static_assert(ENTITY_COUNT <= MAX_ENTITIES);
     static constexpr float32 SCALE = 2.0f / ENTITY_COUNT;
     for (uint32 i = 0; i < ENTITY_COUNT; ++i)
@@ -347,7 +347,6 @@ static void Run()
         entity_buffer->texture_index[i] = i % TEXTURE_COUNT;
     }
 
-    float32 x = 0.0f;
     for (;;)
     {
         ProcessWindowEvents();
@@ -376,11 +375,19 @@ static void Run()
 
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 {
+static float32 x = 0.0f;
     entity_buffer->position[i].y = fabs(sinf(((float32)i / ENTITY_COUNT) + x));
 }
 if (KeyDown(KEY_F))
 {
-    x += 0.005f;
+    if (KeyDown(KEY_SHIFT))
+    {
+        x -= 0.005f;
+    }
+    else
+    {
+        x += 0.005f;
+    }
 }
 
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);

@@ -372,10 +372,10 @@ static void Run()
         {
             CTK_FATAL("next_frame_result != VK_SUCCESS");
         }
-
+        
+static float32 x = 0.0f;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 {
-static float32 x = 0.0f;
     entity_buffer->position[i].y = fabs(sinf(((float32)i / ENTITY_COUNT) + x));
 }
 if (KeyDown(KEY_F))

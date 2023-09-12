@@ -50,6 +50,7 @@ static constexpr const char* TEXTURE_IMAGE_PATHS[] =
     "images/dirt_block.png",
 };
 static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
+static_assert(TEXTURE_COUNT == MAX_TEXTURES);
 
 static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
 {

@@ -17,7 +17,7 @@ layout(set = 0, binding = 0, std430) uniform EntityBuffer
 }
 entity;
 
-layout(set = 0, binding = 1) uniform sampler2D texture_sampler[3];
+layout(set = 0, binding = 1) uniform sampler2D texture_sampler[MAX_TEXTURES];
 
 void main()
 {

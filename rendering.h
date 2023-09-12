@@ -43,13 +43,13 @@ static VkCommandBuffer BeginRenderCommands(RenderTarget* render_target, uint32 r
         .queryFlags           = 0,
         .pipelineStatistics   = 0,
     };
-    VkCommandBufferBeginInfo command_buffer_begin_info =
+    VkCommandBufferBeginInfo begin_info =
     {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .flags            = VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT,
         .pInheritanceInfo = &inheritance_info,
     };
-    VkResult res = vkBeginCommandBuffer(command_buffer, &command_buffer_begin_info);
+    VkResult res = vkBeginCommandBuffer(command_buffer, &begin_info);
     Validate(res, "vkBeginCommandBuffer() failed");
 
     return command_buffer;

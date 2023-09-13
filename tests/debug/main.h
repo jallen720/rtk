@@ -38,9 +38,9 @@ struct RenderState
 
 struct EntityBuffer
 {
-    Vec4<float32> position[MAX_ENTITIES];
-    float32       scale[MAX_ENTITIES];
-    uint32        texture_index[MAX_ENTITIES];
+    Vec4<float32> positions[MAX_ENTITIES];
+    float32       scales[MAX_ENTITIES];
+    uint32        texture_indexes[MAX_ENTITIES];
 };
 
 static constexpr const char* TEXTURE_IMAGE_PATHS[] =
@@ -233,18 +233,18 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .render_target = rs->render_target,
     };
     ShaderDataSet* shader_data_sets[] = { rs->shader_data_set };
-    // VkPushConstantRange push_constant_ranges[] =
-    // {
-    //     {
-    //         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-    //         .offset     = 0,
-    //         .size       = 4,
-    //     },
-    // };
+    VkPushConstantRange push_constant_ranges[] =
+    {
+        {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset     = 0,
+            .size       = sizeof(uint32),
+        },
+    };
     PipelineLayoutInfo pipeline_layout_info =
     {
         .shader_data_sets     = CTK_WRAP_ARRAY(shader_data_sets),
-        // .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
+        .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
     };
     rs->pipeline = CreatePipeline(&perm_stack->allocator, &frame, free_list, &pipeline_info, &pipeline_layout_info);
 
@@ -275,7 +275,7 @@ static void Run()
     /// Initialization
     ///
 
-    // Make win32 process DPI aware so windows scale properly.
+    // Make win32 process DPI aware so windows scales properly.
     SetProcessDPIAware();
 
     WindowInfo window_info =
@@ -343,9 +343,9 @@ static void Run()
     static constexpr float32 SCALE = 2.0f / ENTITY_COUNT;
     for (uint32 i = 0; i < ENTITY_COUNT; ++i)
     {
-        entity_buffer->position[i] = { SCALE * i, SCALE * i, 0, 1 };
-        entity_buffer->scale[i] = SCALE;
-        entity_buffer->texture_index[i] = i % TEXTURE_COUNT;
+        entity_buffer->positions[i] = { SCALE * i, SCALE * i, 0, 1 };
+        entity_buffer->scales[i] = SCALE;
+        entity_buffer->texture_indexes[i] = i % TEXTURE_COUNT;
     }
 
     for (;;)
@@ -373,11 +373,12 @@ static void Run()
         {
             CTK_FATAL("next_frame_result != VK_SUCCESS");
         }
-        
+
 static float32 x = 0.0f;
+static bool instanced = true;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 {
-    entity_buffer->position[i].y = fabs(sinf(((float32)i / ENTITY_COUNT) + x));
+    entity_buffer->positions[i].y = fabs(sinf(((float32)i / ENTITY_COUNT) + x));
 }
 if (KeyDown(KEY_F))
 {
@@ -390,12 +391,32 @@ if (KeyDown(KEY_F))
         x += 0.005f;
     }
 }
+if (KeyPressed(KEY_R))
+{
+    instanced = !instanced;
+}
 
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
+if (instanced)
+{
+    uint32 pc = USE_GL_INSTANCE_INDEX;
+    vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
             BindPipeline(command_buffer, rs->pipeline);
             BindShaderDataSet(command_buffer, rs->shader_data_set, rs->pipeline, 0);
             BindMeshData(command_buffer, rs->mesh_data);
             DrawMesh(command_buffer, rs->quad_mesh, 0, ENTITY_COUNT);
+}
+else
+{
+    BindPipeline(command_buffer, rs->pipeline);
+    BindShaderDataSet(command_buffer, rs->shader_data_set, rs->pipeline, 0);
+    BindMeshData(command_buffer, rs->mesh_data);
+    for (uint32 i = 0; i < ENTITY_COUNT; ++i)
+    {
+        vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(i), &i);
+        DrawMesh(command_buffer, rs->quad_mesh, 0, 1);
+    }
+}
         EndRenderCommands(command_buffer);
 
         SubmitRenderCommands(rs->render_target);

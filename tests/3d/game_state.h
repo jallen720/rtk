@@ -42,6 +42,7 @@ struct EntityData
 {
     Transform transforms[MAX_ENTITIES];
     Entity    entities[MAX_ENTITIES];
+    uint32    texture_indexes[MAX_ENTITIES];
     uint32    count;
 };
 
@@ -140,7 +141,7 @@ static void InitGameState()
     };
 
     // Entities
-    static constexpr uint32 CUBE_SIZE = 64;
+    static constexpr uint32 CUBE_SIZE = 6;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
     static_assert(CUBE_ENTITY_COUNT <= MAX_ENTITIES);
     EntityData* entity_data = &game_state.entity_data;
@@ -159,6 +160,9 @@ static void InitGameState()
             .rotate_axis      = (uint8)RandomRange(0u, 3u),
             .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
         };
+        entity_data->texture_indexes[entity] = entity < CUBE_ENTITY_COUNT / 3 ? 0 :
+                                               entity < 2 * (CUBE_ENTITY_COUNT / 3) ? 1 :
+                                               2;
     }
 }
 

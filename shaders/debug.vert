@@ -8,24 +8,31 @@
 layout(location = 0) in vec3 in_vert_pos;
 layout(location = 1) in vec2 in_vert_uv;
 layout(location = 0) out vec2 out_vert_uv;
-layout(location = 1) out flat uint out_instance_index;
+layout(location = 1) out flat uint out_entity_index;
 
 layout(set = 0, binding = 0, std430) uniform EntityBuffer
 {
-    vec4  position[MAX_ENTITIES];
-    float scale[MAX_ENTITIES];
-    uint  texture_index[MAX_ENTITIES];
+    vec4  positions[MAX_ENTITIES];
+    float scales[MAX_ENTITIES];
+    uint  texture_indexes[MAX_ENTITIES];
 }
 entity;
+
+layout(push_constant) uniform PushConstants
+{
+    uint entity_index;
+}
+pc;
 
 const vec2 screen_offset      = vec2(-1, -1);
 const vec2 screen_orientation = vec2( 1, -1);
 
 void main()
 {
-    vec2 vert_pos = in_vert_pos.xy * entity.scale[gl_InstanceIndex];
-    vec2 pos = (vert_pos.xy + entity.position[gl_InstanceIndex].xy + screen_offset) * screen_orientation;
-    gl_Position = vec4(pos, 0, 1);
+    uint entity_index = pc.entity_index == USE_GL_INSTANCE_INDEX ? gl_InstanceIndex : pc.entity_index;
+    vec2 vert_pos = in_vert_pos.xy * entity.scales[entity_index];
+    vec2 pos = (vert_pos.xy + entity.positions[entity_index].xy + screen_offset) * screen_orientation;
+    gl_Position = vec4(pos, 1, 1);
     out_vert_uv = in_vert_uv;
-    out_instance_index = gl_InstanceIndex;
+    out_entity_index = entity_index;
 }

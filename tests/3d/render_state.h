@@ -19,23 +19,24 @@ namespace Test3D
 
 /// Data
 ////////////////////////////////////////////////////////////
-struct VSBuffer
+struct EntityBuffer
 {
     Matrix mvp_matrixes[MAX_ENTITIES];
+    uint32 texture_indexes[MAX_ENTITIES];
 };
 
 struct MVPMatrixState
 {
-    BatchRange  batch_range;
-    Matrix      view_projection_matrix;
-    VSBuffer*   frame_vs_buffer;
-    EntityData* entity_data;
+    BatchRange    batch_range;
+    Matrix        view_projection_matrix;
+    EntityBuffer* frame_entity_buffer;
+    EntityData*   entity_data;
 };
 
 struct RenderCommandState
 {
     uint32         thread_index;
-    ShaderDataSet* texture;
+    // ShaderDataSet* texture;
     BatchRange     batch_range;
     Mesh*          mesh;
 };
@@ -68,18 +69,20 @@ struct RenderState
     RenderTarget* render_target;
     struct
     {
-        ShaderData* vs_buffer;
-        ShaderData* axis_cube_texture;
-        ShaderData* axis_cube_inv_texture;
-        ShaderData* dirt_block_texture;
+        ShaderData* entity_buffer;
+ShaderData* textures;
+        // ShaderData* axis_cube_texture;
+        // ShaderData* axis_cube_inv_texture;
+        // ShaderData* dirt_block_texture;
     }
     data;
     struct
     {
         ShaderDataSet* entity_data;
-        ShaderDataSet* axis_cube_texture;
-        ShaderDataSet* axis_cube_inv_texture;
-        ShaderDataSet* dirt_block_texture;
+ShaderDataSet* textures;
+        // ShaderDataSet* axis_cube_texture;
+        // ShaderDataSet* axis_cube_inv_texture;
+        // ShaderDataSet* dirt_block_texture;
     }
     data_set;
     struct
@@ -99,6 +102,15 @@ struct RenderState
 };
 
 static constexpr uint32 RENDER_THREAD_COUNT = 6;
+
+static constexpr const char* TEXTURE_IMAGE_PATHS[] =
+{
+    "images/axis_cube.png",
+    "images/axis_cube_inv.png",
+    "images/dirt_block.png",
+};
+static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
+static_assert(TEXTURE_COUNT == MAX_TEXTURES);
 
 /// Instance
 ////////////////////////////////////////////////////////////
@@ -188,23 +200,39 @@ static void InitSampler()
     global_rs.sampler = CreateSampler(&info);
 }
 
+static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
+{
+    // Load image data and write to staging buffer.
+    ImageData image_data = {};
+    LoadImageData(&image_data, image_path);
+    WriteHostBuffer(staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
+    DestroyImageData(&image_data);
+
+    // Copy image data in staging buffer to shader data images.
+    uint32 image_count = GetImageCount(sd);
+    for (uint32 i = 0; i < image_count; ++i)
+    {
+        WriteToShaderDataImage(sd, 0, index, staging_buffer);
+    }
+}
+
 static void InitShaderDatas(Stack* perm_stack)
 {
     // Buffers
     {
         ShaderDataInfo info =
         {
-            .stages      = VK_SHADER_STAGE_VERTEX_BIT,
+            .stages      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
             .type        = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .per_frame   = true,
             .count       = 1,
             .buffer =
             {
                 .stack = &global_rs.host_stack,
-                .size  = sizeof(VSBuffer),
+                .size  = sizeof(EntityBuffer),
             },
         };
-        global_rs.data.vs_buffer = CreateShaderData(&perm_stack->allocator, &info);
+        global_rs.data.entity_buffer = CreateShaderData(&perm_stack->allocator, &info);
     }
 
     // Textures
@@ -214,7 +242,8 @@ static void InitShaderDatas(Stack* perm_stack)
             .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
             .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .per_frame = false,
-            .count     = 1,
+.count     = 3,
+            // .count     = 1,
             .image =
             {
                 .image =
@@ -244,76 +273,93 @@ static void InitShaderDatas(Stack* perm_stack)
                 .sampler = global_rs.sampler,
             },
         };
-        global_rs.data.axis_cube_texture     = CreateShaderData(&perm_stack->allocator, &info);
-        global_rs.data.axis_cube_inv_texture = CreateShaderData(&perm_stack->allocator, &info);
-        global_rs.data.dirt_block_texture    = CreateShaderData(&perm_stack->allocator, &info);
+global_rs.data.textures = CreateShaderData(&perm_stack->allocator, &info);
+
+// Write image data to textures.
+BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+{
+    WriteImageToTexture(global_rs.data.textures, i, &global_rs.staging_buffer, TEXTURE_IMAGE_PATHS[i]);
+}
+        // global_rs.data.axis_cube_texture     = CreateShaderData(&perm_stack->allocator, &info);
+        // global_rs.data.axis_cube_inv_texture = CreateShaderData(&perm_stack->allocator, &info);
+        // global_rs.data.dirt_block_texture    = CreateShaderData(&perm_stack->allocator, &info);
     }
 }
 
-static void WriteImageToTexture(ShaderData* sd, uint32 index, const char* image_path)
-{
-    // Load image data and write to staging buffer.
-    ImageData image_data = {};
-    LoadImageData(&image_data, image_path);
-    WriteHostBuffer(&global_rs.staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
-    DestroyImageData(&image_data);
+// static void WriteImageToTexture(ShaderData* sd, uint32 index, const char* image_path)
+// {
+//     // Load image data and write to staging buffer.
+//     ImageData image_data = {};
+//     LoadImageData(&image_data, image_path);
+//     WriteHostBuffer(&global_rs.staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
+//     DestroyImageData(&image_data);
 
-    // Copy image data in staging buffer to shader data images.
-    uint32 image_count = GetImageCount(sd);
-    for (uint32 i = 0; i < image_count; ++i)
-    {
-        WriteToShaderDataImage(sd, 0, index, &global_rs.staging_buffer);
-    }
-}
+//     // Copy image data in staging buffer to shader data images.
+//     uint32 image_count = GetImageCount(sd);
+//     for (uint32 i = 0; i < image_count; ++i)
+//     {
+//         WriteToShaderDataImage(sd, 0, index, &global_rs.staging_buffer);
+//     }
+// }
 
-static void LoadTextureData()
-{
-    WriteImageToTexture(global_rs.data.axis_cube_texture,     0, "images/axis_cube.png");
-    WriteImageToTexture(global_rs.data.axis_cube_inv_texture, 0, "images/axis_cube_inv.png");
-    WriteImageToTexture(global_rs.data.dirt_block_texture,    0, "images/dirt_block.png");
-}
+// static void LoadTextureData()
+// {
+//     WriteImageToTexture(global_rs.data.axis_cube_texture,     0, "images/axis_cube.png");
+//     WriteImageToTexture(global_rs.data.axis_cube_inv_texture, 0, "images/axis_cube_inv.png");
+//     WriteImageToTexture(global_rs.data.dirt_block_texture,    0, "images/dirt_block.png");
+// }
 
 static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 {
-    // data_set.vs_buffer
+    // data_set.entity_buffer
     {
         ShaderData* datas[] =
         {
-            global_rs.data.vs_buffer,
+            global_rs.data.entity_buffer,
         };
         global_rs.data_set.entity_data =
             CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 
-    // data_set.axis_cube_texture
+// data_set.textures
+{
+    ShaderData* datas[] =
     {
-        ShaderData* datas[] =
-        {
-            global_rs.data.axis_cube_texture,
-        };
-        global_rs.data_set.axis_cube_texture =
-            CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-    }
+        global_rs.data.textures,
+    };
+    global_rs.data_set.textures = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+}
 
-    // data_set.axis_cube_inv_texture
-    {
-        ShaderData* datas[] =
-        {
-            global_rs.data.axis_cube_inv_texture,
-        };
-        global_rs.data_set.axis_cube_inv_texture =
-            CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-    }
+    // // data_set.axis_cube_texture
+    // {
+    //     ShaderData* datas[] =
+    //     {
+    //         global_rs.data.axis_cube_texture,
+    //     };
+    //     global_rs.data_set.axis_cube_texture =
+    //         CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+    // }
 
-    // data_set.dirt_block_texture
-    {
-        ShaderData* datas[] =
-        {
-            global_rs.data.dirt_block_texture,
-        };
-        global_rs.data_set.dirt_block_texture =
-            CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-    }
+    // // data_set.axis_cube_inv_texture
+    // {
+    //     ShaderData* datas[] =
+    //     {
+    //         global_rs.data.axis_cube_inv_texture,
+    //     };
+    //     global_rs.data_set.axis_cube_inv_texture =
+    //         CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+    // }
+
+    // // data_set.dirt_block_texture
+    // {
+    //     ShaderData* datas[] =
+    //     {
+    //         global_rs.data.dirt_block_texture,
+    //     };
+    //     global_rs.data_set.dirt_block_texture =
+    //         CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+    // }
 }
 
 static void InitShaders(Stack* perm_stack, Stack* temp_stack)
@@ -330,20 +376,21 @@ static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_l
     ShaderDataSet* shader_data_sets[] =
     {
         global_rs.data_set.entity_data,
-        global_rs.data_set.axis_cube_texture,
+global_rs.data_set.textures,
+        // global_rs.data_set.axis_cube_texture,
     };
-    // VkPushConstantRange push_constant_ranges[] =
-    // {
-    //     {
-    //         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-    //         .offset     = 0,
-    //         .size       = sizeof(uint32)
-    //     },
-    // };
+    VkPushConstantRange push_constant_ranges[] =
+    {
+        {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset     = 0,
+            .size       = sizeof(uint32)
+        },
+    };
     PipelineLayoutInfo pipeline_layout_info =
     {
         .shader_data_sets     = CTK_WRAP_ARRAY(shader_data_sets),
-        // .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
+        .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
     };
 
     // Pipeline Info
@@ -443,7 +490,7 @@ static void UpdateMVPMatrixesThread(void* data)
     auto state = (MVPMatrixState*)data;
     BatchRange batch_range = state->batch_range;
     Matrix view_projection_matrix = state->view_projection_matrix;
-    VSBuffer* frame_vs_buffer = state->frame_vs_buffer;
+    EntityBuffer* frame_entity_buffer = state->frame_entity_buffer;
     EntityData* entity_data = state->entity_data;
 
     // Update entity MVP matrixes.
@@ -457,10 +504,12 @@ static void UpdateMVPMatrixesThread(void* data)
         model_matrix = RotateZ(model_matrix, entity_transform->rotation.z);
         // model_matrix = Scale(model_matrix, entity_transform->scale);
 
-        frame_vs_buffer->mvp_matrixes[i] = view_projection_matrix * model_matrix;
+        frame_entity_buffer->mvp_matrixes[i] = view_projection_matrix * model_matrix;
+        frame_entity_buffer->texture_indexes[i] = entity_data->texture_indexes[i];
     }
 }
 
+static bool instanced = true;
 static void RecordRenderCommandsThread(void* data)
 {
     auto state = (RenderCommandState*)data;
@@ -468,9 +517,23 @@ static void RecordRenderCommandsThread(void* data)
         Pipeline* pipeline = global_rs.pipeline;
         BindPipeline(command_buffer, pipeline);
         BindShaderDataSet(command_buffer, global_rs.data_set.entity_data, pipeline, 0);
-        BindShaderDataSet(command_buffer, state->texture, pipeline, 1);
+BindShaderDataSet(command_buffer, global_rs.data_set.textures, pipeline, 1);
+        // BindShaderDataSet(command_buffer, state->texture, pipeline, 1);
         BindMeshData(command_buffer, global_rs.mesh.data);
+if (instanced)
+{
+    uint32 pc = USE_GL_INSTANCE_INDEX;
+    vkCmdPushConstants(command_buffer, global_rs.pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
+}
+else
+{
+    for (uint32 i = state->batch_range.start; i < state->batch_range.start + state->batch_range.size; ++i)
+    {
+        vkCmdPushConstants(command_buffer, pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(i), &i);
+        DrawMesh(command_buffer, state->mesh, 0, 1);
+    }
+}
     EndRenderCommands(command_buffer);
 }
 
@@ -507,8 +570,8 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     InitImageState(&perm_stack->allocator, 16);
     InitShaderDatas(perm_stack);
-    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    LoadTextureData();
+    // BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    // LoadTextureData();
 
     InitShaderDataSets(perm_stack, temp_stack);
     InitRenderTargets(perm_stack, temp_stack, free_list);
@@ -523,7 +586,7 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool)
 {
     Job<MVPMatrixState>* job = &global_rs.job.update_mvp_matrixes;
     Matrix view_projection_matrix = GetViewProjectionMatrix(&game_state.view);
-    auto frame_vs_buffer = GetCurrentFrameBufferMem<VSBuffer>(global_rs.data.vs_buffer, 0);
+    auto frame_entity_buffer = GetCurrentFrameBufferMem<EntityBuffer>(global_rs.data.entity_buffer, 0);
     uint32 thread_count = thread_pool->size;
 
     // Initialize thread states and submit tasks.
@@ -532,7 +595,7 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool)
         MVPMatrixState* state = GetPtr(&job->states, thread_index);
         state->batch_range            = GetBatchRange(thread_index, thread_count, game_state.entity_data.count);
         state->view_projection_matrix = view_projection_matrix;
-        state->frame_vs_buffer        = frame_vs_buffer;
+        state->frame_entity_buffer    = frame_entity_buffer;
         state->entity_data            = &game_state.entity_data;
 
         Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, UpdateMVPMatrixesThread));
@@ -549,22 +612,29 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
 {
     Job<RenderCommandState>* job = &global_rs.job.record_render_commands;
 
-    // Initialize thread states and submit tasks.
-    static ShaderDataSet* textures[] =
-    {
-        global_rs.data_set.axis_cube_texture,
-        global_rs.data_set.axis_cube_inv_texture,
-        global_rs.data_set.dirt_block_texture,
-    };
+    // // Initialize thread states and submit tasks.
+    // static ShaderDataSet* textures[] =
+    // {
+    //     global_rs.data_set.axis_cube_texture,
+    //     global_rs.data_set.axis_cube_inv_texture,
+    //     global_rs.data_set.dirt_block_texture,
+    // };
     static Mesh* meshes[] =
     {
-        global_rs.mesh.cube,
         global_rs.mesh.quad,
+        global_rs.mesh.cube,
     };
-    static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(textures);
+    // static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(textures);
+static constexpr uint32 TEXTURE_COUNT = 3;
     static constexpr uint32 MESH_COUNT    = CTK_ARRAY_SIZE(meshes);
     static constexpr uint32 THREAD_COUNT  = TEXTURE_COUNT * MESH_COUNT;
     static_assert(THREAD_COUNT <= RENDER_THREAD_COUNT);
+
+if (KeyPressed(KEY_R))
+{
+    instanced = !instanced;
+    PrintLine("instanced: %s", instanced ? "true" : "false");
+}
     for (uint32 texture_index = 0; texture_index < TEXTURE_COUNT; ++texture_index)
     {
         for (uint32 mesh_index = 0; mesh_index < MESH_COUNT; ++mesh_index)
@@ -572,7 +642,7 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
             uint32 thread_index = (texture_index * MESH_COUNT) + mesh_index;
             RenderCommandState* state = GetPtr(&job->states, thread_index);
             state->thread_index = thread_index;
-            state->texture      = textures[texture_index];
+            // state->texture      = textures[texture_index];
             state->mesh         = meshes[mesh_index];
             state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, game_state.entity_data.count);
 

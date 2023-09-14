@@ -313,7 +313,7 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
         vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
 
         InitDeviceFeatures(&physical_device.features);
-        vkGetPhysicalDeviceFeatures2(physical_device.hnd, &physical_device.features.vulkan_1_0);
+        vkGetPhysicalDeviceFeatures2(physical_device.hnd, &physical_device.features.list);
 
         // Graphics and present queue families required.
         if (physical_device.queue_families.graphics == UNSET_INDEX ||
@@ -333,8 +333,8 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
         DeviceFeatures* device_features = &physical_device.features;
 
         // Vulkan 1.0 Features
-        VkBool32* vulkan_1_0_enabled_features = (VkBool32*)&enabled_features->vulkan_1_0.features;
-        VkBool32* vulkan_1_0_device_features = (VkBool32*)&physical_device.features.vulkan_1_0.features;
+        VkBool32* vulkan_1_0_enabled_features = (VkBool32*)&enabled_features->vulkan_1_0;
+        VkBool32* vulkan_1_0_device_features = (VkBool32*)&physical_device.features.vulkan_1_0;
         for (uint32 i = 0; i < VULKAN_1_0_DEVICE_FEATURE_COUNT; ++i)
         {
             if (vulkan_1_0_enabled_features[i] == VK_TRUE && vulkan_1_0_device_features == VK_FALSE)
@@ -425,7 +425,7 @@ static void InitDevice(DeviceFeatures* enabled_features)
     VkDeviceCreateInfo create_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext                   = enabled_features->vulkan_1_0.pNext,
+        .pNext                   = enabled_features->list.pNext,
         .flags                   = 0,
         .queueCreateInfoCount    = queue_infos.count,
         .pQueueCreateInfos       = queue_infos.data,
@@ -433,7 +433,7 @@ static void InitDevice(DeviceFeatures* enabled_features)
         .ppEnabledLayerNames     = NULL,
         .enabledExtensionCount   = CTK_ARRAY_SIZE(enabled_extensions),
         .ppEnabledExtensionNames = enabled_extensions,
-        .pEnabledFeatures        = &enabled_features->vulkan_1_0.features,
+        .pEnabledFeatures        = NULL,
     };
     VkResult res = vkCreateDevice(global_ctx.physical_device->hnd, &create_info, NULL, &global_ctx.device);
     Validate(res, "vkCreateDevice() failed");

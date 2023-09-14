@@ -151,7 +151,18 @@ static constexpr uint32 VULKAN_1_3_DEVICE_FEATURE_COUNT = CTK_ARRAY_SIZE(VULKAN_
 
 struct DeviceFeatures
 {
-    VkPhysicalDeviceFeatures2        vulkan_1_0;
+    union
+    {
+        VkPhysicalDeviceFeatures2 list;
+        struct
+        {
+
+            VkStructureType          sType;
+            void*                    pNext;
+            VkPhysicalDeviceFeatures vulkan_1_0;
+        };
+    };
+
     VkPhysicalDeviceVulkan11Features vulkan_1_1;
     VkPhysicalDeviceVulkan12Features vulkan_1_2;
     VkPhysicalDeviceVulkan13Features vulkan_1_3;
@@ -161,7 +172,7 @@ struct DeviceFeatures
 ////////////////////////////////////////////////////////////
 static void InitDeviceFeatures(DeviceFeatures* device_features)
 {
-    device_features->vulkan_1_0 =
+    device_features->list =
     {
         .sType    = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
         .pNext    = &device_features->vulkan_1_1,

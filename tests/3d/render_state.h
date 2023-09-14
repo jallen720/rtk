@@ -35,10 +35,9 @@ struct MVPMatrixState
 
 struct RenderCommandState
 {
-    uint32         thread_index;
-    // ShaderDataSet* texture;
-    BatchRange     batch_range;
-    Mesh*          mesh;
+    uint32     thread_index;
+    BatchRange batch_range;
+    Mesh*      mesh;
 };
 
 template<typename StateType>
@@ -70,19 +69,13 @@ struct RenderState
     struct
     {
         ShaderData* entity_buffer;
-ShaderData* textures;
-        // ShaderData* axis_cube_texture;
-        // ShaderData* axis_cube_inv_texture;
-        // ShaderData* dirt_block_texture;
+        ShaderData* textures;
     }
     data;
     struct
     {
         ShaderDataSet* entity_data;
-ShaderDataSet* textures;
-        // ShaderDataSet* axis_cube_texture;
-        // ShaderDataSet* axis_cube_inv_texture;
-        // ShaderDataSet* dirt_block_texture;
+        ShaderDataSet* textures;
     }
     data_set;
     struct
@@ -242,8 +235,7 @@ static void InitShaderDatas(Stack* perm_stack)
             .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
             .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .per_frame = false,
-.count     = 3,
-            // .count     = 1,
+            .count     = 3,
             .image =
             {
                 .image =
@@ -273,42 +265,16 @@ static void InitShaderDatas(Stack* perm_stack)
                 .sampler = global_rs.sampler,
             },
         };
-global_rs.data.textures = CreateShaderData(&perm_stack->allocator, &info);
+        global_rs.data.textures = CreateShaderData(&perm_stack->allocator, &info);
 
-// Write image data to textures.
-BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-{
-    WriteImageToTexture(global_rs.data.textures, i, &global_rs.staging_buffer, TEXTURE_IMAGE_PATHS[i]);
-}
-        // global_rs.data.axis_cube_texture     = CreateShaderData(&perm_stack->allocator, &info);
-        // global_rs.data.axis_cube_inv_texture = CreateShaderData(&perm_stack->allocator, &info);
-        // global_rs.data.dirt_block_texture    = CreateShaderData(&perm_stack->allocator, &info);
+        // Write image data to textures.
+        BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+        {
+            WriteImageToTexture(global_rs.data.textures, i, &global_rs.staging_buffer, TEXTURE_IMAGE_PATHS[i]);
+        }
     }
 }
-
-// static void WriteImageToTexture(ShaderData* sd, uint32 index, const char* image_path)
-// {
-//     // Load image data and write to staging buffer.
-//     ImageData image_data = {};
-//     LoadImageData(&image_data, image_path);
-//     WriteHostBuffer(&global_rs.staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
-//     DestroyImageData(&image_data);
-
-//     // Copy image data in staging buffer to shader data images.
-//     uint32 image_count = GetImageCount(sd);
-//     for (uint32 i = 0; i < image_count; ++i)
-//     {
-//         WriteToShaderDataImage(sd, 0, index, &global_rs.staging_buffer);
-//     }
-// }
-
-// static void LoadTextureData()
-// {
-//     WriteImageToTexture(global_rs.data.axis_cube_texture,     0, "images/axis_cube.png");
-//     WriteImageToTexture(global_rs.data.axis_cube_inv_texture, 0, "images/axis_cube_inv.png");
-//     WriteImageToTexture(global_rs.data.dirt_block_texture,    0, "images/dirt_block.png");
-// }
 
 static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
 {
@@ -318,48 +284,17 @@ static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
         {
             global_rs.data.entity_buffer,
         };
-        global_rs.data_set.entity_data =
-            CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+        global_rs.data_set.entity_data = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 
-// data_set.textures
-{
-    ShaderData* datas[] =
+    // data_set.textures
     {
-        global_rs.data.textures,
-    };
-    global_rs.data_set.textures = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-}
-
-    // // data_set.axis_cube_texture
-    // {
-    //     ShaderData* datas[] =
-    //     {
-    //         global_rs.data.axis_cube_texture,
-    //     };
-    //     global_rs.data_set.axis_cube_texture =
-    //         CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-    // }
-
-    // // data_set.axis_cube_inv_texture
-    // {
-    //     ShaderData* datas[] =
-    //     {
-    //         global_rs.data.axis_cube_inv_texture,
-    //     };
-    //     global_rs.data_set.axis_cube_inv_texture =
-    //         CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-    // }
-
-    // // data_set.dirt_block_texture
-    // {
-    //     ShaderData* datas[] =
-    //     {
-    //         global_rs.data.dirt_block_texture,
-    //     };
-    //     global_rs.data_set.dirt_block_texture =
-    //         CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-    // }
+        ShaderData* datas[] =
+        {
+            global_rs.data.textures,
+        };
+        global_rs.data_set.textures = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+    }
 }
 
 static void InitShaders(Stack* perm_stack, Stack* temp_stack)
@@ -376,8 +311,7 @@ static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_l
     ShaderDataSet* shader_data_sets[] =
     {
         global_rs.data_set.entity_data,
-global_rs.data_set.textures,
-        // global_rs.data_set.axis_cube_texture,
+        global_rs.data_set.textures,
     };
     VkPushConstantRange push_constant_ranges[] =
     {
@@ -517,8 +451,7 @@ static void RecordRenderCommandsThread(void* data)
         Pipeline* pipeline = global_rs.pipeline;
         BindPipeline(command_buffer, pipeline);
         BindShaderDataSet(command_buffer, global_rs.data_set.entity_data, pipeline, 0);
-BindShaderDataSet(command_buffer, global_rs.data_set.textures, pipeline, 1);
-        // BindShaderDataSet(command_buffer, state->texture, pipeline, 1);
+        BindShaderDataSet(command_buffer, global_rs.data_set.textures, pipeline, 1);
         BindMeshData(command_buffer, global_rs.mesh.data);
 if (instanced)
 {
@@ -612,20 +545,12 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
 {
     Job<RenderCommandState>* job = &global_rs.job.record_render_commands;
 
-    // // Initialize thread states and submit tasks.
-    // static ShaderDataSet* textures[] =
-    // {
-    //     global_rs.data_set.axis_cube_texture,
-    //     global_rs.data_set.axis_cube_inv_texture,
-    //     global_rs.data_set.dirt_block_texture,
-    // };
     static Mesh* meshes[] =
     {
         global_rs.mesh.quad,
         global_rs.mesh.cube,
     };
-    // static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(textures);
-static constexpr uint32 TEXTURE_COUNT = 3;
+    static constexpr uint32 TEXTURE_COUNT = 3;
     static constexpr uint32 MESH_COUNT    = CTK_ARRAY_SIZE(meshes);
     static constexpr uint32 THREAD_COUNT  = TEXTURE_COUNT * MESH_COUNT;
     static_assert(THREAD_COUNT <= RENDER_THREAD_COUNT);
@@ -642,7 +567,6 @@ if (KeyPressed(KEY_R))
             uint32 thread_index = (texture_index * MESH_COUNT) + mesh_index;
             RenderCommandState* state = GetPtr(&job->states, thread_index);
             state->thread_index = thread_index;
-            // state->texture      = textures[texture_index];
             state->mesh         = meshes[mesh_index];
             state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, game_state.entity_data.count);
 

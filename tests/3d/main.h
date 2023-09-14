@@ -45,6 +45,7 @@ static void Run()
     // Init RTK Context + Resources
     ContextInfo context_info = {};
     context_info.instance_info.application_name       = "RTK 3D Test";
+    context_info.instance_info.api_version            = VK_API_VERSION_1_3;
     context_info.instance_info.extensions             = {};
 #ifdef RTK_ENABLE_VALIDATION
     context_info.instance_info.debug_callback         = DefaultDebugCallback;
@@ -57,13 +58,11 @@ static void Run()
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 #endif
 
-    DeviceFeatures enabled_features[] =
-    {
-        DeviceFeatures::GEOMETRY_SHADER,
-        DeviceFeatures::SAMPLER_ANISOTROPY,
-        DeviceFeatures::SCALAR_BLOCK_LAYOUT,
-    };
-    context_info.enabled_features = CTK_WRAP_ARRAY(enabled_features);
+    InitDeviceFeatures(&context_info.enabled_features);
+    context_info.enabled_features.vulkan_1_0.features.geometryShader                   = VK_TRUE;
+    context_info.enabled_features.vulkan_1_0.features.samplerAnisotropy                = VK_TRUE;
+    context_info.enabled_features.vulkan_1_2.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    context_info.enabled_features.vulkan_1_2.scalarBlockLayout                         = VK_TRUE;
 
     VkDescriptorPoolSize descriptor_pool_sizes[] =
     {

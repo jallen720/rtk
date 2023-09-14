@@ -313,18 +313,18 @@ static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_l
         global_rs.data_set.entity_data,
         global_rs.data_set.textures,
     };
-    VkPushConstantRange push_constant_ranges[] =
-    {
-        {
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-            .offset     = 0,
-            .size       = sizeof(uint32)
-        },
-    };
+    // VkPushConstantRange push_constant_ranges[] =
+    // {
+    //     {
+    //         .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+    //         .offset     = 0,
+    //         .size       = sizeof(uint32)
+    //     },
+    // };
     PipelineLayoutInfo pipeline_layout_info =
     {
         .shader_data_sets     = CTK_WRAP_ARRAY(shader_data_sets),
-        .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
+        // .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
     };
 
     // Pipeline Info
@@ -443,7 +443,6 @@ static void UpdateMVPMatrixesThread(void* data)
     }
 }
 
-static bool instanced = true;
 static void RecordRenderCommandsThread(void* data)
 {
     auto state = (RenderCommandState*)data;
@@ -453,20 +452,7 @@ static void RecordRenderCommandsThread(void* data)
         BindShaderDataSet(command_buffer, global_rs.data_set.entity_data, pipeline, 0);
         BindShaderDataSet(command_buffer, global_rs.data_set.textures, pipeline, 1);
         BindMeshData(command_buffer, global_rs.mesh.data);
-if (instanced)
-{
-    uint32 pc = USE_GL_INSTANCE_INDEX;
-    vkCmdPushConstants(command_buffer, global_rs.pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
-}
-else
-{
-    for (uint32 i = state->batch_range.start; i < state->batch_range.start + state->batch_range.size; ++i)
-    {
-        vkCmdPushConstants(command_buffer, pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(i), &i);
-        DrawMesh(command_buffer, state->mesh, 0, 1);
-    }
-}
     EndRenderCommands(command_buffer);
 }
 
@@ -503,8 +489,6 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     InitImageState(&perm_stack->allocator, 16);
     InitShaderDatas(perm_stack);
-    // BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    // LoadTextureData();
 
     InitShaderDataSets(perm_stack, temp_stack);
     InitRenderTargets(perm_stack, temp_stack, free_list);
@@ -555,11 +539,6 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
     static constexpr uint32 THREAD_COUNT  = TEXTURE_COUNT * MESH_COUNT;
     static_assert(THREAD_COUNT <= RENDER_THREAD_COUNT);
 
-if (KeyPressed(KEY_R))
-{
-    instanced = !instanced;
-    PrintLine("instanced: %s", instanced ? "true" : "false");
-}
     for (uint32 texture_index = 0; texture_index < TEXTURE_COUNT; ++texture_index)
     {
         for (uint32 mesh_index = 0; mesh_index < MESH_COUNT; ++mesh_index)

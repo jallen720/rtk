@@ -18,21 +18,14 @@ layout(set = 0, binding = 0, std430) uniform EntityBuffer
 }
 entity;
 
-layout(push_constant) uniform PushConstants
-{
-    uint entity_index;
-}
-pc;
-
 const vec2 screen_offset      = vec2(-1, -1);
 const vec2 screen_orientation = vec2( 1, -1);
 
 void main()
 {
-    uint entity_index = pc.entity_index == USE_GL_INSTANCE_INDEX ? gl_InstanceIndex : pc.entity_index;
-    vec2 vert_pos = in_vert_pos.xy * entity.scales[entity_index];
-    vec2 pos = (vert_pos.xy + entity.positions[entity_index].xy + screen_offset) * screen_orientation;
+    vec2 vert_pos = in_vert_pos.xy * entity.scales[gl_InstanceIndex];
+    vec2 pos = (vert_pos.xy + entity.positions[gl_InstanceIndex].xy + screen_offset) * screen_orientation;
     gl_Position = vec4(pos, 1, 1);
     out_vert_uv = in_vert_uv;
-    out_entity_index = entity_index;
+    out_entity_index = gl_InstanceIndex;
 }

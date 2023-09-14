@@ -292,6 +292,7 @@ static void Run()
     // Init RTK Context + Resources
     ContextInfo context_info = {};
     context_info.instance_info.application_name       = "Debug Test";
+    context_info.instance_info.api_version            = VK_API_VERSION_1_3;
     context_info.instance_info.extensions             = {};
 #ifdef RTK_ENABLE_VALIDATION
     context_info.instance_info.debug_callback         = DefaultDebugCallback;
@@ -304,13 +305,11 @@ static void Run()
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 #endif
 
-    DeviceFeatures enabled_features[] =
-    {
-        DeviceFeatures::GEOMETRY_SHADER,
-        DeviceFeatures::SAMPLER_ANISOTROPY,
-        DeviceFeatures::SCALAR_BLOCK_LAYOUT,
-    };
-    context_info.enabled_features = CTK_WRAP_ARRAY(enabled_features);
+    InitDeviceFeatures(&context_info.enabled_features);
+    context_info.enabled_features.vulkan_1_0.features.geometryShader                   = VK_TRUE;
+    context_info.enabled_features.vulkan_1_0.features.samplerAnisotropy                = VK_TRUE;
+    context_info.enabled_features.vulkan_1_2.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+    context_info.enabled_features.vulkan_1_2.scalarBlockLayout                         = VK_TRUE;
 
     VkDescriptorPoolSize descriptor_pool_sizes[] =
     {
@@ -375,7 +374,6 @@ static void Run()
         }
 
 static float32 x = 0.0f;
-static bool instanced = true;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 {
     entity_buffer->positions[i].y = fabs(sinf(((float32)i / ENTITY_COUNT) + x));
@@ -391,32 +389,12 @@ if (KeyDown(KEY_F))
         x += 0.005f;
     }
 }
-if (KeyPressed(KEY_R))
-{
-    instanced = !instanced;
-}
 
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
-if (instanced)
-{
-    uint32 pc = USE_GL_INSTANCE_INDEX;
-    vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pc), &pc);
             BindPipeline(command_buffer, rs->pipeline);
             BindShaderDataSet(command_buffer, rs->shader_data_set, rs->pipeline, 0);
             BindMeshData(command_buffer, rs->mesh_data);
             DrawMesh(command_buffer, rs->quad_mesh, 0, ENTITY_COUNT);
-}
-else
-{
-    BindPipeline(command_buffer, rs->pipeline);
-    BindShaderDataSet(command_buffer, rs->shader_data_set, rs->pipeline, 0);
-    BindMeshData(command_buffer, rs->mesh_data);
-    for (uint32 i = 0; i < ENTITY_COUNT; ++i)
-    {
-        vkCmdPushConstants(command_buffer, rs->pipeline->layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(i), &i);
-        DrawMesh(command_buffer, rs->quad_mesh, 0, 1);
-    }
-}
         EndRenderCommands(command_buffer);
 
         SubmitRenderCommands(rs->render_target);

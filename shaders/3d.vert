@@ -17,16 +17,9 @@ layout(set = 0, binding = 0, std430) uniform EntityBuffer
 }
 entity_buffer;
 
-layout(push_constant) uniform PushConstants
-{
-    uint entity_index;
-}
-pc;
-
 void main()
 {
-    uint entity_index = pc.entity_index == USE_GL_INSTANCE_INDEX ? gl_InstanceIndex : pc.entity_index;
-    gl_Position = entity_buffer.mvp_matrixes[entity_index] * vec4(in_vert_pos, 1);
+    gl_Position = entity_buffer.mvp_matrixes[gl_InstanceIndex] * vec4(in_vert_pos, 1);
     out_vert_uv = in_vert_uv;
-    out_entity_index = entity_index;
+    out_entity_index = gl_InstanceIndex;
 }

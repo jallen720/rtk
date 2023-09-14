@@ -2,6 +2,7 @@
 #extension GL_ARB_separate_shader_objects : require
 #extension GL_GOOGLE_include_directive    : require
 #extension GL_EXT_scalar_block_layout     : require
+#extension GL_EXT_nonuniform_qualifier    : require
 
 #include "../tests/3d/defs.h"
 
@@ -20,5 +21,5 @@ layout(set = 1, binding = 0) uniform sampler2D textures[MAX_TEXTURES];
 
 void main()
 {
-    out_color = texture(textures[entity.texture_indexes[in_entity_index]], in_vert_uv);
+    out_color = texture(textures[nonuniformEXT(entity.texture_indexes[in_entity_index])], in_vert_uv);
 }

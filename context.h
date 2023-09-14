@@ -15,16 +15,17 @@ static constexpr uint32 MAX_DEVICE_FEATURES = sizeof(VkPhysicalDeviceFeatures) /
 struct InstanceInfo
 {
     const char*                         application_name;
+    uint32                              api_version;
+    Array<const char*>                  extensions;
     DebugCallback                       debug_callback;
     VkDebugUtilsMessageSeverityFlagsEXT debug_message_severity;
     VkDebugUtilsMessageTypeFlagsEXT     debug_message_type;
-    Array<const char*>                  extensions;
 };
 
 struct ContextInfo
 {
     InstanceInfo                instance_info;
-    Array<DeviceFeatures>       enabled_features;
+    DeviceFeatures              enabled_features;
     uint32                      render_thread_count;
     Array<VkDescriptorPoolSize> descriptor_pool_sizes;
 };
@@ -42,7 +43,7 @@ struct PhysicalDevice
     VkFormat                         depth_image_format;
     VkPhysicalDeviceProperties       properties;
     VkPhysicalDeviceMemoryProperties mem_properties;
-    DeviceFeatureInfo                feature_info;
+    DeviceFeatures                   features;
 };
 
 struct Swapchain
@@ -216,7 +217,7 @@ static void InitInstance(InstanceInfo* info, Stack* temp_stack)
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
         .pEngineName        = info->application_name,
         .engineVersion      = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion         = VK_API_VERSION_1_1,
+        .apiVersion         = info->api_version,
     };
 
     static constexpr const char* REQUIRED_EXTENSIONS[] =
@@ -274,8 +275,14 @@ static void InitSurface()
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
+static void LogUnsupportedDeviceFeature(PhysicalDevice* physical_device, const char* feature_name)
+{
+    PrintError("requested device feature \"%s\" not supported by device \"%s\"",
+               feature_name, physical_device->properties.deviceName);
+}
+
 static void
-LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFeatures>* enabled_features)
+LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures* enabled_features)
 {
     Stack frame = CreateFrame(temp_stack);
 
@@ -305,8 +312,8 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFea
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
         vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
 
-        InitDeviceFeatureInfo(&physical_device.feature_info);
-        vkGetPhysicalDeviceFeatures2(physical_device.hnd, &physical_device.feature_info.standard);
+        InitDeviceFeatures(&physical_device.features);
+        vkGetPhysicalDeviceFeatures2(physical_device.hnd, &physical_device.features.vulkan_1_0);
 
         // Graphics and present queue families required.
         if (physical_device.queue_families.graphics == UNSET_INDEX ||
@@ -323,33 +330,56 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, Array<DeviceFea
 
         // All requested enabled features must be supported.
         bool all_enabled_features_supported = true;
-        DeviceFeatureInfo* feature_info = &physical_device.feature_info;
-        auto standard_feature_array = GetStandardFeatureArray(feature_info);
-        CTK_ITER(enabled_feature, enabled_features)
-        {
-            bool feature_supported = true;
-            if (*enabled_feature <= DeviceFeatures::INHERITED_QUERIES)
-            {
-                if (standard_feature_array[(uint32)*enabled_feature] != VK_TRUE)
-                {
-                    feature_supported = false;
-                }
-            }
-            else if (*enabled_feature == DeviceFeatures::SCALAR_BLOCK_LAYOUT)
-            {
-                if (feature_info->scalar_block_layout.scalarBlockLayout != VK_TRUE)
-                {
-                    feature_supported = false;
-                }
-            }
+        DeviceFeatures* device_features = &physical_device.features;
 
-            if (!feature_supported)
+        // Vulkan 1.0 Features
+        VkBool32* vulkan_1_0_enabled_features = (VkBool32*)&enabled_features->vulkan_1_0.features;
+        VkBool32* vulkan_1_0_device_features = (VkBool32*)&physical_device.features.vulkan_1_0.features;
+        for (uint32 i = 0; i < VULKAN_1_0_DEVICE_FEATURE_COUNT; ++i)
+        {
+            if (vulkan_1_0_enabled_features[i] == VK_TRUE && vulkan_1_0_device_features == VK_FALSE)
             {
-                PrintError("enabled device feature %s is not supported for device %s",
-                           GetDeviceFeatureName(*enabled_feature), physical_device.properties.deviceName);
+                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_Vulkan_1_0(i));
                 all_enabled_features_supported = false;
             }
         }
+
+        // Vulkan 1.1 Features
+        VkBool32* vulkan_1_1_enabled_features = (VkBool32*)&enabled_features->vulkan_1_1;
+        VkBool32* vulkan_1_1_device_features = (VkBool32*)&physical_device.features.vulkan_1_1;
+        for (uint32 i = 0; i < VULKAN_1_1_DEVICE_FEATURE_COUNT; ++i)
+        {
+            if (vulkan_1_1_enabled_features[i] == VK_TRUE && vulkan_1_1_device_features == VK_FALSE)
+            {
+                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_Vulkan_1_1(i));
+                all_enabled_features_supported = false;
+            }
+        }
+
+        // Vulkan 1.2 Features
+        VkBool32* vulkan_1_2_enabled_features = (VkBool32*)&enabled_features->vulkan_1_2;
+        VkBool32* vulkan_1_2_device_features = (VkBool32*)&physical_device.features.vulkan_1_2;
+        for (uint32 i = 0; i < VULKAN_1_2_DEVICE_FEATURE_COUNT; ++i)
+        {
+            if (vulkan_1_2_enabled_features[i] == VK_TRUE && vulkan_1_2_device_features == VK_FALSE)
+            {
+                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_Vulkan_1_2(i));
+                all_enabled_features_supported = false;
+            }
+        }
+
+        // Vulkan 1.3 Features
+        VkBool32* vulkan_1_3_enabled_features = (VkBool32*)&enabled_features->vulkan_1_3;
+        VkBool32* vulkan_1_3_device_features  = (VkBool32*)&physical_device.features.vulkan_1_3;
+        for (uint32 i = 0; i < VULKAN_1_3_DEVICE_FEATURE_COUNT; ++i)
+        {
+            if (vulkan_1_3_enabled_features[i] == VK_TRUE && vulkan_1_3_device_features == VK_FALSE)
+            {
+                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_Vulkan_1_3(i));
+                all_enabled_features_supported = false;
+            }
+        }
+
         if (!all_enabled_features_supported)
         {
             continue;
@@ -376,7 +406,7 @@ static void UsePhysicalDevice(uint32 index)
     global_ctx.physical_device = GetPtr(&global_ctx.physical_devices, index);
 }
 
-static void InitDevice(Array<DeviceFeatures>* enabled_features)
+static void InitDevice(DeviceFeatures* enabled_features)
 {
     QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
 
@@ -390,28 +420,12 @@ static void InitDevice(Array<DeviceFeatures>* enabled_features)
         Push(&queue_infos, GetSingleQueueInfo(queue_families->present));
     }
 
-    // Create physical device features struct for device creation.
-    DeviceFeatureInfo enabled_feature_info = {};
-    InitDeviceFeatureInfo(&enabled_feature_info);
-    VkBool32* standard_feature_array = GetStandardFeatureArray(&enabled_feature_info);
-    CTK_ITER(device_feature, enabled_features)
-    {
-        if (*device_feature <= DeviceFeatures::INHERITED_QUERIES)
-        {
-            standard_feature_array[(uint32)*device_feature] = VK_TRUE;
-        }
-        else if (*device_feature == DeviceFeatures::SCALAR_BLOCK_LAYOUT)
-        {
-            enabled_feature_info.scalar_block_layout.scalarBlockLayout = VK_TRUE;
-        }
-    }
-
     // Create device, specifying enabled extensions and features.
     const char* enabled_extensions[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     VkDeviceCreateInfo create_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext                   = enabled_feature_info.standard.pNext,
+        .pNext                   = enabled_features->vulkan_1_0.pNext,
         .flags                   = 0,
         .queueCreateInfoCount    = queue_infos.count,
         .pQueueCreateInfos       = queue_infos.data,
@@ -419,7 +433,7 @@ static void InitDevice(Array<DeviceFeatures>* enabled_features)
         .ppEnabledLayerNames     = NULL,
         .enabledExtensionCount   = CTK_ARRAY_SIZE(enabled_extensions),
         .ppEnabledExtensionNames = enabled_extensions,
-        .pEnabledFeatures        = &enabled_feature_info.standard.features,
+        .pEnabledFeatures        = &enabled_features->vulkan_1_0.features,
     };
     VkResult res = vkCreateDevice(global_ctx.physical_device->hnd, &create_info, NULL, &global_ctx.device);
     Validate(res, "vkCreateDevice() failed");

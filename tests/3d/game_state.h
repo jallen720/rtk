@@ -161,7 +161,7 @@ static void InitGameState()
             .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
         };
         entity_data->texture_indexes[entity] =
-                                               (entity/38) % MAX_TEXTURES;
+                                               entity % MAX_TEXTURES;
                                                // entity < CUBE_ENTITY_COUNT / 3 ? 0 :
                                                // entity < 2 * (CUBE_ENTITY_COUNT / 3) ? 1 :
                                                // 2;

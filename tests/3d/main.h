@@ -59,8 +59,8 @@ static void Run()
 #endif
 
     InitDeviceFeatures(&context_info.enabled_features);
-    context_info.enabled_features.vulkan_1_0.geometryShader                   = VK_TRUE;
-    context_info.enabled_features.vulkan_1_0.samplerAnisotropy                = VK_TRUE;
+    context_info.enabled_features.vulkan_1_0.geometryShader                            = VK_TRUE;
+    context_info.enabled_features.vulkan_1_0.samplerAnisotropy                         = VK_TRUE;
     context_info.enabled_features.vulkan_1_2.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
     context_info.enabled_features.vulkan_1_2.scalarBlockLayout                         = VK_TRUE;
 

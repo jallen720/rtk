@@ -334,7 +334,7 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
 
         // Vulkan 1.0 Features
         VkBool32* vulkan_1_0_enabled_features = (VkBool32*)&enabled_features->vulkan_1_0;
-        VkBool32* vulkan_1_0_device_features = (VkBool32*)&physical_device.features.vulkan_1_0;
+        VkBool32* vulkan_1_0_device_features = (VkBool32*)&device_features->vulkan_1_0;
         for (uint32 i = 0; i < VULKAN_1_0_DEVICE_FEATURE_COUNT; ++i)
         {
             if (vulkan_1_0_enabled_features[i] == VK_TRUE && vulkan_1_0_device_features == VK_FALSE)
@@ -346,7 +346,7 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
 
         // Vulkan 1.1 Features
         VkBool32* vulkan_1_1_enabled_features = (VkBool32*)&enabled_features->vulkan_1_1;
-        VkBool32* vulkan_1_1_device_features = (VkBool32*)&physical_device.features.vulkan_1_1;
+        VkBool32* vulkan_1_1_device_features = (VkBool32*)&device_features->vulkan_1_1;
         for (uint32 i = 0; i < VULKAN_1_1_DEVICE_FEATURE_COUNT; ++i)
         {
             if (vulkan_1_1_enabled_features[i] == VK_TRUE && vulkan_1_1_device_features == VK_FALSE)
@@ -358,7 +358,7 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
 
         // Vulkan 1.2 Features
         VkBool32* vulkan_1_2_enabled_features = (VkBool32*)&enabled_features->vulkan_1_2;
-        VkBool32* vulkan_1_2_device_features = (VkBool32*)&physical_device.features.vulkan_1_2;
+        VkBool32* vulkan_1_2_device_features = (VkBool32*)&device_features->vulkan_1_2;
         for (uint32 i = 0; i < VULKAN_1_2_DEVICE_FEATURE_COUNT; ++i)
         {
             if (vulkan_1_2_enabled_features[i] == VK_TRUE && vulkan_1_2_device_features == VK_FALSE)
@@ -370,7 +370,7 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
 
         // Vulkan 1.3 Features
         VkBool32* vulkan_1_3_enabled_features = (VkBool32*)&enabled_features->vulkan_1_3;
-        VkBool32* vulkan_1_3_device_features  = (VkBool32*)&physical_device.features.vulkan_1_3;
+        VkBool32* vulkan_1_3_device_features  = (VkBool32*)&device_features->vulkan_1_3;
         for (uint32 i = 0; i < VULKAN_1_3_DEVICE_FEATURE_COUNT; ++i)
         {
             if (vulkan_1_3_enabled_features[i] == VK_TRUE && vulkan_1_3_device_features == VK_FALSE)

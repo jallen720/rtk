@@ -160,9 +160,11 @@ static void InitGameState()
             .rotate_axis      = (uint8)RandomRange(0u, 3u),
             .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
         };
-        entity_data->texture_indexes[entity] = entity < CUBE_ENTITY_COUNT / 3 ? 0 :
-                                               entity < 2 * (CUBE_ENTITY_COUNT / 3) ? 1 :
-                                               2;
+        entity_data->texture_indexes[entity] =
+                                               (entity/38) % MAX_TEXTURES;
+                                               // entity < CUBE_ENTITY_COUNT / 3 ? 0 :
+                                               // entity < 2 * (CUBE_ENTITY_COUNT / 3) ? 1 :
+                                               // 2;
     }
 }
 
@@ -196,18 +198,18 @@ static void UpdateGame()
 
         static constexpr float32 ROTATION_SPEED = 0.1f;
         float32 rotation = entity->rotate_direction * ROTATION_SPEED;
-        if (entity->rotate_axis == 0)
-        {
-            transform->rotation.x += rotation;
-        }
-        else if (entity->rotate_axis == 1)
-        {
-            transform->rotation.y += rotation;
-        }
-        else
-        {
-            transform->rotation.z += rotation;
-        }
+        // if (entity->rotate_axis == 0)
+        // {
+        //     transform->rotation.x += rotation;
+        // }
+        // else if (entity->rotate_axis == 1)
+        // {
+        //     transform->rotation.y += rotation;
+        // }
+        // else
+        // {
+        //     transform->rotation.z += rotation;
+        // }
     }
 }
 

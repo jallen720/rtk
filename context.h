@@ -312,8 +312,9 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
         vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
 
-        InitDeviceFeatures(&physical_device.features);
-        vkGetPhysicalDeviceFeatures2(physical_device.hnd, &physical_device.features.list);
+        DeviceFeatures* device_features = &physical_device.features;
+        InitDeviceFeatures(device_features);
+        GetDeviceFeatures(physical_device.hnd, device_features);
 
         // Graphics and present queue families required.
         if (physical_device.queue_families.graphics == UNSET_INDEX ||
@@ -330,52 +331,51 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
 
         // All requested enabled features must be supported.
         bool all_enabled_features_supported = true;
-        DeviceFeatures* device_features = &physical_device.features;
 
         // Vulkan 1.0 Features
-        VkBool32* vulkan_1_0_enabled_features = (VkBool32*)&enabled_features->vulkan_1_0;
-        VkBool32* vulkan_1_0_device_features = (VkBool32*)&device_features->vulkan_1_0;
+        VkBool32* vulkan_1_0_enabled_features = GetDeviceFeaturesArray_1_0(&enabled_features->vulkan_1_0);
+        VkBool32* vulkan_1_0_device_features = GetDeviceFeaturesArray_1_0(&device_features->vulkan_1_0);
         for (uint32 i = 0; i < VULKAN_1_0_DEVICE_FEATURE_COUNT; ++i)
         {
-            if (vulkan_1_0_enabled_features[i] == VK_TRUE && vulkan_1_0_device_features == VK_FALSE)
+            if (vulkan_1_0_enabled_features[i] == VK_TRUE && vulkan_1_0_device_features[i] == VK_FALSE)
             {
-                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_Vulkan_1_0(i));
+                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_1_0(i));
                 all_enabled_features_supported = false;
             }
         }
 
         // Vulkan 1.1 Features
-        VkBool32* vulkan_1_1_enabled_features = (VkBool32*)&enabled_features->vulkan_1_1;
-        VkBool32* vulkan_1_1_device_features = (VkBool32*)&device_features->vulkan_1_1;
+        VkBool32* vulkan_1_1_enabled_features = GetDeviceFeaturesArray_1_1(&enabled_features->vulkan_1_1);
+        VkBool32* vulkan_1_1_device_features = GetDeviceFeaturesArray_1_1(&device_features->vulkan_1_1);
         for (uint32 i = 0; i < VULKAN_1_1_DEVICE_FEATURE_COUNT; ++i)
         {
-            if (vulkan_1_1_enabled_features[i] == VK_TRUE && vulkan_1_1_device_features == VK_FALSE)
+            if (vulkan_1_1_enabled_features[i] == VK_TRUE && vulkan_1_1_device_features[i] == VK_FALSE)
             {
-                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_Vulkan_1_1(i));
+                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_1_1(i));
                 all_enabled_features_supported = false;
             }
         }
 
         // Vulkan 1.2 Features
-        VkBool32* vulkan_1_2_enabled_features = (VkBool32*)&enabled_features->vulkan_1_2;
-        VkBool32* vulkan_1_2_device_features = (VkBool32*)&device_features->vulkan_1_2;
+        VkBool32* vulkan_1_2_enabled_features = GetDeviceFeaturesArray_1_2(&enabled_features->vulkan_1_2);
+        VkBool32* vulkan_1_2_device_features = GetDeviceFeaturesArray_1_2(&device_features->vulkan_1_2);
         for (uint32 i = 0; i < VULKAN_1_2_DEVICE_FEATURE_COUNT; ++i)
         {
-            if (vulkan_1_2_enabled_features[i] == VK_TRUE && vulkan_1_2_device_features == VK_FALSE)
+            if (vulkan_1_2_enabled_features[i] == VK_TRUE && vulkan_1_2_device_features[i] == VK_FALSE)
             {
-                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_Vulkan_1_2(i));
+                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_1_2(i));
                 all_enabled_features_supported = false;
             }
         }
 
         // Vulkan 1.3 Features
-        VkBool32* vulkan_1_3_enabled_features = (VkBool32*)&enabled_features->vulkan_1_3;
-        VkBool32* vulkan_1_3_device_features  = (VkBool32*)&device_features->vulkan_1_3;
+        VkBool32* vulkan_1_3_enabled_features = GetDeviceFeaturesArray_1_3(&enabled_features->vulkan_1_3);
+        VkBool32* vulkan_1_3_device_features = GetDeviceFeaturesArray_1_3(&device_features->vulkan_1_3);
         for (uint32 i = 0; i < VULKAN_1_3_DEVICE_FEATURE_COUNT; ++i)
         {
-            if (vulkan_1_3_enabled_features[i] == VK_TRUE && vulkan_1_3_device_features == VK_FALSE)
+            if (vulkan_1_3_enabled_features[i] == VK_TRUE && vulkan_1_3_device_features[i] == VK_FALSE)
             {
-                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_Vulkan_1_3(i));
+                LogUnsupportedDeviceFeature(&physical_device, GetDeviceFeatureName_1_3(i));
                 all_enabled_features_supported = false;
             }
         }
@@ -425,7 +425,7 @@ static void InitDevice(DeviceFeatures* enabled_features)
     VkDeviceCreateInfo create_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-        .pNext                   = enabled_features->list.pNext,
+        .pNext                   = &enabled_features->vulkan_1_0,
         .flags                   = 0,
         .queueCreateInfoCount    = queue_infos.count,
         .pQueueCreateInfos       = queue_infos.data,
@@ -894,9 +894,9 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
 
 /// Debugging
 ////////////////////////////////////////////////////////////
-static void ListMemoryTypes(PhysicalDevice* physical_device, uint32 tabs = 0)
+static void LogMemoryTypes(VkPhysicalDeviceMemoryProperties* mem_properties, uint32 tabs = 0)
 {
-    VkPhysicalDeviceMemoryProperties* mem_properties = &physical_device->mem_properties;
+    Print("    memory types:");
     for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
     {
         VkMemoryType* type = mem_properties->memoryTypes + i;
@@ -913,6 +913,68 @@ static void ListMemoryTypes(PhysicalDevice* physical_device, uint32 tabs = 0)
 
         PrintMemoryProperties(type->propertyFlags, tabs + 2);
     }
+    PrintLine();
+}
+
+static void LogDeviceFeature(const char* feature_name, VkBool32 enabled, uint32 feature_index,
+                             uint32 longest_feature_name_size)
+{
+    static constexpr const char* ALIGN_BUFFER = "................................................................";
+    Print("            [%2u] %s", feature_index, feature_name);
+    Print(" %.*s ", longest_feature_name_size - StringSize(feature_name), ALIGN_BUFFER);
+    if (enabled == VK_TRUE)
+    {
+        PrintLine(OUTPUT_COLOR_GREEN, "%s", "TRUE");
+    }
+    else
+    {
+        PrintLine(OUTPUT_COLOR_RED, "%s", "FALSE");
+    }
+}
+
+static void LogDeviceFeatures(DeviceFeatures* device_features)
+{
+    PrintLine("    device features:");
+
+    // Vulkan 1.0 Features
+    VkBool32* vulkan_1_0_device_features = GetDeviceFeaturesArray_1_0(&device_features->vulkan_1_0);
+    PrintLine("        Vulkan 1.0:");
+    for (uint32 i = 0; i < VULKAN_1_0_DEVICE_FEATURE_COUNT; ++i)
+    {
+        LogDeviceFeature(GetDeviceFeatureName_1_0(i), vulkan_1_0_device_features[i], i,
+                         VULKAN_1_0_LONGEST_DEVICE_FEATURE_NAME_SIZE);
+    }
+    PrintLine();
+
+    // Vulkan 1.1 Features
+    VkBool32* vulkan_1_1_device_features = GetDeviceFeaturesArray_1_1(&device_features->vulkan_1_1);
+    PrintLine("        Vulkan 1.1:");
+    for (uint32 i = 0; i < VULKAN_1_1_DEVICE_FEATURE_COUNT; ++i)
+    {
+        LogDeviceFeature(GetDeviceFeatureName_1_1(i), vulkan_1_1_device_features[i], i,
+                         VULKAN_1_1_LONGEST_DEVICE_FEATURE_NAME_SIZE);
+    }
+    PrintLine();
+
+    // Vulkan 1.2 Features
+    VkBool32* vulkan_1_2_device_features = GetDeviceFeaturesArray_1_2(&device_features->vulkan_1_2);
+    PrintLine("        Vulkan 1.2:");
+    for (uint32 i = 0; i < VULKAN_1_2_DEVICE_FEATURE_COUNT; ++i)
+    {
+        LogDeviceFeature(GetDeviceFeatureName_1_2(i), vulkan_1_2_device_features[i], i,
+                         VULKAN_1_2_LONGEST_DEVICE_FEATURE_NAME_SIZE);
+    }
+    PrintLine();
+
+    // Vulkan 1.3 Features
+    VkBool32* vulkan_1_3_device_features  = GetDeviceFeaturesArray_1_3(&device_features->vulkan_1_3);
+    PrintLine("        Vulkan 1.3:");
+    for (uint32 i = 0; i < VULKAN_1_3_DEVICE_FEATURE_COUNT; ++i)
+    {
+        LogDeviceFeature(GetDeviceFeatureName_1_3(i), vulkan_1_3_device_features[i], i,
+                         VULKAN_1_3_LONGEST_DEVICE_FEATURE_NAME_SIZE);
+    }
+    PrintLine();
 }
 
 static void LogPhysicalDevice(PhysicalDevice* physical_device)
@@ -925,9 +987,6 @@ static void LogPhysicalDevice(PhysicalDevice* physical_device)
         type == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU   ? "VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU" :
         type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? "VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU" :
         "invalid");
-    PrintLine("    queue_families:");
-    PrintLine("        graphics: %u", physical_device->queue_families.graphics);
-    PrintLine("        present:  %u", physical_device->queue_families.present);
     PrintLine("    depth_image_format: %s",
         depth_image_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? "VK_FORMAT_D32_SFLOAT_S8_UINT" :
         depth_image_format == VK_FORMAT_D32_SFLOAT         ? "VK_FORMAT_D32_SFLOAT"         :
@@ -935,7 +994,11 @@ static void LogPhysicalDevice(PhysicalDevice* physical_device)
         depth_image_format == VK_FORMAT_D16_UNORM_S8_UINT  ? "VK_FORMAT_D16_UNORM_S8_UINT"  :
         depth_image_format == VK_FORMAT_D16_UNORM          ? "VK_FORMAT_D16_UNORM"          :
         "UNKNWON");
-    Print("    memory types:");
-    ListMemoryTypes(physical_device, 2);
     PrintLine();
+    PrintLine("    queue_families:");
+    PrintLine("        graphics: %u", physical_device->queue_families.graphics);
+    PrintLine("        present:  %u", physical_device->queue_families.present);
+    PrintLine();
+    LogMemoryTypes(&physical_device->mem_properties, 2);
+    LogDeviceFeatures(&physical_device->features);
 }

@@ -57,7 +57,6 @@ static void Run()
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 #endif
-
     InitDeviceFeatures(&context_info.enabled_features);
     context_info.enabled_features.vulkan_1_0.geometryShader                            = VK_TRUE;
     context_info.enabled_features.vulkan_1_0.samplerAnisotropy                         = VK_TRUE;

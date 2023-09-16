@@ -967,7 +967,7 @@ static void LogDeviceFeatures(DeviceFeatures* device_features)
     PrintLine();
 
     // Vulkan 1.3 Features
-    VkBool32* vulkan_1_3_device_features  = GetDeviceFeaturesArray_1_3(&device_features->vulkan_1_3);
+    VkBool32* vulkan_1_3_device_features = GetDeviceFeaturesArray_1_3(&device_features->vulkan_1_3);
     PrintLine("        Vulkan 1.3:");
     for (uint32 i = 0; i < VULKAN_1_3_DEVICE_FEATURE_COUNT; ++i)
     {

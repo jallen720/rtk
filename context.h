@@ -233,8 +233,10 @@ static void InitInstance(InstanceInfo* info, Stack* temp_stack)
     PushRange(&extensions, REQUIRED_EXTENSIONS, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS));
     PushRange(&extensions, &info->extensions);
 
+    Array<const char*> layers = {};
 #ifdef RTK_ENABLE_VALIDATION
-    const char* validation_layer = "VK_LAYER_KHRONOS_validation";
+    InitArray(&layers, &frame.allocator, 1);
+    Push(&layers, "VK_LAYER_KHRONOS_validation");
 #endif
 
     VkInstanceCreateInfo create_info = {};
@@ -245,8 +247,8 @@ static void InitInstance(InstanceInfo* info, Stack* temp_stack)
     create_info.ppEnabledExtensionNames = extensions.data;
 #ifdef RTK_ENABLE_VALIDATION
     create_info.pNext                   = &debug_msgr_info;
-    create_info.enabledLayerCount       = 1;
-    create_info.ppEnabledLayerNames     = &validation_layer;
+    create_info.enabledLayerCount       = layers.count;
+    create_info.ppEnabledLayerNames     = layers.data;
 #else
     create_info.pNext                   = NULL;
     create_info.enabledLayerCount       = 0;

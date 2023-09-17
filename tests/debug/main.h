@@ -205,7 +205,11 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
                                    VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Pipeline
-    Shader* shaders[] = { rs->vert_shader, rs->frag_shader, };
+    Shader* shaders[] =
+    {
+        rs->vert_shader,
+        rs->frag_shader,
+    };
     VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
     VkViewport viewports[] =
     {

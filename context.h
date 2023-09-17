@@ -109,6 +109,117 @@ static Context global_ctx;
 ////////////////////////////////////////////////////////////
 static VkSurfaceCapabilitiesKHR GetSurfaceCapabilities();
 
+/// Debugging
+////////////////////////////////////////////////////////////
+static void LogMemoryTypes(VkPhysicalDeviceMemoryProperties* mem_properties, uint32 tabs = 0)
+{
+    Print("    memory types:");
+    for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
+    {
+        VkMemoryType* type = mem_properties->memoryTypes + i;
+        PrintLine();
+
+        PrintTabs(tabs);
+        PrintLine("VkMemoryType [%u]:", i);
+
+        PrintTabs(tabs + 1);
+        PrintLine("heapIndex: %u", type->heapIndex);
+
+        PrintTabs(tabs + 1);
+        PrintLine("propertyFlags:");
+
+        PrintMemoryProperties(type->propertyFlags, tabs + 2);
+    }
+    PrintLine();
+}
+
+static void LogDeviceFeature(const char* feature_name, VkBool32 enabled, uint32 feature_index,
+                             uint32 longest_feature_name_size)
+{
+    static constexpr const char* ALIGN_BUFFER = "................................................................";
+    Print("            [%2u] %s", feature_index, feature_name);
+    Print(" %.*s ", longest_feature_name_size - StringSize(feature_name), ALIGN_BUFFER);
+    if (enabled == VK_TRUE)
+    {
+        PrintLine(OUTPUT_COLOR_GREEN, "%s", "TRUE");
+    }
+    else
+    {
+        PrintLine(OUTPUT_COLOR_RED, "%s", "FALSE");
+    }
+}
+
+static void LogDeviceFeatures(DeviceFeatures* device_features)
+{
+    PrintLine("    device features:");
+
+    // Vulkan 1.0 Features
+    VkBool32* vulkan_1_0_device_features = GetDeviceFeaturesArray_1_0(&device_features->vulkan_1_0);
+    PrintLine("        Vulkan 1.0:");
+    for (uint32 i = 0; i < VULKAN_1_0_DEVICE_FEATURE_COUNT; ++i)
+    {
+        LogDeviceFeature(GetDeviceFeatureName_1_0(i), vulkan_1_0_device_features[i], i,
+                         VULKAN_1_0_LONGEST_DEVICE_FEATURE_NAME_SIZE);
+    }
+    PrintLine();
+
+    // Vulkan 1.1 Features
+    VkBool32* vulkan_1_1_device_features = GetDeviceFeaturesArray_1_1(&device_features->vulkan_1_1);
+    PrintLine("        Vulkan 1.1:");
+    for (uint32 i = 0; i < VULKAN_1_1_DEVICE_FEATURE_COUNT; ++i)
+    {
+        LogDeviceFeature(GetDeviceFeatureName_1_1(i), vulkan_1_1_device_features[i], i,
+                         VULKAN_1_1_LONGEST_DEVICE_FEATURE_NAME_SIZE);
+    }
+    PrintLine();
+
+    // Vulkan 1.2 Features
+    VkBool32* vulkan_1_2_device_features = GetDeviceFeaturesArray_1_2(&device_features->vulkan_1_2);
+    PrintLine("        Vulkan 1.2:");
+    for (uint32 i = 0; i < VULKAN_1_2_DEVICE_FEATURE_COUNT; ++i)
+    {
+        LogDeviceFeature(GetDeviceFeatureName_1_2(i), vulkan_1_2_device_features[i], i,
+                         VULKAN_1_2_LONGEST_DEVICE_FEATURE_NAME_SIZE);
+    }
+    PrintLine();
+
+    // Vulkan 1.3 Features
+    VkBool32* vulkan_1_3_device_features = GetDeviceFeaturesArray_1_3(&device_features->vulkan_1_3);
+    PrintLine("        Vulkan 1.3:");
+    for (uint32 i = 0; i < VULKAN_1_3_DEVICE_FEATURE_COUNT; ++i)
+    {
+        LogDeviceFeature(GetDeviceFeatureName_1_3(i), vulkan_1_3_device_features[i], i,
+                         VULKAN_1_3_LONGEST_DEVICE_FEATURE_NAME_SIZE);
+    }
+    PrintLine();
+}
+
+static void LogPhysicalDevice(PhysicalDevice* physical_device)
+{
+    VkPhysicalDeviceType type = physical_device->properties.deviceType;
+    VkFormat depth_image_format = physical_device->depth_image_format;
+
+    PrintLine("%s:", physical_device->properties.deviceName);
+    PrintLine("    type: %s",
+        type == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU   ? "VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU" :
+        type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? "VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU" :
+        "invalid");
+    PrintLine("    depth_image_format: %s",
+        depth_image_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? "VK_FORMAT_D32_SFLOAT_S8_UINT" :
+        depth_image_format == VK_FORMAT_D32_SFLOAT         ? "VK_FORMAT_D32_SFLOAT"         :
+        depth_image_format == VK_FORMAT_D24_UNORM_S8_UINT  ? "VK_FORMAT_D24_UNORM_S8_UINT"  :
+        depth_image_format == VK_FORMAT_D16_UNORM_S8_UINT  ? "VK_FORMAT_D16_UNORM_S8_UINT"  :
+        depth_image_format == VK_FORMAT_D16_UNORM          ? "VK_FORMAT_D16_UNORM"          :
+        "UNKNWON");
+    PrintLine();
+    PrintLine("    queue_families:");
+    PrintLine("        graphics: %u", physical_device->queue_families.graphics);
+    PrintLine("        present:  %u", physical_device->queue_families.present);
+    PrintLine();
+    LogMemoryTypes(&physical_device->mem_properties, 2);
+    LogDeviceFeatures(&physical_device->features);
+}
+
 /// Internal
 ////////////////////////////////////////////////////////////
 static QueueFamilies FindQueueFamilies(Stack* temp_stack, VkPhysicalDevice physical_device, VkSurfaceKHR surface)
@@ -892,115 +1003,4 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
     Validate(res, "vkAllocateMemory() failed");
 
     return mem;
-}
-
-/// Debugging
-////////////////////////////////////////////////////////////
-static void LogMemoryTypes(VkPhysicalDeviceMemoryProperties* mem_properties, uint32 tabs = 0)
-{
-    Print("    memory types:");
-    for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
-    {
-        VkMemoryType* type = mem_properties->memoryTypes + i;
-        PrintLine();
-
-        PrintTabs(tabs);
-        PrintLine("VkMemoryType [%u]:", i);
-
-        PrintTabs(tabs + 1);
-        PrintLine("heapIndex: %u", type->heapIndex);
-
-        PrintTabs(tabs + 1);
-        PrintLine("propertyFlags:");
-
-        PrintMemoryProperties(type->propertyFlags, tabs + 2);
-    }
-    PrintLine();
-}
-
-static void LogDeviceFeature(const char* feature_name, VkBool32 enabled, uint32 feature_index,
-                             uint32 longest_feature_name_size)
-{
-    static constexpr const char* ALIGN_BUFFER = "................................................................";
-    Print("            [%2u] %s", feature_index, feature_name);
-    Print(" %.*s ", longest_feature_name_size - StringSize(feature_name), ALIGN_BUFFER);
-    if (enabled == VK_TRUE)
-    {
-        PrintLine(OUTPUT_COLOR_GREEN, "%s", "TRUE");
-    }
-    else
-    {
-        PrintLine(OUTPUT_COLOR_RED, "%s", "FALSE");
-    }
-}
-
-static void LogDeviceFeatures(DeviceFeatures* device_features)
-{
-    PrintLine("    device features:");
-
-    // Vulkan 1.0 Features
-    VkBool32* vulkan_1_0_device_features = GetDeviceFeaturesArray_1_0(&device_features->vulkan_1_0);
-    PrintLine("        Vulkan 1.0:");
-    for (uint32 i = 0; i < VULKAN_1_0_DEVICE_FEATURE_COUNT; ++i)
-    {
-        LogDeviceFeature(GetDeviceFeatureName_1_0(i), vulkan_1_0_device_features[i], i,
-                         VULKAN_1_0_LONGEST_DEVICE_FEATURE_NAME_SIZE);
-    }
-    PrintLine();
-
-    // Vulkan 1.1 Features
-    VkBool32* vulkan_1_1_device_features = GetDeviceFeaturesArray_1_1(&device_features->vulkan_1_1);
-    PrintLine("        Vulkan 1.1:");
-    for (uint32 i = 0; i < VULKAN_1_1_DEVICE_FEATURE_COUNT; ++i)
-    {
-        LogDeviceFeature(GetDeviceFeatureName_1_1(i), vulkan_1_1_device_features[i], i,
-                         VULKAN_1_1_LONGEST_DEVICE_FEATURE_NAME_SIZE);
-    }
-    PrintLine();
-
-    // Vulkan 1.2 Features
-    VkBool32* vulkan_1_2_device_features = GetDeviceFeaturesArray_1_2(&device_features->vulkan_1_2);
-    PrintLine("        Vulkan 1.2:");
-    for (uint32 i = 0; i < VULKAN_1_2_DEVICE_FEATURE_COUNT; ++i)
-    {
-        LogDeviceFeature(GetDeviceFeatureName_1_2(i), vulkan_1_2_device_features[i], i,
-                         VULKAN_1_2_LONGEST_DEVICE_FEATURE_NAME_SIZE);
-    }
-    PrintLine();
-
-    // Vulkan 1.3 Features
-    VkBool32* vulkan_1_3_device_features = GetDeviceFeaturesArray_1_3(&device_features->vulkan_1_3);
-    PrintLine("        Vulkan 1.3:");
-    for (uint32 i = 0; i < VULKAN_1_3_DEVICE_FEATURE_COUNT; ++i)
-    {
-        LogDeviceFeature(GetDeviceFeatureName_1_3(i), vulkan_1_3_device_features[i], i,
-                         VULKAN_1_3_LONGEST_DEVICE_FEATURE_NAME_SIZE);
-    }
-    PrintLine();
-}
-
-static void LogPhysicalDevice(PhysicalDevice* physical_device)
-{
-    VkPhysicalDeviceType type = physical_device->properties.deviceType;
-    VkFormat depth_image_format = physical_device->depth_image_format;
-
-    PrintLine("%s:", physical_device->properties.deviceName);
-    PrintLine("    type: %s",
-        type == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU   ? "VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU" :
-        type == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ? "VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU" :
-        "invalid");
-    PrintLine("    depth_image_format: %s",
-        depth_image_format == VK_FORMAT_D32_SFLOAT_S8_UINT ? "VK_FORMAT_D32_SFLOAT_S8_UINT" :
-        depth_image_format == VK_FORMAT_D32_SFLOAT         ? "VK_FORMAT_D32_SFLOAT"         :
-        depth_image_format == VK_FORMAT_D24_UNORM_S8_UINT  ? "VK_FORMAT_D24_UNORM_S8_UINT"  :
-        depth_image_format == VK_FORMAT_D16_UNORM_S8_UINT  ? "VK_FORMAT_D16_UNORM_S8_UINT"  :
-        depth_image_format == VK_FORMAT_D16_UNORM          ? "VK_FORMAT_D16_UNORM"          :
-        "UNKNWON");
-    PrintLine();
-    PrintLine("    queue_families:");
-    PrintLine("        graphics: %u", physical_device->queue_families.graphics);
-    PrintLine("        present:  %u", physical_device->queue_families.present);
-    PrintLine();
-    LogMemoryTypes(&physical_device->mem_properties, 2);
-    LogDeviceFeatures(&physical_device->features);
 }

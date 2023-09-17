@@ -1,7 +1,6 @@
 #ifndef DEFS_3D_H
 #define DEFS_3D_H
 
-#define USE_GL_INSTANCE_INDEX 0xFFFFFFFF
 #define MAX_ENTITIES 2048//262144
 #define MAX_TEXTURES 3
 

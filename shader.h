@@ -6,11 +6,12 @@ struct Shader
     VkShaderStageFlagBits stage;
 };
 
-/// Utils
+/// Interface
 ////////////////////////////////////////////////////////////
-static VkShaderModule LoadShaderModule(Stack* temp_stack, const char* path)
+static void InitShader(Shader* shader, Stack* temp_stack, const char* path, VkShaderStageFlagBits stage)
 {
     Stack frame = CreateFrame(temp_stack);
+
     Array<uint32>* bytecode = ReadFile<uint32>(&frame.allocator, path);
     VkShaderModuleCreateInfo info =
     {
@@ -20,23 +21,16 @@ static VkShaderModule LoadShaderModule(Stack* temp_stack, const char* path)
         .codeSize = ByteSize(bytecode),
         .pCode    = bytecode->data,
     };
-
-    VkShaderModule module = VK_NULL_HANDLE;
-    VkResult res = vkCreateShaderModule(global_ctx.device, &info, NULL, &module);
+    VkResult res = vkCreateShaderModule(GetDevice(), &info, NULL, &shader->module);
     Validate(res, "vkCreateShaderModule() failed");
 
-    return module;
+    shader->stage = stage;
 }
 
-/// Interface
-////////////////////////////////////////////////////////////
 static Shader* CreateShader(const Allocator* allocator, Stack* temp_stack, const char* path,
                             VkShaderStageFlagBits stage)
 {
     auto shader = Allocate<Shader>(allocator, 1);
-
-    shader->module = LoadShaderModule(temp_stack, path);
-    shader->stage  = stage;
-
+    InitShader(shader, temp_stack, path, stage);
     return shader;
 }

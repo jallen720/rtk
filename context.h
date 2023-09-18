@@ -889,6 +889,11 @@ static VkSurfaceCapabilitiesKHR GetSurfaceCapabilities()
     return capabilities;
 }
 
+static uint32 GetFrameCount()
+{
+    return global_ctx.frames.size;
+}
+
 static void BeginTempCommandBuffer()
 {
     VkCommandBufferBeginInfo info =

@@ -172,12 +172,10 @@ static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, F
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static RenderTarget* CreateRenderTarget(const Allocator* allocator, Stack* temp_stack, FreeList* free_list,
-                                        RenderTargetInfo* info)
+static void InitRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list,
+                             RenderTargetInfo* info)
 {
     Stack frame = CreateFrame(temp_stack);
-
-    auto render_target = Allocate<RenderTarget>(allocator, 1);
 
     render_target->depth_testing = info->depth_testing;
 
@@ -245,7 +243,13 @@ static RenderTarget* CreateRenderTarget(const Allocator* allocator, Stack* temp_
 
     // Create depth images and framebuffers based on swapchain extent.
     CreateRenderTarget(render_target, &frame, free_list);
+}
 
+static RenderTarget* CreateRenderTarget(const Allocator* allocator, Stack* temp_stack, FreeList* free_list,
+                                        RenderTargetInfo* info)
+{
+    auto render_target = Allocate<RenderTarget>(allocator, 1);
+    InitRenderTarget(render_target, temp_stack, free_list, info);
     return render_target;
 }
 

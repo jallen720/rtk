@@ -236,7 +236,10 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .depth_testing = false,
         .render_target = rs->render_target,
     };
-    ShaderDataSet* shader_data_sets[] = { rs->shader_data_set };
+    ShaderDataSet* shader_data_sets[] =
+    {
+        rs->shader_data_set,
+    };
     VkPushConstantRange push_constant_ranges[] =
     {
         {

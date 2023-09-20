@@ -36,10 +36,8 @@ namespace RTK
 #include "rtk/device_features.h"
 #include "rtk/context.h"
 #include "rtk/buffer.h"
-#include "rtk/buffer_2.h"
 #include "rtk/image.h"
 #include "rtk/mesh.h"
-#include "rtk/mesh_2.h"
 #include "rtk/shader.h"
 #include "rtk/shader_data.h"
 #include "rtk/shader_data_2.h"
@@ -47,6 +45,7 @@ namespace RTK
 #include "rtk/pipeline.h"
 #include "rtk/pipeline_2.h"
 #include "rtk/rendering.h"
+#include "rtk/rendering_2.h"
 #include "rtk/frame_metrics.h"
 
 }

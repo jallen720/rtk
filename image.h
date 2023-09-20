@@ -228,20 +228,15 @@ static void DestroyImageData(ImageData* image_data)
     *image_data = {};
 }
 
-static void LoadImageData2(ImageHnd image_hnd, Buffer2* image_data_buffer, const char* path)
+static void LoadImageData(ImageHnd image_hnd, Buffer* image_data_buffer, const char* path)
 {
     VkImage image = GetImage(image_hnd);
 
     // Load image data and write to staging buffer.
     ImageData image_data = {};
-    image_data.data = stbi_load(path, &image_data.width, &image_data.height, &image_data.channel_count, 0);
-    if (image_data.data == NULL)
-    {
-        CTK_FATAL("failed to load image data from path '%s'", path);
-    }
-    image_data.size = image_data.width * image_data.height * image_data.channel_count;
-    WriteHostBuffer2(image_data_buffer, image_data.data, (VkDeviceSize)image_data.size);
-    stbi_image_free(image_data.data);
+    LoadImageData(&image_data, path);
+    WriteHostBuffer(image_data_buffer, image_data.data, (VkDeviceSize)image_data.size);
+    DestroyImageData(&image_data);
 
     // Copy image data from buffer memory to image memory.
     BeginTempCommandBuffer();

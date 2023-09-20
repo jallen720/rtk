@@ -2,7 +2,7 @@
 ////////////////////////////////////////////////////////////
 struct BufferShaderDataInfo
 {
-    DeviceStack* stack;
+    BufferStack* stack;
     VkDeviceSize size;
 };
 

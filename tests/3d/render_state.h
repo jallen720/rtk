@@ -60,8 +60,8 @@ struct RenderState
     job;
 
     // Memory
-    DeviceStack device_stack;
-    DeviceStack host_stack;
+    BufferStack device_stack;
+    BufferStack host_stack;
     Buffer      staging_buffer;
 
     // Resources
@@ -113,7 +113,7 @@ static RenderState global_rs;
 ////////////////////////////////////////////////////////////
 static void InitDeviceMemory()
 {
-    DeviceStackInfo host_stack_info =
+    BufferStackInfo host_stack_info =
     {
         .size               = Megabyte32<64>(),
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -123,9 +123,9 @@ static void InitDeviceMemory()
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    InitDeviceStack(&global_rs.host_stack, &host_stack_info);
+    InitBufferStack(&global_rs.host_stack, &host_stack_info);
 
-    DeviceStackInfo device_stack_info =
+    BufferStackInfo device_stack_info =
     {
         .size               = Megabyte32<64>(),
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -134,7 +134,7 @@ static void InitDeviceMemory()
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    InitDeviceStack(&global_rs.device_stack, &device_stack_info);
+    InitBufferStack(&global_rs.device_stack, &device_stack_info);
 
     InitBuffer(&global_rs.staging_buffer, &global_rs.host_stack, Megabyte32<4>());
 }

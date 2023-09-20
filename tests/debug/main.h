@@ -25,8 +25,8 @@ namespace TestDebug
 struct RenderState
 {
 #ifdef USE_ORIGINAL
-    DeviceStack*   host_stack;
-    DeviceStack*   device_stack;
+    BufferStack*   host_stack;
+    BufferStack*   device_stack;
     Buffer*        staging_buffer;
     RenderTarget*  render_target;
     ShaderData*    textures;
@@ -38,18 +38,19 @@ struct RenderState
     MeshData*      mesh_data;
     Mesh*          quad_mesh;
 #else
-    BufferStack2    host_stack;
-    BufferStack2    device_stack;
-    Buffer2         staging_buffer;
+    BufferStack     host_stack;
+    BufferStack     device_stack;
+    Buffer          staging_buffer;
     RenderTarget    render_target;
-    Array<Buffer2>  entity_buffer;
+    Array<Buffer>   entity_buffer;
     Array<ImageHnd> textures;
+    VkSampler       texture_sampler;
     DescriptorSet   descriptor_set;
     Shader          vert_shader;
     Shader          frag_shader;
     Pipeline        pipeline;
-    MeshData2       mesh_data;
-    Mesh2           quad_mesh;
+    MeshData        mesh_data;
+    Mesh            quad_mesh;
 #endif
 };
 
@@ -93,7 +94,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
 
 #ifdef USE_ORIGINAL
     // Device Memory
-    DeviceStackInfo host_stack_info =
+    BufferStackInfo host_stack_info =
     {
         .size               = Megabyte32<16>(),
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -103,8 +104,8 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    rs->host_stack = CreateDeviceStack(&perm_stack->allocator, &host_stack_info);
-    DeviceStackInfo device_stack_info =
+    rs->host_stack = CreateBufferStack(&perm_stack->allocator, &host_stack_info);
+    BufferStackInfo device_stack_info =
     {
         .size               = Megabyte32<16>(),
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -113,7 +114,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    rs->device_stack = CreateDeviceStack(&perm_stack->allocator, &device_stack_info);
+    rs->device_stack = CreateBufferStack(&perm_stack->allocator, &device_stack_info);
     rs->staging_buffer = CreateBuffer(&perm_stack->allocator, rs->host_stack, Megabyte32<4>());
 
     // Image State
@@ -287,7 +288,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
                                          rs->staging_buffer);
     }
 #else
-    BufferStackInfo2 device_stack_info =
+    BufferStackInfo device_stack_info =
     {
         .size               = Megabyte32<16>(),
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -296,8 +297,8 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    InitBufferStack2(&rs->device_stack, &device_stack_info);
-    BufferStackInfo2 host_stack_info =
+    InitBufferStack(&rs->device_stack, &device_stack_info);
+    BufferStackInfo host_stack_info =
     {
         .size               = Megabyte32<16>(),
         .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
@@ -307,8 +308,8 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    InitBufferStack2(&rs->host_stack, &host_stack_info);
-    InitBuffer2(&rs->staging_buffer, &rs->host_stack, Megabyte32<4>());
+    InitBufferStack(&rs->host_stack, &host_stack_info);
+    InitBuffer(&rs->staging_buffer, &rs->host_stack, Megabyte32<4>());
 
     // Render Target
     VkClearValue attachment_clear_values[] = { { .color = { 0.0f, 0.1f, 0.2f, 1.0f } } };
@@ -393,16 +394,16 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     InitPipeline2(&rs->pipeline, &frame, free_list, &pipeline_info, &pipeline_layout_info);
 
     // Meshes
-    MeshDataInfo2 mesh_data_info =
+    MeshDataInfo mesh_data_info =
     {
         .vertex_buffer_size = Megabyte32<1>(),
         .index_buffer_size  = Megabyte32<1>(),
     };
-    InitMeshData2(&rs->mesh_data, &rs->device_stack, &mesh_data_info);
+    InitMeshData(&rs->mesh_data, &rs->device_stack, &mesh_data_info);
     {
         #include "rtk/meshes/quad.h"
-        InitDeviceMesh2(&rs->quad_mesh, &rs->mesh_data, CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                        &rs->staging_buffer);
+        InitDeviceMesh(&rs->quad_mesh, &rs->mesh_data, CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                       &rs->staging_buffer);
     }
 
     // Descriptor Data
@@ -411,10 +412,33 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     InitArrayFull(&rs->entity_buffer, &perm_stack->allocator, GetFrameCount());
     for (uint32 i = 0; i < rs->entity_buffer.size; ++i)
     {
-        InitBuffer2(GetPtr(&rs->entity_buffer, i), &rs->host_stack, sizeof(EntityBuffer));
+        InitBuffer(GetPtr(&rs->entity_buffer, i), &rs->host_stack, sizeof(EntityBuffer));
     }
 
     // Textures
+    VkSamplerCreateInfo texture_sampler_info =
+    {
+        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext                   = NULL,
+        .flags                   = 0,
+        .magFilter               = VK_FILTER_NEAREST,
+        .minFilter               = VK_FILTER_NEAREST,
+        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .mipLodBias              = 0.0f,
+        .anisotropyEnable        = VK_FALSE,
+        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+        .compareEnable           = VK_FALSE,
+        .compareOp               = VK_COMPARE_OP_ALWAYS,
+        .minLod                  = 0.0f,
+        .maxLod                  = 0.0f,
+        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+    };
+    rs->texture_sampler = CreateSampler(&texture_sampler_info);
+
     InitImageState(&perm_stack->allocator, 8);
     InitArray(&rs->textures, &perm_stack->allocator, TEXTURE_COUNT);
     VkImageCreateInfo texture_create_info =
@@ -448,7 +472,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
-        LoadImageData2(Get(&rs->textures, i), &rs->staging_buffer, TEXTURE_IMAGE_PATHS[i]);
+        LoadImageData(Get(&rs->textures, i), &rs->staging_buffer, TEXTURE_IMAGE_PATHS[i]);
     }
 #endif
 
@@ -535,7 +559,7 @@ static void Run()
     #ifdef USE_ORIGINAL
         entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffer, frame_index, 0u); // <- How has this been working?
     #else
-        entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, frame_index);
+        entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, frame_index)->mapped_mem;
     #endif
         for (uint32 i = 0; i < ENTITY_COUNT; ++i)
         {
@@ -546,7 +570,10 @@ static void Run()
     }
 
 #ifndef USE_ORIGINAL
-    BindBuffers(&rs->descriptor_set, temp_stack, rs->textures, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    BindImages(&rs->descriptor_set, temp_stack, rs->textures, rs->texture_sampler, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+        Buffer* entity_buffer_descriptor_data[] = { GetPtr(&rs->entity_buffer, GetFrameIndex()) };
+        BindBuffers(&rs->descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer_descriptor_data), 0, 0,
+                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 #endif
 
     for (;;)
@@ -578,7 +605,7 @@ static void Run()
 #ifdef USE_ORIGINAL
 entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffer, GetFrameIndex(), 0u); // <- How has this been working?
 #else
-entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, GetFrameIndex());
+entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, GetFrameIndex())->mapped_mem;
 #endif
 static float32 x = 0.0f;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
@@ -597,12 +624,7 @@ if (KeyDown(KEY_F))
     }
 }
 
-#ifndef USE_ORIGINAL
-        Buffer2* entity_buffer[] = { GetPtr(&rs->entity_buffer, GetFrameIndex()) };
-        BindBuffers(&rs->descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer), 0, 0,
-                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-#endif
-
+#ifdef USE_ORIGINAL
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
             BindPipeline(command_buffer, rs->pipeline);
             BindShaderDataSet(command_buffer, rs->shader_data_set, rs->pipeline, 0);
@@ -611,6 +633,25 @@ if (KeyDown(KEY_F))
         EndRenderCommands(command_buffer);
 
         SubmitRenderCommands(rs->render_target);
+#else
+        // Buffer* entity_buffer_descriptor_data[] = { GetPtr(&rs->entity_buffer, GetFrameIndex()) };
+        // BindBuffers(&rs->descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer_descriptor_data), 0, 0,
+        //             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+
+        DescriptorSet* descriptor_sets[] =
+        {
+            &rs->descriptor_set,
+        };
+        VkCommandBuffer command_buffer = BeginRenderCommands(&rs->render_target, 0);
+            BindPipeline(command_buffer, &rs->pipeline);
+            BindDescriptorSets(command_buffer, &rs->pipeline, temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
+            BindMeshData(command_buffer, &rs->mesh_data);
+            DrawMesh(command_buffer, &rs->quad_mesh, 0, ENTITY_COUNT);
+        EndRenderCommands(command_buffer);
+
+        SubmitRenderCommands(&rs->render_target);
+#endif
+
     }
 }
 

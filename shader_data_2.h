@@ -37,7 +37,7 @@ static void InitDescriptorSet(DescriptorSet* descriptor_set, Array<VkDescriptorS
     Validate(res, "vkAllocateDescriptorSets() failed");
 }
 
-static void BindBuffers(DescriptorSet* descriptor_set, Stack* temp_stack, Array<Buffer2*> buffers, uint32 binding,
+static void BindBuffers(DescriptorSet* descriptor_set, Stack* temp_stack, Array<Buffer*> buffers, uint32 binding,
                         uint32 offset, VkDescriptorType type)
 {
     Stack frame = CreateFrame(temp_stack);
@@ -46,7 +46,7 @@ static void BindBuffers(DescriptorSet* descriptor_set, Stack* temp_stack, Array<
     InitArray(&buffer_infos, &frame.allocator, buffers.count);
     for (uint32 i = 0; i < buffers.count; ++i)
     {
-        Buffer2* buffer = Get(&buffers, i);
+        Buffer* buffer = Get(&buffers, i);
         Push(&buffer_infos,
         {
             .buffer = buffer->hnd,

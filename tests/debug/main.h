@@ -556,11 +556,11 @@ static void Run()
     static constexpr float32 SCALE = 2.0f / ENTITY_COUNT;
     for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
     {
-    #ifdef USE_ORIGINAL
+#ifdef USE_ORIGINAL
         entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffer, frame_index, 0u); // <- How has this been working?
-    #else
+#else
         entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, frame_index)->mapped_mem;
-    #endif
+#endif
         for (uint32 i = 0; i < ENTITY_COUNT; ++i)
         {
             entity_buffer->positions[i] = { SCALE * i, SCALE * i, 0, 1 };

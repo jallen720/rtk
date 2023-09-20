@@ -17,7 +17,7 @@
 using namespace CTK;
 using namespace RTK;
 
-#define USE_ORIGINAL
+// #define USE_ORIGINAL
 
 namespace TestDebug
 {
@@ -70,6 +70,7 @@ static constexpr const char* TEXTURE_IMAGE_PATHS[] =
 static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
 static_assert(TEXTURE_COUNT == MAX_TEXTURES);
 
+#ifdef USE_ORIGINAL
 static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
 {
     // Load image data and write to staging buffer.
@@ -85,12 +86,11 @@ static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_bu
         WriteToShaderDataImage(sd, 0, index, staging_buffer);
     }
 }
+#endif
 
-static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
+static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
     Stack frame = CreateFrame(temp_stack);
-
-    auto rs = Allocate<RenderState>(perm_stack, 1);
 
 #ifdef USE_ORIGINAL
     // Device Memory
@@ -324,13 +324,11 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     VkDescriptorSetLayoutBinding bindings[] =
     {
         {
-            .binding         = 0,
             .descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptorCount = 1,
             .stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         },
         {
-            .binding         = 1,
             .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = TEXTURE_COUNT,
             .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
@@ -475,8 +473,6 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
         LoadImageData(Get(&rs->textures, i), &rs->staging_buffer, TEXTURE_IMAGE_PATHS[i]);
     }
 #endif
-
-    return rs;
 }
 
 static void Run()
@@ -547,7 +543,8 @@ static void Run()
     ///
     /// Test
     ///
-    RenderState* rs = CreateRenderState(perm_stack, temp_stack, free_list);
+    RenderState rs = {};
+    InitRenderState(&rs, perm_stack, temp_stack, free_list);
 
     // Initialize entities.
     EntityBuffer* entity_buffer = NULL;
@@ -557,9 +554,9 @@ static void Run()
     for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
     {
 #ifdef USE_ORIGINAL
-        entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffer, frame_index, 0u); // <- How has this been working?
+        entity_buffer = GetBufferMem<EntityBuffer>(rs.entity_buffer, frame_index, 0u); // <- How has this been working?
 #else
-        entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, frame_index)->mapped_mem;
+        entity_buffer = (EntityBuffer*)GetPtr(&rs.entity_buffer, frame_index)->mapped_mem;
 #endif
         for (uint32 i = 0; i < ENTITY_COUNT; ++i)
         {
@@ -570,10 +567,10 @@ static void Run()
     }
 
 #ifndef USE_ORIGINAL
-    BindImages(&rs->descriptor_set, temp_stack, rs->textures, rs->texture_sampler, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-        Buffer* entity_buffer_descriptor_data[] = { GetPtr(&rs->entity_buffer, GetFrameIndex()) };
-        BindBuffers(&rs->descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer_descriptor_data), 0, 0,
-                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    BindImages(&rs.descriptor_set, temp_stack, rs.textures, rs.texture_sampler, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    Buffer* entity_buffer_descriptor_data[] = { GetPtr(&rs.entity_buffer, GetFrameIndex()) };
+    BindBuffers(&rs.descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer_descriptor_data), 0, 0,
+                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 #endif
 
     for (;;)
@@ -603,9 +600,9 @@ static void Run()
         }
 
 #ifdef USE_ORIGINAL
-entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffer, GetFrameIndex(), 0u); // <- How has this been working?
+entity_buffer = GetBufferMem<EntityBuffer>(rs.entity_buffer, GetFrameIndex(), 0u); // <- How has this been working?
 #else
-entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, GetFrameIndex())->mapped_mem;
+entity_buffer = (EntityBuffer*)GetPtr(&rs.entity_buffer, GetFrameIndex())->mapped_mem;
 #endif
 static float32 x = 0.0f;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
@@ -625,31 +622,31 @@ if (KeyDown(KEY_F))
 }
 
 #ifdef USE_ORIGINAL
-        VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
-            BindPipeline(command_buffer, rs->pipeline);
-            BindShaderDataSet(command_buffer, rs->shader_data_set, rs->pipeline, 0);
-            BindMeshData(command_buffer, rs->mesh_data);
-            DrawMesh(command_buffer, rs->quad_mesh, 0, ENTITY_COUNT);
+        VkCommandBuffer command_buffer = BeginRenderCommands(rs.render_target, 0);
+            BindPipeline(command_buffer, rs.pipeline);
+            BindShaderDataSet(command_buffer, rs.shader_data_set, rs.pipeline, 0);
+            BindMeshData(command_buffer, rs.mesh_data);
+            DrawMesh(command_buffer, rs.quad_mesh, 0, ENTITY_COUNT);
         EndRenderCommands(command_buffer);
 
-        SubmitRenderCommands(rs->render_target);
+        SubmitRenderCommands(rs.render_target);
 #else
-        // Buffer* entity_buffer_descriptor_data[] = { GetPtr(&rs->entity_buffer, GetFrameIndex()) };
-        // BindBuffers(&rs->descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer_descriptor_data), 0, 0,
+        // Buffer* entity_buffer_descriptor_data[] = { GetPtr(&rs.entity_buffer, GetFrameIndex()) };
+        // BindBuffers(&rs.descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer_descriptor_data), 0, 0,
         //             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
         DescriptorSet* descriptor_sets[] =
         {
-            &rs->descriptor_set,
+            &rs.descriptor_set,
         };
-        VkCommandBuffer command_buffer = BeginRenderCommands(&rs->render_target, 0);
-            BindPipeline(command_buffer, &rs->pipeline);
-            BindDescriptorSets(command_buffer, &rs->pipeline, temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
-            BindMeshData(command_buffer, &rs->mesh_data);
-            DrawMesh(command_buffer, &rs->quad_mesh, 0, ENTITY_COUNT);
+        VkCommandBuffer command_buffer = BeginRenderCommands(&rs.render_target, 0);
+            BindPipeline(command_buffer, &rs.pipeline);
+            BindDescriptorSets(command_buffer, &rs.pipeline, temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
+            BindMeshData(command_buffer, &rs.mesh_data);
+            DrawMesh(command_buffer, &rs.quad_mesh, 0, ENTITY_COUNT);
         EndRenderCommands(command_buffer);
 
-        SubmitRenderCommands(&rs->render_target);
+        SubmitRenderCommands(&rs.render_target);
 #endif
 
     }

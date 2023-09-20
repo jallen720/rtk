@@ -13,6 +13,12 @@ static void InitDescriptorSet(DescriptorSet* descriptor_set, Array<VkDescriptorS
     VkResult res = VK_SUCCESS;
     VkDevice device = GetDevice();
 
+    // Set all binding indexes to their index in the array.
+    for (uint32 i = 0; i < bindings.count; ++i)
+    {
+        GetPtr(&bindings, i)->binding = i;
+    }
+
     VkDescriptorSetLayoutCreateInfo layout_info =
     {
         .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,

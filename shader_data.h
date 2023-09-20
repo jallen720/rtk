@@ -98,14 +98,14 @@ static Type* GetBufferMem(ShaderData* shader_data, uint32 instance_index, uint32
     CTK_ASSERT(shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                shader_data->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC);
 
-    uint32 instance_offset = instance_index * shader_data->count;
+    uint32 instance_offset = (shader_data->per_frame ? instance_index : 0) * shader_data->count;
     return (Type*)GetPtr(&shader_data->buffers, instance_offset + index)->mapped_mem;
 }
 
 template<typename Type>
 static Type* GetCurrentFrameBufferMem(ShaderData* shader_data, uint32 index)
 {
-    return GetBufferMem<Type>(shader_data, global_ctx.frames.index, index);
+    return GetBufferMem<Type>(shader_data, GetFrameIndex(), index);
 }
 
 static void

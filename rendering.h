@@ -65,7 +65,7 @@ static void BindShaderDataSet(VkCommandBuffer command_buffer, ShaderDataSet* sha
 {
     VkDescriptorSet descriptor_sets[] =
     {
-        Get(&shader_data_set->instances, global_ctx.frames.index)
+        Get(&shader_data_set->instances, GetFrameIndex())
     };
     vkCmdBindDescriptorSets(command_buffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,

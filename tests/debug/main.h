@@ -17,11 +17,14 @@
 using namespace CTK;
 using namespace RTK;
 
+#define USE_ORIGINAL
+
 namespace TestDebug
 {
 
 struct RenderState
 {
+#ifdef USE_ORIGINAL
     DeviceStack*   host_stack;
     DeviceStack*   device_stack;
     Buffer*        staging_buffer;
@@ -34,6 +37,20 @@ struct RenderState
     Pipeline*      pipeline;
     MeshData*      mesh_data;
     Mesh*          quad_mesh;
+#else
+    BufferStack2    host_stack;
+    BufferStack2    device_stack;
+    Buffer2         staging_buffer;
+    RenderTarget    render_target;
+    Array<Buffer2>  entity_buffer;
+    Array<ImageHnd> textures;
+    DescriptorSet   descriptor_set;
+    Shader          vert_shader;
+    Shader          frag_shader;
+    Pipeline        pipeline;
+    MeshData2       mesh_data;
+    Mesh2           quad_mesh;
+#endif
 };
 
 struct EntityBuffer
@@ -74,6 +91,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
 
     auto rs = Allocate<RenderState>(perm_stack, 1);
 
+#ifdef USE_ORIGINAL
     // Device Memory
     DeviceStackInfo host_stack_info =
     {
@@ -115,7 +133,7 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
     {
         .stages    = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        .per_frame = false,
+        .per_frame = true,
         .count     = 1,
         .buffer =
         {
@@ -268,6 +286,171 @@ static RenderState* CreateRenderState(Stack* perm_stack, Stack* temp_stack, Free
                                          CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
                                          rs->staging_buffer);
     }
+#else
+    BufferStackInfo2 device_stack_info =
+    {
+        .size               = Megabyte32<16>(),
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    InitBufferStack2(&rs->device_stack, &device_stack_info);
+    BufferStackInfo2 host_stack_info =
+    {
+        .size               = Megabyte32<16>(),
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                              VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    };
+    InitBufferStack2(&rs->host_stack, &host_stack_info);
+    InitBuffer2(&rs->staging_buffer, &rs->host_stack, Megabyte32<4>());
+
+    // Render Target
+    VkClearValue attachment_clear_values[] = { { .color = { 0.0f, 0.1f, 0.2f, 1.0f } } };
+    RenderTargetInfo rt_info =
+    {
+        .depth_testing           = false,
+        .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
+    };
+    InitRenderTarget(&rs->render_target, &frame, free_list, &rt_info);
+
+    // Descriptor Set
+    VkDescriptorSetLayoutBinding bindings[] =
+    {
+        {
+            .binding         = 0,
+            .descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = 1,
+            .stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        },
+        {
+            .binding         = 1,
+            .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = TEXTURE_COUNT,
+            .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
+        },
+    };
+    InitDescriptorSet(&rs->descriptor_set, CTK_WRAP_ARRAY(bindings));
+
+    // Shaders
+    InitShader(&rs->vert_shader, &frame, "shaders/bin/debug.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    InitShader(&rs->frag_shader, &frame, "shaders/bin/debug.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    // Pipeline
+    Shader* shaders[] =
+    {
+        &rs->vert_shader,
+        &rs->frag_shader,
+    };
+    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
+    VkViewport viewports[] =
+    {
+        {
+            .x        = 0,
+            .y        = 0,
+            .width    = (float32)swapchain_extent.width,
+            .height   = (float32)swapchain_extent.height,
+            .minDepth = 0,
+            .maxDepth = 1
+        },
+    };
+    VertexLayout vertex_layout = {};
+    InitArray(&vertex_layout.bindings, &frame.allocator, 1);
+    PushBinding(&vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
+    InitArray(&vertex_layout.attributes, &frame.allocator, 2);
+    PushAttribute(&vertex_layout, 3, ATTRIBUTE_TYPE_FLOAT32); // Position
+    PushAttribute(&vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // UV
+    PipelineInfo pipeline_info =
+    {
+        .shaders       = CTK_WRAP_ARRAY(shaders),
+        .viewports     = CTK_WRAP_ARRAY(viewports),
+        .vertex_layout = &vertex_layout,
+        .depth_testing = false,
+        .render_target = &rs->render_target,
+    };
+    VkDescriptorSetLayout descriptor_set_layouts[] =
+    {
+        rs->descriptor_set.layout,
+    };
+    VkPushConstantRange push_constant_ranges[] =
+    {
+        {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset     = 0,
+            .size       = sizeof(uint32),
+        },
+    };
+    PipelineLayoutInfo2 pipeline_layout_info =
+    {
+        .descriptor_set_layouts = CTK_WRAP_ARRAY(descriptor_set_layouts),
+        .push_constant_ranges   = CTK_WRAP_ARRAY(push_constant_ranges),
+    };
+    InitPipeline2(&rs->pipeline, &frame, free_list, &pipeline_info, &pipeline_layout_info);
+
+    // Meshes
+    MeshDataInfo2 mesh_data_info =
+    {
+        .vertex_buffer_size = Megabyte32<1>(),
+        .index_buffer_size  = Megabyte32<1>(),
+    };
+    InitMeshData2(&rs->mesh_data, &rs->device_stack, &mesh_data_info);
+    {
+        #include "rtk/meshes/quad.h"
+        InitDeviceMesh2(&rs->quad_mesh, &rs->mesh_data, CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                        &rs->staging_buffer);
+    }
+
+    // Descriptor Data
+
+    // Entity Buffer
+    InitArrayFull(&rs->entity_buffer, &perm_stack->allocator, GetFrameCount());
+    for (uint32 i = 0; i < rs->entity_buffer.size; ++i)
+    {
+        InitBuffer2(GetPtr(&rs->entity_buffer, i), &rs->host_stack, sizeof(EntityBuffer));
+    }
+
+    // Textures
+    InitImageState(&perm_stack->allocator, 8);
+    InitArray(&rs->textures, &perm_stack->allocator, TEXTURE_COUNT);
+    VkImageCreateInfo texture_create_info =
+    {
+        .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .pNext     = NULL,
+        .flags     = 0,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format    = GetSwapchain()->surface_format.format,
+        .extent =
+        {
+            .width  = 64,
+            .height = 32,
+            .depth  = 1
+        },
+        .mipLevels             = 1,
+        .arrayLayers           = 1,
+        .samples               = VK_SAMPLE_COUNT_1_BIT,
+        .tiling                = VK_IMAGE_TILING_OPTIMAL,
+        .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                 VK_IMAGE_USAGE_SAMPLED_BIT,
+        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices   = NULL,
+        .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        Push(&rs->textures, CreateImage(&texture_create_info));
+    }
+    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        LoadImageData2(Get(&rs->textures, i), &rs->staging_buffer, TEXTURE_IMAGE_PATHS[i]);
+    }
+#endif
 
     return rs;
 }
@@ -343,16 +526,28 @@ static void Run()
     RenderState* rs = CreateRenderState(perm_stack, temp_stack, free_list);
 
     // Initialize entities.
-    auto entity_buffer = GetCurrentFrameBufferMem<EntityBuffer>(rs->entity_buffer, 0u);
+    EntityBuffer* entity_buffer = NULL;
     static constexpr uint32 ENTITY_COUNT = MAX_ENTITIES;
     static_assert(ENTITY_COUNT <= MAX_ENTITIES);
     static constexpr float32 SCALE = 2.0f / ENTITY_COUNT;
-    for (uint32 i = 0; i < ENTITY_COUNT; ++i)
+    for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
     {
-        entity_buffer->positions[i] = { SCALE * i, SCALE * i, 0, 1 };
-        entity_buffer->scales[i] = SCALE;
-        entity_buffer->texture_indexes[i] = i % TEXTURE_COUNT;
+    #ifdef USE_ORIGINAL
+        entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffer, frame_index, 0u); // <- How has this been working?
+    #else
+        entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, frame_index);
+    #endif
+        for (uint32 i = 0; i < ENTITY_COUNT; ++i)
+        {
+            entity_buffer->positions[i] = { SCALE * i, SCALE * i, 0, 1 };
+            entity_buffer->scales[i] = SCALE;
+            entity_buffer->texture_indexes[i] = i % TEXTURE_COUNT;
+        }
     }
+
+#ifndef USE_ORIGINAL
+    BindBuffers(&rs->descriptor_set, temp_stack, rs->textures, 0, 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+#endif
 
     for (;;)
     {
@@ -380,6 +575,11 @@ static void Run()
             CTK_FATAL("next_frame_result != VK_SUCCESS");
         }
 
+#ifdef USE_ORIGINAL
+entity_buffer = GetBufferMem<EntityBuffer>(rs->entity_buffer, GetFrameIndex(), 0u); // <- How has this been working?
+#else
+entity_buffer = (EntityBuffer*)GetPtr(&rs->entity_buffer, GetFrameIndex());
+#endif
 static float32 x = 0.0f;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 {
@@ -396,6 +596,12 @@ if (KeyDown(KEY_F))
         x += 0.005f;
     }
 }
+
+#ifndef USE_ORIGINAL
+        Buffer2* entity_buffer[] = { GetPtr(&rs->entity_buffer, GetFrameIndex()) };
+        BindBuffers(&rs->descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer), 0, 0,
+                    VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+#endif
 
         VkCommandBuffer command_buffer = BeginRenderCommands(rs->render_target, 0);
             BindPipeline(command_buffer, rs->pipeline);

@@ -894,6 +894,11 @@ static uint32 GetFrameCount()
     return global_ctx.frames.size;
 }
 
+static uint32 GetFrameIndex()
+{
+    return global_ctx.frames.index;
+}
+
 static void BeginTempCommandBuffer()
 {
     VkCommandBufferBeginInfo info =

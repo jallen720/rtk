@@ -1,8 +1,11 @@
 /// Data
 ////////////////////////////////////////////////////////////
+static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
+
 struct BufferStackInfo
 {
     VkDeviceSize          size;
+    VkDeviceSize          offset_alignment;
     VkBufferUsageFlags    usage_flags;
     VkMemoryPropertyFlags mem_property_flags;
 };
@@ -14,6 +17,20 @@ struct BufferStack
     VkDeviceSize   size;
     VkDeviceSize   index;
     uint8*         mapped_mem;
+};
+
+enum struct BufferType
+{
+    BUFFER,
+    UNIFORM,
+    STORAGE,
+};
+
+struct BufferInfo
+{
+    BufferType   type;
+    VkDeviceSize size;
+    VkDeviceSize offset_alignment;
 };
 
 struct Buffer
@@ -29,6 +46,7 @@ struct Buffer
 ////////////////////////////////////////////////////////////
 static void InitBufferStack(BufferStack* buffer_stack, BufferStackInfo* info)
 {
+    PhysicalDevice* physical_device = GetPhysicalDevice();
     VkDevice device = GetDevice();
     VkResult res = VK_SUCCESS;
 
@@ -38,7 +56,7 @@ static void InitBufferStack(BufferStack* buffer_stack, BufferStackInfo* info)
     create_info.usage = info->usage_flags;
 
     // Check if sharing mode needs to be concurrent due to separate graphics & present queue families.
-    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
+    QueueFamilies* queue_families = &physical_device->queue_families;
     if (queue_families->graphics != queue_families->present)
     {
         create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
@@ -81,31 +99,40 @@ static BufferStack* CreateBufferStack(const Allocator* allocator, BufferStackInf
     return buffer_stack;
 }
 
-static void InitBuffer(Buffer* buffer, BufferStack* buffer_stack, VkDeviceSize size)
+static void InitBuffer(Buffer* buffer, BufferStack* buffer_stack, BufferInfo* info)
 {
-    CTK_TODO("fix to align buffer-stack index (should be named offset) before allocation instead of using aligned size");
-    VkDeviceSize min_offset_alignment = global_ctx.physical_device->properties.limits.minUniformBufferOffsetAlignment;
-    VkDeviceSize aligned_size = MultipleOf(size, min_offset_alignment);
+    PhysicalDevice* physical_device = GetPhysicalDevice();
 
-    if (buffer_stack->index + aligned_size > buffer_stack->size)
+    VkDeviceSize offset_alignment = info->offset_alignment;
+    if (info->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
-        CTK_FATAL("can't sub-allocate %u-byte buffer for from buffer-stack at index %u: allocation would exceed "
-                  "buffer-stack size of %u", aligned_size, buffer_stack->index, buffer_stack->size);
+        info->offset_alignment =
+            info->type == BufferType::UNIFORM ? physical_device->properties.limits.minUniformBufferOffsetAlignment :
+            info->type == BufferType::STORAGE ? physical_device->properties.limits.minStorageBufferOffsetAlignment :
+            4;
+    }
+    VkDeviceSize offset_aligned_index = MultipleOf(buffer_stack->index, info->offset_alignment);
+
+    if (offset_aligned_index + info->size > buffer_stack->size)
+    {
+        CTK_FATAL("can't sub-allocate %u-byte buffer for from buffer-stack at %u-byte offset-aligned index %u: "
+                  "allocation would exceed buffer-stack size of %u",
+                  info->size, info->offset_alignment, offset_aligned_index, buffer_stack->size);
     }
 
     buffer->hnd        = buffer_stack->hnd;
-    buffer->offset     = buffer_stack->index;
-    buffer->size       = aligned_size;
+    buffer->offset     = offset_aligned_index;
+    buffer->size       = info->size;
     buffer->index      = 0;
     buffer->mapped_mem = buffer_stack->mapped_mem == NULL ? NULL : buffer_stack->mapped_mem + buffer->offset;
 
-    buffer_stack->index += aligned_size;
+    buffer_stack->index = offset_aligned_index + info->size;
 }
 
-static Buffer* CreateBuffer(const Allocator* allocator, BufferStack* buffer_stack, VkDeviceSize size)
+static Buffer* CreateBuffer(const Allocator* allocator, BufferStack* buffer_stack, BufferInfo* info)
 {
     auto buffer = Allocate<Buffer>(allocator, 1);
-    InitBuffer(buffer, buffer_stack, size);
+    InitBuffer(buffer, buffer_stack, info);
     return buffer;
 }
 

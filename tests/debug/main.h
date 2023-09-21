@@ -115,7 +115,13 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
     rs->device_stack = CreateBufferStack(&perm_stack->allocator, &device_stack_info);
-    rs->staging_buffer = CreateBuffer(&perm_stack->allocator, rs->host_stack, Megabyte32<4>());
+    BufferInfo staging_buffer_info =
+    {
+        .type             = BufferType::BUFFER,
+        .size             = Megabyte32<4>(),
+        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+    };
+    rs->staging_buffer = CreateBuffer(&perm_stack->allocator, rs->host_stack, &staging_buffer_info);
 
     // Image State
     InitImageState(&perm_stack->allocator, 8);
@@ -309,7 +315,13 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
     InitBufferStack(&rs->host_stack, &host_stack_info);
-    InitBuffer(&rs->staging_buffer, &rs->host_stack, Megabyte32<4>());
+    BufferInfo staging_buffer_info =
+    {
+        .type             = BufferType::BUFFER,
+        .size             = Megabyte32<4>(),
+        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+    };
+    InitBuffer(&rs->staging_buffer, &rs->host_stack, &staging_buffer_info);
 
     // Render Target
     VkClearValue attachment_clear_values[] = { { .color = { 0.0f, 0.1f, 0.2f, 1.0f } } };
@@ -408,9 +420,15 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
 
     // Entity Buffer
     InitArrayFull(&rs->entity_buffer, &perm_stack->allocator, GetFrameCount());
+    BufferInfo entity_buffer_info =
+    {
+        .type             = BufferType::BUFFER,
+        .size             = sizeof(EntityBuffer),
+        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+    };
     for (uint32 i = 0; i < rs->entity_buffer.size; ++i)
     {
-        InitBuffer(GetPtr(&rs->entity_buffer, i), &rs->host_stack, sizeof(EntityBuffer));
+        InitBuffer(GetPtr(&rs->entity_buffer, i), &rs->host_stack, &entity_buffer_info);
     }
 
     // Textures

@@ -23,8 +23,21 @@ struct Mesh
 ////////////////////////////////////////////////////////////
 static void InitMeshData(MeshData* mesh_data, BufferStack* buffer_stack, MeshDataInfo* info)
 {
-    InitBuffer(&mesh_data->vertex_buffer, buffer_stack, info->vertex_buffer_size);
-    InitBuffer(&mesh_data->index_buffer, buffer_stack, info->index_buffer_size);
+    BufferInfo vertex_buffer_info =
+    {
+        .type             = BufferType::BUFFER,
+        .size             = info->vertex_buffer_size,
+        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+    };
+    InitBuffer(&mesh_data->vertex_buffer, buffer_stack, &vertex_buffer_info);
+
+    BufferInfo index_buffer_info =
+    {
+        .type             = BufferType::BUFFER,
+        .size             = info->index_buffer_size,
+        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+    };
+    InitBuffer(&mesh_data->index_buffer, buffer_stack, &index_buffer_info);
 }
 
 static MeshData* CreateMeshData(const Allocator* allocator, BufferStack* buffer_stack, MeshDataInfo* info)

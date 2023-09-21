@@ -69,9 +69,15 @@ static ShaderData* CreateShaderData(const Allocator* allocator, ShaderDataInfo* 
     {
         BufferShaderDataInfo* buffer_info = &info->buffer;
         InitArray(&shader_data->buffers, allocator, total_count);
+        BufferInfo buffer_init_info =
+        {
+            .type             = BufferType::UNIFORM,
+            .size             = buffer_info->size,
+            .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+        };
         for (uint32 i = 0; i < total_count; ++i)
         {
-            InitBuffer(Push(&shader_data->buffers), buffer_info->stack, buffer_info->size);
+            InitBuffer(Push(&shader_data->buffers), buffer_info->stack, &buffer_init_info);
         }
     }
     else if (shader_data->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)

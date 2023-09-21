@@ -136,7 +136,13 @@ static void InitDeviceMemory()
     };
     InitBufferStack(&global_rs.device_stack, &device_stack_info);
 
-    InitBuffer(&global_rs.staging_buffer, &global_rs.host_stack, Megabyte32<4>());
+    BufferInfo staging_buffer_info =
+    {
+        .type             = BufferType::BUFFER,
+        .size             = Megabyte32<4>(),
+        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+    };
+    InitBuffer(&global_rs.staging_buffer, &global_rs.host_stack, &staging_buffer_info);
 }
 
 static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)

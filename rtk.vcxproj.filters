@@ -98,9 +98,6 @@
     <ClInclude Include="tests\debug\defs.h">
       <Filter>Source Files\tests\debug</Filter>
     </ClInclude>
-    <ClInclude Include="shader_data_2.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="rendering_2.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -111,6 +108,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="device_features.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="descriptor_set.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

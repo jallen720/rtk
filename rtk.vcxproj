@@ -151,6 +151,7 @@
     <ClInclude Include="buffer.h" />
     <ClInclude Include="context.h" />
     <ClInclude Include="debug.h" />
+    <ClInclude Include="descriptor_set.h" />
     <ClInclude Include="device_features.h" />
     <ClInclude Include="frame_metrics.h" />
     <ClInclude Include="image.h" />
@@ -165,7 +166,6 @@
     <ClInclude Include="rtk.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="shader_data.h" />
-    <ClInclude Include="shader_data_2.h" />
     <ClInclude Include="stb\stb_image.h" />
     <ClInclude Include="tests\3d\defs.h" />
     <ClInclude Include="tests\3d\game_state.h" />

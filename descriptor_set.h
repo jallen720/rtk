@@ -8,15 +8,15 @@ struct DescriptorSet
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitDescriptorSet(DescriptorSet* descriptor_set, Array<VkDescriptorSetLayoutBinding> bindings)
+static void InitDescriptorSet(DescriptorSet* descriptor_set, Array<VkDescriptorSetLayoutBinding> layout_bindings)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = GetDevice();
 
     // Set all binding indexes to their index in the array.
-    for (uint32 i = 0; i < bindings.count; ++i)
+    for (uint32 i = 0; i < layout_bindings.count; ++i)
     {
-        GetPtr(&bindings, i)->binding = i;
+        GetPtr(&layout_bindings, i)->binding = i;
     }
 
     VkDescriptorSetLayoutCreateInfo layout_info =
@@ -24,8 +24,8 @@ static void InitDescriptorSet(DescriptorSet* descriptor_set, Array<VkDescriptorS
         .sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
         .pNext        = NULL,
         .flags        = 0,
-        .bindingCount = bindings.count,
-        .pBindings    = bindings.data,
+        .bindingCount = layout_bindings.count,
+        .pBindings    = layout_bindings.data,
     };
     res = vkCreateDescriptorSetLayout(device, &layout_info, NULL, &descriptor_set->layout);
     Validate(res, "vkCreateDescriptorSetLayout() failed");

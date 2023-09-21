@@ -40,7 +40,7 @@ namespace RTK
 #include "rtk/mesh.h"
 #include "rtk/shader.h"
 #include "rtk/shader_data.h"
-#include "rtk/shader_data_2.h"
+#include "rtk/descriptor_set.h"
 #include "rtk/render_target.h"
 #include "rtk/pipeline.h"
 #include "rtk/pipeline_2.h"

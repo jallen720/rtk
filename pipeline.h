@@ -194,12 +194,10 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count, AttributeTyp
     ++layout->attribute_location;
 }
 
-static Pipeline* CreatePipeline(const Allocator* allocator, Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
-                                PipelineLayoutInfo* layout_info)
+static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
+                         PipelineLayoutInfo* layout_info)
 {
     Stack frame = CreateFrame(temp_stack);
-
-    auto pipeline = Allocate<Pipeline>(allocator, 1);
 
     /// Configure Pipeline
     ////////////////////////////////////////////////////////////
@@ -243,7 +241,13 @@ static Pipeline* CreatePipeline(const Allocator* allocator, Stack* temp_stack, F
     /// Create Pipeline
     ////////////////////////////////////////////////////////////
     CreatePipeline(pipeline);
+}
 
+static Pipeline* CreatePipeline(const Allocator* allocator, Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
+                                PipelineLayoutInfo* layout_info)
+{
+    auto pipeline = Allocate<Pipeline>(allocator, 1);
+    InitPipeline(pipeline, temp_stack, free_list, info, layout_info);
     return pipeline;
 }
 

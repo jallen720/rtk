@@ -332,27 +332,6 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
     return VK_FALSE;
 }
 
-static const char* VkPresentModeName(VkPresentModeKHR present_mode)
-{
-    static constexpr Pair<VkPresentModeKHR, const char*> NAMES[] =
-    {
-        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_IMMEDIATE_KHR),
-        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_MAILBOX_KHR),
-        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_FIFO_KHR),
-        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_FIFO_RELAXED_KHR),
-        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR),
-        CTK_VALUE_STRING_PAIR(VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR),
-    };
-
-    const char* name = NULL;
-    if (!FindValue(NAMES, CTK_ARRAY_SIZE(NAMES), present_mode, &name))
-    {
-        CTK_FATAL("can't find name for present mode %u", present_mode);
-    }
-
-    return name;
-}
-
 static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint32 tabs = 0)
 {
     PrintTabs(tabs);

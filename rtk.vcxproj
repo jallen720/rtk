@@ -149,12 +149,15 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="buffer.h" />
+    <ClInclude Include="buffer_2.h" />
     <ClInclude Include="context.h" />
     <ClInclude Include="debug.h" />
     <ClInclude Include="descriptor_set.h" />
+    <ClInclude Include="descriptor_set_2.h" />
     <ClInclude Include="device_features.h" />
     <ClInclude Include="frame_metrics.h" />
     <ClInclude Include="image.h" />
+    <ClInclude Include="image_2.h" />
     <ClInclude Include="mesh.h" />
     <ClInclude Include="mesh_2.h" />
     <ClInclude Include="pipeline.h" />

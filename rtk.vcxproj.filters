@@ -113,5 +113,14 @@
     <ClInclude Include="descriptor_set.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="buffer_2.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="descriptor_set_2.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="image_2.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

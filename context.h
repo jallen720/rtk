@@ -11,6 +11,7 @@
 ////////////////////////////////////////////////////////////
 static constexpr uint32 UNSET_INDEX         = UINT32_MAX;
 static constexpr uint32 MAX_DEVICE_FEATURES = sizeof(VkPhysicalDeviceFeatures) / sizeof(VkBool32);
+static constexpr uint32 MAX_FRAME_COUNT     = 4;
 
 struct InstanceInfo
 {
@@ -779,7 +780,9 @@ static void InitFrames(Stack* perm_stack)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = global_ctx.device;
+
     uint32 frame_count = global_ctx.swapchain.image_views.count + 1;
+    CTK_ASSERT(frame_count <= MAX_FRAME_COUNT);
 
     InitRingBuffer(&global_ctx.frames, &perm_stack->allocator, frame_count);
     for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)

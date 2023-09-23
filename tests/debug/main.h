@@ -17,8 +17,6 @@
 using namespace CTK;
 using namespace RTK;
 
-// #define USE_ORIGINAL
-
 namespace TestDebug
 {
 
@@ -320,6 +318,7 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .type             = BufferType::BUFFER,
         .size             = Megabyte32<4>(),
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .instance_count   = 0,
     };
     InitBuffer(&rs->staging_buffer, &rs->host_stack, &staging_buffer_info);
 
@@ -419,17 +418,14 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     // Descriptor Data
 
     // Entity Buffer
-    InitArrayFull(&rs->entity_buffer, &perm_stack->allocator, GetFrameCount());
     BufferInfo entity_buffer_info =
     {
-        .type             = BufferType::BUFFER,
+        .type             = BufferType::UNIFORM_BUFFER,
         .size             = sizeof(EntityBuffer),
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .instance_count   = GetFrameCount(),
     };
-    for (uint32 i = 0; i < rs->entity_buffer.size; ++i)
-    {
-        InitBuffer(GetPtr(&rs->entity_buffer, i), &rs->host_stack, &entity_buffer_info);
-    }
+    InitBuffer(&rs->entity_buffer, &rs->host_stack, &entity_buffer_info);
 
     // Textures
     VkSamplerCreateInfo texture_sampler_info =
@@ -572,9 +568,9 @@ static void Run()
     for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
     {
 #ifdef USE_ORIGINAL
-        entity_buffer = GetBufferMem<EntityBuffer>(rs.entity_buffer, frame_index, 0u); // <- How has this been working?
+        entity_buffer = GetBufferMem<EntityBuffer>(rs.entity_buffer, frame_index, 0u);
 #else
-        entity_buffer = (EntityBuffer*)GetPtr(&rs.entity_buffer, frame_index)->mapped_mem;
+        entity_buffer = GetMappedMem<EntityBuffer>(&rs.entity_buffer, frame_index);
 #endif
         for (uint32 i = 0; i < ENTITY_COUNT; ++i)
         {
@@ -583,13 +579,6 @@ static void Run()
             entity_buffer->texture_indexes[i] = i % TEXTURE_COUNT;
         }
     }
-
-#ifndef USE_ORIGINAL
-    BindImages(&rs.descriptor_set, temp_stack, rs.textures, rs.texture_sampler, 1, 0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    Buffer* entity_buffer_descriptor_data[] = { GetPtr(&rs.entity_buffer, GetFrameIndex()) };
-    BindBuffers(&rs.descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer_descriptor_data), 0, 0,
-                VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-#endif
 
     for (;;)
     {
@@ -618,9 +607,9 @@ static void Run()
         }
 
 #ifdef USE_ORIGINAL
-entity_buffer = GetBufferMem<EntityBuffer>(rs.entity_buffer, GetFrameIndex(), 0u); // <- How has this been working?
+entity_buffer = GetBufferMem<EntityBuffer>(rs.entity_buffer, GetFrameIndex(), 0u);
 #else
-entity_buffer = (EntityBuffer*)GetPtr(&rs.entity_buffer, GetFrameIndex())->mapped_mem;
+entity_buffer = GetMappedMem<EntityBuffer>(&rs.entity_buffer, GetFrameIndex());
 #endif
 static float32 x = 0.0f;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
@@ -649,10 +638,6 @@ if (KeyDown(KEY_F))
 
         SubmitRenderCommands(rs.render_target);
 #else
-        // Buffer* entity_buffer_descriptor_data[] = { GetPtr(&rs.entity_buffer, GetFrameIndex()) };
-        // BindBuffers(&rs.descriptor_set, temp_stack, CTK_WRAP_ARRAY(entity_buffer_descriptor_data), 0, 0,
-        //             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-
         DescriptorSet* descriptor_sets[] =
         {
             &rs.descriptor_set,

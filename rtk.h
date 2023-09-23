@@ -31,6 +31,10 @@ using namespace CTK;
 namespace RTK
 {
 
+#define USE_ORIGINAL
+
+#ifdef USE_ORIGINAL
+#include "rtk/enum_names.h"
 #include "rtk/debug.h"
 #include "rtk/vk_array.h"
 #include "rtk/device_features.h"
@@ -40,12 +44,24 @@ namespace RTK
 #include "rtk/mesh.h"
 #include "rtk/shader.h"
 #include "rtk/shader_data.h"
-#include "rtk/descriptor_set.h"
 #include "rtk/render_target.h"
 #include "rtk/pipeline.h"
-#include "rtk/pipeline_2.h"
 #include "rtk/rendering.h"
+#include "rtk/frame_metrics.h"
+#else
+#include "rtk/debug.h"
+#include "rtk/vk_array.h"
+#include "rtk/device_features.h"
+#include "rtk/context.h"
+#include "rtk/buffer_2.h"
+#include "rtk/image_2.h"
+#include "rtk/mesh.h"
+#include "rtk/shader.h"
+#include "rtk/descriptor_set_2.h"
+#include "rtk/render_target.h"
+#include "rtk/pipeline_2.h"
 #include "rtk/rendering_2.h"
 #include "rtk/frame_metrics.h"
+#endif
 
 }

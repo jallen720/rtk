@@ -1,4 +1,4 @@
-// #define USE_ORIGINAL
+#define USE_ORIGINAL
 
 #include "ctk3/ctk3.h"
 

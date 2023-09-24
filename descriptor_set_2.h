@@ -192,10 +192,10 @@ static void InitDescriptorSet(DescriptorSet* descriptor_set, Stack* perm_stack, 
         DescriptorBinding* binding = GetPtr(&bindings, i);
         Push(&layout_bindings,
              {
-                 .binding = i,
-                 .descriptorType = binding->type,
-                 .descriptorCount = binding->count,
-                 .stageFlags = binding->stages,
+                 .binding            = i,
+                 .descriptorType     = binding->type,
+                 .descriptorCount    = binding->count,
+                 .stageFlags         = binding->stages,
                  .pImmutableSamplers = NULL,
              });
     }

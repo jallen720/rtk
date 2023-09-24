@@ -340,6 +340,7 @@ static void Run()
     ///
     /// Test
     ///
+
     RenderState rs = {};
     InitRenderState(&rs, perm_stack, temp_stack, free_list);
 

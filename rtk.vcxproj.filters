@@ -122,5 +122,8 @@
     <ClInclude Include="image_2.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="enum_names.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

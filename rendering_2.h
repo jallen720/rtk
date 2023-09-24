@@ -66,11 +66,12 @@ static void BindDescriptorSets(VkCommandBuffer command_buffer, Pipeline* pipelin
     Stack frame = CreateFrame(temp_stack);
 
     // Create array of handles from descriptor sets to pass to vkCmdBindDescriptorSets().
+    uint32 frame_index = GetFrameIndex();
     Array<VkDescriptorSet> descriptor_set_hnds = {};
     InitArray(&descriptor_set_hnds, &frame.allocator, descriptor_sets.count);
     for (uint32 i = 0; i < descriptor_sets.count; ++i)
     {
-        Push(&descriptor_set_hnds, Get(&descriptor_sets, i)->hnd);
+        Push(&descriptor_set_hnds, Get(&Get(&descriptor_sets, i)->hnds, frame_index));
     };
 
     vkCmdBindDescriptorSets(command_buffer,
@@ -87,10 +88,10 @@ static void BindMeshData(VkCommandBuffer command_buffer, MeshData* mesh_data)
                            0, // First Binding
                            1, // Binding Count
                            &mesh_data->vertex_buffer.hnd,
-                           &mesh_data->vertex_buffer.offset);
+                           &mesh_data->vertex_buffer.offsets[0]);
     vkCmdBindIndexBuffer(command_buffer,
                          mesh_data->index_buffer.hnd,
-                         mesh_data->index_buffer.offset,
+                         mesh_data->index_buffer.offsets[0],
                          VK_INDEX_TYPE_UINT32);
 }
 

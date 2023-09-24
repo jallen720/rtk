@@ -40,7 +40,7 @@ struct RenderState
     BufferStack     device_stack;
     Buffer          staging_buffer;
     RenderTarget    render_target;
-    Array<Buffer>   entity_buffer;
+    Buffer          entity_buffer;
     Array<ImageHnd> textures;
     VkSampler       texture_sampler;
     DescriptorSet   descriptor_set;
@@ -318,7 +318,7 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .type             = BufferType::BUFFER,
         .size             = Megabyte32<4>(),
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .instance_count   = 0,
+        .instance_count   = 1,
     };
     InitBuffer(&rs->staging_buffer, &rs->host_stack, &staging_buffer_info);
 
@@ -332,20 +332,20 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     InitRenderTarget(&rs->render_target, &frame, free_list, &rt_info);
 
     // Descriptor Set
-    VkDescriptorSetLayoutBinding bindings[] =
+    DescriptorBinding bindings[] =
     {
         {
-            .descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1,
-            .stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .type   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .count  = 1,
+            .stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         },
         {
-            .descriptorType  = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = TEXTURE_COUNT,
-            .stageFlags      = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .type   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .count  = TEXTURE_COUNT,
+            .stages = VK_SHADER_STAGE_FRAGMENT_BIT,
         },
     };
-    InitDescriptorSet(&rs->descriptor_set, CTK_WRAP_ARRAY(bindings));
+    InitDescriptorSet(&rs->descriptor_set, perm_stack, &frame, CTK_WRAP_ARRAY(bindings));
 
     // Shaders
     InitShader(&rs->vert_shader, &frame, "shaders/bin/debug.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -395,12 +395,12 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
             .size       = sizeof(uint32),
         },
     };
-    PipelineLayoutInfo2 pipeline_layout_info =
+    PipelineLayoutInfo pipeline_layout_info =
     {
         .descriptor_set_layouts = CTK_WRAP_ARRAY(descriptor_set_layouts),
         .push_constant_ranges   = CTK_WRAP_ARRAY(push_constant_ranges),
     };
-    InitPipeline2(&rs->pipeline, &frame, free_list, &pipeline_info, &pipeline_layout_info);
+    InitPipeline(&rs->pipeline, &frame, free_list, &pipeline_info, &pipeline_layout_info);
 
     // Meshes
     MeshDataInfo mesh_data_info =
@@ -420,7 +420,7 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     // Entity Buffer
     BufferInfo entity_buffer_info =
     {
-        .type             = BufferType::UNIFORM_BUFFER,
+        .type             = BufferType::UNIFORM,
         .size             = sizeof(EntityBuffer),
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .instance_count   = GetFrameCount(),
@@ -484,8 +484,26 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
-        LoadImageData(Get(&rs->textures, i), &rs->staging_buffer, TEXTURE_IMAGE_PATHS[i]);
+        LoadImageData(Get(&rs->textures, i), &rs->staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
     }
+
+    DescriptorData descriptor_datas[] =
+    {
+        {
+            .type          = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .binding_index = 0,
+            .count         = 1,
+            .buffers       = &rs->entity_buffer,
+        },
+        {
+            .type          = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .binding_index = 1,
+            .count         = rs->textures.count,
+            .image_hnds    = rs->textures.data,
+            .sampler       = rs->texture_sampler,
+        },
+    };
+    BindDescriptorDatas(&rs->descriptor_set, &frame, CTK_WRAP_ARRAY(descriptor_datas));
 #endif
 }
 

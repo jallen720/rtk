@@ -164,13 +164,13 @@ static void AppendHostBuffer(Buffer* buffer, uint32 instance_index, void* data, 
     CTK_ASSERT(buffer->mapped_mem != NULL);
     CTK_ASSERT(instance_index < buffer->instance_count);
 
-    if (buffer->index + data_size > buffer->size)
+    if (buffer->indexes[instance_index] + data_size > buffer->size)
     {
         CTK_FATAL("can't append %u bytes to host-buffer at index %u: append would exceed size of %u", data_size,
-                  buffer->index, buffer->size);
+                  buffer->indexes[instance_index], buffer->size);
     }
 
-    memcpy(buffer->mapped_mem + buffer->offsets[instance_index] + buffer->index, data, data_size);
+    memcpy(buffer->mapped_mem + buffer->offsets[instance_index] + buffer->indexes[instance_index], data, data_size);
     buffer->indexes[instance_index] += data_size;
 }
 
@@ -178,7 +178,7 @@ static void WriteDeviceBufferCmd(Buffer* buffer, uint32 instance_index,
                                  Buffer* src_buffer, uint32 src_instance_index,
                                  VkDeviceSize offset, VkDeviceSize size)
 {
-    CTK_ASSERT(host_buffer->instance_count == 1);
+    CTK_ASSERT(src_buffer->instance_count == 1);
     CTK_ASSERT(instance_index < buffer->instance_count);
 
     if (size > buffer->size)
@@ -189,12 +189,12 @@ static void WriteDeviceBufferCmd(Buffer* buffer, uint32 instance_index,
 
     VkBufferCopy copy =
     {
-        .srcOffset = host_buffer->offsets[src_instance_index] + offset,
+        .srcOffset = src_buffer->offsets[src_instance_index] + offset,
         .dstOffset = buffer->offsets[instance_index],
         .size      = size,
     };
-    vkCmdCopyBuffer(global_ctx.temp_command_buffer, host_buffer->hnd, buffer->hnd, 1, &copy);
-    buffer->index = size;
+    vkCmdCopyBuffer(global_ctx.temp_command_buffer, src_buffer->hnd, buffer->hnd, 1, &copy);
+    buffer->indexes[instance_index] = size;
 }
 
 static void AppendDeviceBufferCmd(Buffer* buffer, uint32 instance_index,
@@ -204,20 +204,20 @@ static void AppendDeviceBufferCmd(Buffer* buffer, uint32 instance_index,
     CTK_ASSERT(src_buffer->instance_count == 1);
     CTK_ASSERT(instance_index < buffer->instance_count);
 
-    if (buffer->index + size > buffer->size)
+    if (buffer->indexes[instance_index] + size > buffer->size)
     {
         CTK_FATAL("can't append %u bytes to device-buffer at index %u: append would exceed size of %u",
-                  size, buffer->index, buffer->size);
+                  size, buffer->indexes[instance_index], buffer->size);
     }
 
     VkBufferCopy copy =
     {
         .srcOffset = src_buffer->offsets[src_instance_index] + offset,
-        .dstOffset = buffer->offsets[instance_index] + buffer->index,
+        .dstOffset = buffer->offsets[instance_index] + buffer->indexes[instance_index],
         .size      = size,
     };
     vkCmdCopyBuffer(global_ctx.temp_command_buffer, src_buffer->hnd, buffer->hnd, 1, &copy);
-    buffer->index += size;
+    buffer->indexes[instance_index] += size;
 }
 
 template<typename Type>

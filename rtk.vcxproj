@@ -155,6 +155,7 @@
     <ClInclude Include="descriptor_set.h" />
     <ClInclude Include="descriptor_set_2.h" />
     <ClInclude Include="device_features.h" />
+    <ClInclude Include="enum_names.h" />
     <ClInclude Include="frame_metrics.h" />
     <ClInclude Include="image.h" />
     <ClInclude Include="image_2.h" />

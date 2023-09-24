@@ -103,16 +103,21 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
             .stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
         },
         {
-            .type   = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .type   = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
             .count  = TEXTURE_COUNT,
+            .stages = VK_SHADER_STAGE_FRAGMENT_BIT,
+        },
+        {
+            .type   = VK_DESCRIPTOR_TYPE_SAMPLER,
+            .count  = 1,
             .stages = VK_SHADER_STAGE_FRAGMENT_BIT,
         },
     };
     InitDescriptorSet(&rs->descriptor_set, perm_stack, &frame, CTK_WRAP_ARRAY(bindings));
 
     // Shaders
-    InitShader(&rs->vert_shader, &frame, "shaders/bin/debug.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    InitShader(&rs->frag_shader, &frame, "shaders/bin/debug.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    InitShader(&rs->vert_shader, &frame, "shaders/bin/debug_2.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    InitShader(&rs->frag_shader, &frame, "shaders/bin/debug_2.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Pipeline
     Shader* shaders[] =
@@ -247,7 +252,7 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
-        LoadImageData(Get(&rs->textures, i), &rs->staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
+        LoadImage(Get(&rs->textures, i), &rs->staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
     }
 
     DescriptorData descriptor_datas[] =
@@ -259,11 +264,16 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
             .buffers       = &rs->entity_buffer,
         },
         {
-            .type          = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .type          = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
             .binding_index = 1,
             .count         = rs->textures.count,
             .image_hnds    = rs->textures.data,
-            .sampler       = rs->texture_sampler,
+        },
+        {
+            .type          = VK_DESCRIPTOR_TYPE_SAMPLER,
+            .binding_index = 2,
+            .count         = 1,
+            .samplers      = &rs->texture_sampler,
         },
     };
     BindDescriptorDatas(&rs->descriptor_set, &frame, CTK_WRAP_ARRAY(descriptor_datas));

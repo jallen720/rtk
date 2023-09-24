@@ -211,7 +211,7 @@ static void DestroyImageData(ImageData* image_data)
     *image_data = {};
 }
 
-static void LoadImageData(ImageHnd image_hnd, Buffer* image_data_buffer, uint32 instance_index, const char* path)
+static void LoadImage(ImageHnd image_hnd, Buffer* image_data_buffer, uint32 instance_index, const char* path)
 {
     Image* image = GetImage(image_hnd);
 

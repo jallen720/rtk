@@ -94,30 +94,119 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     };
     InitRenderTarget(&rs->render_target, &frame, free_list, &rt_info);
 
-    // Descriptor Set
-    DescriptorBinding bindings[] =
-    {
-        {
-            .type   = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .count  = 1,
-            .stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-        },
-        {
-            .type   = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .count  = TEXTURE_COUNT,
-            .stages = VK_SHADER_STAGE_FRAGMENT_BIT,
-        },
-        {
-            .type   = VK_DESCRIPTOR_TYPE_SAMPLER,
-            .count  = 1,
-            .stages = VK_SHADER_STAGE_FRAGMENT_BIT,
-        },
-    };
-    InitDescriptorSet(&rs->descriptor_set, perm_stack, &frame, CTK_WRAP_ARRAY(bindings));
-
     // Shaders
     InitShader(&rs->vert_shader, &frame, "shaders/bin/debug_2.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     InitShader(&rs->frag_shader, &frame, "shaders/bin/debug_2.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    // Meshes
+    MeshDataInfo mesh_data_info =
+    {
+        .vertex_buffer_size = Megabyte32<1>(),
+        .index_buffer_size  = Megabyte32<1>(),
+    };
+    InitMeshData(&rs->mesh_data, &rs->device_stack, &mesh_data_info);
+    {
+        #include "rtk/meshes/quad.h"
+        InitDeviceMesh(&rs->quad_mesh, &rs->mesh_data, CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                       &rs->staging_buffer);
+    }
+
+    // Descriptor Datas
+
+    // Entity Buffer
+    BufferInfo entity_buffer_info =
+    {
+        .type             = BufferType::UNIFORM,
+        .size             = sizeof(EntityBuffer),
+        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .instance_count   = GetFrameCount(),
+    };
+    InitBuffer(&rs->entity_buffer, &rs->host_stack, &entity_buffer_info);
+
+    // Textures
+    InitImageState(&perm_stack->allocator, 8);
+    InitArray(&rs->textures, &perm_stack->allocator, TEXTURE_COUNT);
+    VkImageCreateInfo texture_create_info =
+    {
+        .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .pNext     = NULL,
+        .flags     = 0,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format    = GetSwapchain()->surface_format.format,
+        .extent =
+        {
+            .width  = 64,
+            .height = 32,
+            .depth  = 1
+        },
+        .mipLevels             = 1,
+        .arrayLayers           = 1,
+        .samples               = VK_SAMPLE_COUNT_1_BIT,
+        .tiling                = VK_IMAGE_TILING_OPTIMAL,
+        .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                 VK_IMAGE_USAGE_SAMPLED_BIT,
+        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices   = NULL,
+        .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        Push(&rs->textures, CreateImage(&texture_create_info));
+    }
+    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        LoadImage(Get(&rs->textures, i), &rs->staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
+    }
+
+    // Texture Sampler
+    VkSamplerCreateInfo texture_sampler_info =
+    {
+        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .pNext                   = NULL,
+        .flags                   = 0,
+        .magFilter               = VK_FILTER_NEAREST,
+        .minFilter               = VK_FILTER_NEAREST,
+        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+        .mipLodBias              = 0.0f,
+        .anisotropyEnable        = VK_FALSE,
+        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+        .compareEnable           = VK_FALSE,
+        .compareOp               = VK_COMPARE_OP_ALWAYS,
+        .minLod                  = 0.0f,
+        .maxLod                  = 0.0f,
+        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+    };
+    rs->texture_sampler = CreateSampler(&texture_sampler_info);
+
+    // Descriptor Sets
+    DescriptorData descriptor_datas[] =
+    {
+        {
+            .type       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .stages     = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .count      = 1,
+            .buffers    = &rs->entity_buffer,
+        },
+        {
+            .type       = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .stages     = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .count      = rs->textures.count,
+            .image_hnds = rs->textures.data,
+        },
+        {
+            .type       = VK_DESCRIPTOR_TYPE_SAMPLER,
+            .stages     = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .count      = 1,
+            .samplers   = &rs->texture_sampler,
+        },
+    };
+    InitDescriptorSet(&rs->descriptor_set, perm_stack, &frame, CTK_WRAP_ARRAY(descriptor_datas));
 
     // Pipeline
     Shader* shaders[] =
@@ -169,114 +258,6 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .push_constant_ranges   = CTK_WRAP_ARRAY(push_constant_ranges),
     };
     InitPipeline(&rs->pipeline, &frame, free_list, &pipeline_info, &pipeline_layout_info);
-
-    // Meshes
-    MeshDataInfo mesh_data_info =
-    {
-        .vertex_buffer_size = Megabyte32<1>(),
-        .index_buffer_size  = Megabyte32<1>(),
-    };
-    InitMeshData(&rs->mesh_data, &rs->device_stack, &mesh_data_info);
-    {
-        #include "rtk/meshes/quad.h"
-        InitDeviceMesh(&rs->quad_mesh, &rs->mesh_data, CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                       &rs->staging_buffer);
-    }
-
-    // Descriptor Data
-
-    // Entity Buffer
-    BufferInfo entity_buffer_info =
-    {
-        .type             = BufferType::UNIFORM,
-        .size             = sizeof(EntityBuffer),
-        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .instance_count   = GetFrameCount(),
-    };
-    InitBuffer(&rs->entity_buffer, &rs->host_stack, &entity_buffer_info);
-
-    // Textures
-    VkSamplerCreateInfo texture_sampler_info =
-    {
-        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .pNext                   = NULL,
-        .flags                   = 0,
-        .magFilter               = VK_FILTER_NEAREST,
-        .minFilter               = VK_FILTER_NEAREST,
-        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
-        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .mipLodBias              = 0.0f,
-        .anisotropyEnable        = VK_FALSE,
-        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
-        .compareEnable           = VK_FALSE,
-        .compareOp               = VK_COMPARE_OP_ALWAYS,
-        .minLod                  = 0.0f,
-        .maxLod                  = 0.0f,
-        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-        .unnormalizedCoordinates = VK_FALSE,
-    };
-    rs->texture_sampler = CreateSampler(&texture_sampler_info);
-
-    InitImageState(&perm_stack->allocator, 8);
-    InitArray(&rs->textures, &perm_stack->allocator, TEXTURE_COUNT);
-    VkImageCreateInfo texture_create_info =
-    {
-        .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .pNext     = NULL,
-        .flags     = 0,
-        .imageType = VK_IMAGE_TYPE_2D,
-        .format    = GetSwapchain()->surface_format.format,
-        .extent =
-        {
-            .width  = 64,
-            .height = 32,
-            .depth  = 1
-        },
-        .mipLevels             = 1,
-        .arrayLayers           = 1,
-        .samples               = VK_SAMPLE_COUNT_1_BIT,
-        .tiling                = VK_IMAGE_TILING_OPTIMAL,
-        .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                 VK_IMAGE_USAGE_SAMPLED_BIT,
-        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 0,
-        .pQueueFamilyIndices   = NULL,
-        .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-    };
-    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-    {
-        Push(&rs->textures, CreateImage(&texture_create_info));
-    }
-    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-    {
-        LoadImage(Get(&rs->textures, i), &rs->staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
-    }
-
-    DescriptorData descriptor_datas[] =
-    {
-        {
-            .type          = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .binding_index = 0,
-            .count         = 1,
-            .buffers       = &rs->entity_buffer,
-        },
-        {
-            .type          = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .binding_index = 1,
-            .count         = rs->textures.count,
-            .image_hnds    = rs->textures.data,
-        },
-        {
-            .type          = VK_DESCRIPTOR_TYPE_SAMPLER,
-            .binding_index = 2,
-            .count         = 1,
-            .samplers      = &rs->texture_sampler,
-        },
-    };
-    BindDescriptorDatas(&rs->descriptor_set, &frame, CTK_WRAP_ARRAY(descriptor_datas));
 }
 
 static void Run()

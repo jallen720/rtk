@@ -4,6 +4,7 @@
 #include "ctk3/debug.h"
 #include "ctk3/math.h"
 #include "ctk3/window.h"
+
 #include "rtk/rtk.h"
 #include "rtk/tests/shared.h"
 #include "rtk/tests/3d/defs.h"

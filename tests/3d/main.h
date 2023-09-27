@@ -85,13 +85,13 @@ static void Run()
     };
     context_info.descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
 
-    context_info.render_thread_count = RENDER_THREAD_COUNT,
+    context_info.render_thread_count = 6,
     InitContext(perm_stack, temp_stack, free_list, &context_info);
 LogPhysicalDevice(global_ctx.physical_device);
 
     // Initialize other test state.
     ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
-    InitRenderState(perm_stack, temp_stack, free_list, RENDER_THREAD_COUNT);
+    InitRenderState(perm_stack, temp_stack, free_list);
     InitGameState(perm_stack, thread_pool->size);
 
     // Run game.
@@ -127,7 +127,7 @@ LogPhysicalDevice(global_ctx.physical_device);
         }
 
         UpdateMVPMatrixes(thread_pool);
-        RecordRenderCommands(thread_pool);
+        RecordRenderCommands(thread_pool, GetEntityCount());
         SubmitRenderCommands(GetRenderTarget());
     }
 }

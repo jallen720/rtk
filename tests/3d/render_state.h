@@ -16,8 +16,8 @@ struct RenderCommandState
 
 struct RenderState
 {
+    // Render Job
     Job<RenderCommandState> render_command_job;
-    uint32                  entity_count;
     Array<Stack>            render_thread_temp_stacks;
 
     // Device Memory
@@ -60,8 +60,12 @@ static RenderState render_state;
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void InitRenderThreadTempStacks(Stack* perm_stack, uint32 render_thread_count)
+static void InitRenderJob(Stack* perm_stack)
 {
+    uint32 render_thread_count = GetRenderThreadCount();
+
+    InitThreadPoolJob(&render_state.render_command_job, perm_stack, render_thread_count);
+
     InitArray(&render_state.render_thread_temp_stacks, &perm_stack->allocator, render_thread_count);
     for (uint32 i = 0; i < render_thread_count; ++i)
     {
@@ -364,11 +368,9 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, uint32 render_thread_count)
+static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
-    InitThreadPoolJob(&render_state.render_command_job, perm_stack, render_thread_count);
-    InitRenderThreadTempStacks(perm_stack, render_thread_count);
-
+    InitRenderJob(perm_stack);
     InitDeviceMemory();
 
     InitRenderTargets(temp_stack, free_list);
@@ -381,7 +383,7 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitPipelines(temp_stack, free_list);
 }
 
-static void RecordRenderCommands(ThreadPool* thread_pool)
+static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
 {
     Job<RenderCommandState>* job = &render_state.render_command_job;
 
@@ -390,12 +392,11 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
         &render_state.quad_mesh,
         &render_state.cube_mesh,
     };
-    static constexpr uint32 TEXTURE_COUNT = 3;
-    static constexpr uint32 MESH_COUNT    = CTK_ARRAY_SIZE(meshes);
-    static constexpr uint32 THREAD_COUNT  = TEXTURE_COUNT * MESH_COUNT;
-    CTK_ASSERT(THREAD_COUNT <= RENDER_THREAD_COUNT);
-
-    for (uint32 texture_index = 0; texture_index < TEXTURE_COUNT; ++texture_index)
+    static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(meshes);
+    uint32 texture_count = render_state.textures.count;
+    uint32 render_thread_count = GetRenderThreadCount();
+    CTK_ASSERT(texture_count * MESH_COUNT == render_thread_count);
+    for (uint32 texture_index = 0; texture_index < texture_count; ++texture_index)
     {
         for (uint32 mesh_index = 0; mesh_index < MESH_COUNT; ++mesh_index)
         {
@@ -403,7 +404,7 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
             RenderCommandState* state = GetPtr(&job->states, thread_index);
             state->thread_index = thread_index;
             state->mesh         = meshes[mesh_index];
-            state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, render_state.entity_count);
+            state->batch_range  = GetBatchRange(thread_index, render_thread_count, entity_count);
             state->temp_stack   = GetPtr(&render_state.render_thread_temp_stacks, thread_index);
 
             Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));
@@ -411,7 +412,7 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
     }
 
     // Wait for tasks to complete.
-    for (uint32 i = 0; i < THREAD_COUNT; ++i)
+    for (uint32 i = 0; i < render_thread_count; ++i)
     {
         Wait(thread_pool, Get(&job->tasks, i));
     }
@@ -425,10 +426,4 @@ static RenderTarget* GetRenderTarget()
 static Buffer* GetEntityBuffer()
 {
     return &render_state.entity_buffer;
-}
-
-static void SetEntityCount(uint32 entity_count)
-{
-    CTK_ASSERT(entity_count <= MAX_ENTITIES);
-    render_state.entity_count = entity_count;
 }

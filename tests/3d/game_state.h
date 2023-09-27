@@ -235,7 +235,6 @@ static void InitGameState(Stack* perm_stack, uint32 job_task_count)
     InitThreadPoolJob(&game_state.mvp_matrix_job, perm_stack, job_task_count);
     InitView();
     InitEntities();
-    SetEntityCount(game_state.entity_data.count);
 }
 
 static void UpdateGame()
@@ -276,4 +275,9 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool)
     {
         Wait(thread_pool, Get(&job->tasks, i));
     }
+}
+
+static uint32 GetEntityCount()
+{
+    return game_state.entity_data.count;
 }

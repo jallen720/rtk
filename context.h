@@ -81,6 +81,8 @@ struct Frame
 
 struct Context
 {
+    uint32 render_thread_count;
+
     // Instance State
     VkInstance               instance;
     VkDebugUtilsMessengerEXT debug_messenger;
@@ -730,16 +732,16 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
     CreateSwapchain(&frame, free_list);
 }
 
-static void InitRenderCommandPools(Stack* perm_stack, uint32 render_thread_count)
+static void InitRenderCommandPools(Stack* perm_stack)
 {
-    InitArray(&global_ctx.render_command_pools, &perm_stack->allocator, render_thread_count);
+    InitArray(&global_ctx.render_command_pools, &perm_stack->allocator, global_ctx.render_thread_count);
     VkCommandPoolCreateInfo info =
     {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
         .queueFamilyIndex = global_ctx.physical_device->queue_families.graphics,
     };
-    for (uint32 i = 0; i < render_thread_count; ++i)
+    for (uint32 i = 0; i < global_ctx.render_thread_count; ++i)
     {
         VkResult res = vkCreateCommandPool(global_ctx.device, &info, NULL, Push(&global_ctx.render_command_pools));
         Validate(res, "vkCreateCommandPool() failed");
@@ -849,6 +851,8 @@ static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_size
 ////////////////////////////////////////////////////////////
 static void InitContext(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ContextInfo* info)
 {
+    global_ctx.render_thread_count = info->render_thread_count;
+
     InitInstance(&info->instance_info, temp_stack);
     InitSurface();
 
@@ -863,7 +867,7 @@ static void InitContext(Stack* perm_stack, Stack* temp_stack, FreeList* free_lis
 
     // Initialize rendering state.
     InitSwapchain(temp_stack, free_list);
-    InitRenderCommandPools(perm_stack, info->render_thread_count);
+    InitRenderCommandPools(perm_stack);
     InitFrames(perm_stack);
     InitDescriptorPool(&info->descriptor_pool_sizes);
 };
@@ -900,6 +904,11 @@ static uint32 GetFrameCount()
 static uint32 GetFrameIndex()
 {
     return global_ctx.frames.index;
+}
+
+static uint32 GetRenderThreadCount()
+{
+    return global_ctx.render_thread_count;
 }
 
 static void BeginTempCommandBuffer()

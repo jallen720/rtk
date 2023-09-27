@@ -25,8 +25,31 @@ struct DescriptorSet
     VkDescriptorSetLayout  layout;
 };
 
+static VkDescriptorPool global_descriptor_pool;
+
 /// Interface
 ////////////////////////////////////////////////////////////
+static void InitDescriptorPool(Array<VkDescriptorPoolSize> descriptor_pool_sizes)
+{
+    // Count total descriptors from pool sizes.
+    uint32 total_descriptors = 0;
+    for (uint32 i = 0; i < descriptor_pool_sizes.count; ++i)
+    {
+        total_descriptors += GetPtr(&descriptor_pool_sizes, i)->descriptorCount;
+    }
+
+    VkDescriptorPoolCreateInfo pool_info =
+    {
+        .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .flags         = 0,
+        .maxSets       = total_descriptors,
+        .poolSizeCount = descriptor_pool_sizes.count,
+        .pPoolSizes    = descriptor_pool_sizes.data,
+    };
+    VkResult res = vkCreateDescriptorPool(GetDevice(), &pool_info, NULL, &global_descriptor_pool);
+    Validate(res, "vkCreateDescriptorPool() failed");
+}
+
 static void InitDescriptorSet(DescriptorSet* descriptor_set, Stack* perm_stack, Stack* temp_stack,
                               Array<DescriptorData> datas)
 {
@@ -77,7 +100,7 @@ static void InitDescriptorSet(DescriptorSet* descriptor_set, Stack* perm_stack, 
     {
         .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
         .pNext              = NULL,
-        .descriptorPool     = global_ctx.descriptor_pool,
+        .descriptorPool     = global_descriptor_pool,
         .descriptorSetCount = layouts.count,
         .pSetLayouts        = layouts.data,
     };

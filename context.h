@@ -25,10 +25,9 @@ struct InstanceInfo
 
 struct ContextInfo
 {
-    InstanceInfo                instance_info;
-    DeviceFeatures              enabled_features;
-    uint32                      render_thread_count;
-    Array<VkDescriptorPoolSize> descriptor_pool_sizes;
+    InstanceInfo   instance_info;
+    uint32         render_thread_count;
+    DeviceFeatures enabled_features;
 };
 
 struct QueueFamilies
@@ -826,27 +825,6 @@ static void InitFrames(Stack* perm_stack)
     }
 }
 
-static void InitDescriptorPool(Array<VkDescriptorPoolSize>* descriptor_pool_sizes)
-{
-    // Count total descriptors from pool sizes.
-    uint32 total_descriptors = 0;
-    for (uint32 i = 0; i < descriptor_pool_sizes->count; ++i)
-    {
-        total_descriptors += GetPtr(descriptor_pool_sizes, i)->descriptorCount;
-    }
-
-    VkDescriptorPoolCreateInfo pool_info =
-    {
-        .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .flags         = 0,
-        .maxSets       = total_descriptors,
-        .poolSizeCount = descriptor_pool_sizes->count,
-        .pPoolSizes    = descriptor_pool_sizes->data,
-    };
-    VkResult res = vkCreateDescriptorPool(global_ctx.device, &pool_info, NULL, &global_ctx.descriptor_pool);
-    Validate(res, "vkCreateDescriptorPool() failed");
-}
-
 /// Interface
 ////////////////////////////////////////////////////////////
 static void InitContext(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ContextInfo* info)
@@ -869,7 +847,6 @@ static void InitContext(Stack* perm_stack, Stack* temp_stack, FreeList* free_lis
     InitSwapchain(temp_stack, free_list);
     InitRenderCommandPools(perm_stack);
     InitFrames(perm_stack);
-    InitDescriptorPool(&info->descriptor_pool_sizes);
 };
 
 static VkDevice GetDevice()

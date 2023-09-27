@@ -229,6 +229,22 @@ static void InitDescriptorDatas(Stack* perm_stack)
 
 static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
 {
+    VkDescriptorPoolSize descriptor_pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
+    };
+    InitDescriptorPool(CTK_WRAP_ARRAY(descriptor_pool_sizes));
+
     // Entity
     {
         DescriptorData datas[] =

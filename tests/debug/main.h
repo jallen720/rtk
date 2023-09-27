@@ -187,6 +187,21 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     Validate(res, "vkCreateSampler() failed");
 
     // Descriptor Sets
+    VkDescriptorPoolSize descriptor_pool_sizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
+    };
+    InitDescriptorPool(CTK_WRAP_ARRAY(descriptor_pool_sizes));
     DescriptorData descriptor_datas[] =
     {
         {
@@ -288,9 +303,9 @@ static void Run()
 
     // Init RTK Context + Resources
     ContextInfo context_info = {};
-    context_info.instance_info.application_name       = "Debug Test";
-    context_info.instance_info.api_version            = VK_API_VERSION_1_3;
-    context_info.instance_info.extensions             = {};
+    context_info.instance_info.application_name = "Debug Test";
+    context_info.instance_info.api_version      = VK_API_VERSION_1_3;
+    context_info.instance_info.extensions       = {};
 #ifdef RTK_ENABLE_VALIDATION
     context_info.instance_info.debug_callback         = DefaultDebugCallback;
     context_info.instance_info.debug_message_severity = // VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
@@ -301,6 +316,7 @@ static void Run()
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 #endif
+    context_info.render_thread_count = 1;
 
     InitDeviceFeatures(&context_info.enabled_features);
     context_info.enabled_features.vulkan_1_0.geometryShader                            = VK_TRUE;
@@ -308,23 +324,6 @@ static void Run()
     context_info.enabled_features.vulkan_1_2.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
     context_info.enabled_features.vulkan_1_2.scalarBlockLayout                         = VK_TRUE;
 
-    VkDescriptorPoolSize descriptor_pool_sizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
-    };
-    context_info.descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
-
-    context_info.render_thread_count = 1,
     InitContext(perm_stack, temp_stack, free_list, &context_info);
 
     ///
@@ -382,17 +381,7 @@ for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 {
     entity_buffer->positions[i].y = fabs(sinf(((float32)i / ENTITY_COUNT) + x));
 }
-if (KeyDown(KEY_F))
-{
-    if (KeyDown(KEY_SHIFT))
-    {
-        x -= 0.005f;
-    }
-    else
-    {
-        x += 0.005f;
-    }
-}
+x += 0.005f;
 
         VkCommandBuffer command_buffer = BeginRenderCommands(&rs.render_target, 0);
             DescriptorSet* descriptor_sets[] =

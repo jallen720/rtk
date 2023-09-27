@@ -125,7 +125,6 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     InitBuffer(&rs->entity_buffer, &rs->host_stack, &entity_buffer_info);
 
     // Textures
-    InitImageGroups(&perm_stack->allocator, 4);
     rs->textures_group = CreateImageGroup(&perm_stack->allocator, 4);
     InitArray(&rs->textures, &perm_stack->allocator, TEXTURE_COUNT);
     VkImageCreateInfo texture_create_info =
@@ -331,6 +330,7 @@ static void Run()
     ///
     /// Test
     ///
+    InitImageGroups(&perm_stack->allocator, 4);
     RenderState rs = {};
     InitRenderState(&rs, perm_stack, temp_stack, free_list);
 

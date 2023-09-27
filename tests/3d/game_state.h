@@ -64,6 +64,7 @@ static void InitView()
         .max_x_angle  = 85.0f,
     };
 }
+
 static uint32 PushEntity(EntityData* entity_data)
 {
     if (entity_data->count == MAX_ENTITIES)

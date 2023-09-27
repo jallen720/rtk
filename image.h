@@ -185,30 +185,13 @@ static void BackImagesWithMemory(VkMemoryPropertyFlags mem_properties)
     }
 }
 
-static void ValidateImageHnd(ImageHnd hnd)
+static Image* GetImage(ImageHnd hnd)
 {
     if (hnd >= global_image_state.count)
     {
-        CTK_FATAL("can't access image for handle %u: handle exceeds image count of %u", hnd, global_image_state.count);
+        CTK_FATAL("can't access image for handle %u: handle exceeds max of %u", hnd, global_image_state.count);
     }
-}
-
-static VkImage GetImage(ImageHnd hnd)
-{
-    ValidateImageHnd(hnd);
-    return global_image_state.data[hnd].hnd;
-}
-
-static VkExtent3D GetImageExtent(ImageHnd hnd)
-{
-    ValidateImageHnd(hnd);
-    return global_image_state.data[hnd].extent;
-}
-
-static VkImageView GetImageView(ImageHnd hnd)
-{
-    ValidateImageHnd(hnd);
-    return global_image_state.data[hnd].default_view;
+    return global_image_state.data + hnd;
 }
 
 static void LoadImageData(ImageData* image_data, const char* path)
@@ -226,6 +209,105 @@ static void DestroyImageData(ImageData* image_data)
 {
     stbi_image_free(image_data->data);
     *image_data = {};
+}
+
+static void LoadImage(ImageHnd image_hnd, Buffer* image_data_buffer, uint32 instance_index, const char* path)
+{
+    Image* image = GetImage(image_hnd);
+
+    // Load image data and write to staging buffer.
+    ImageData image_data = {};
+    LoadImageData(&image_data, path);
+    WriteHostBuffer(image_data_buffer, 0, image_data.data, (VkDeviceSize)image_data.size);
+    DestroyImageData(&image_data);
+
+    // Copy image data from buffer memory to image memory.
+    BeginTempCommandBuffer();
+        // Transition image layout for use in shader.
+        VkImageMemoryBarrier pre_copy_mem_barrier =
+        {
+            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask       = 0,
+            .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image               = image->hnd,
+            .subresourceRange =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = 1,
+                .baseArrayLayer = 0,
+                .layerCount     = 1,
+            },
+        };
+        vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
+                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
+                             0, // Dependency Flags
+                             0, // Memory Barrier Count
+                             NULL, // Memory Barriers
+                             0, // Buffer Memory Barrier Count
+                             NULL, // Buffer Memory Barriers
+                             1, // Image Memory Barrier Count
+                             &pre_copy_mem_barrier); // Image Memory Barriers
+
+        VkBufferImageCopy copy =
+        {
+            .bufferOffset      = image_data_buffer->offsets[instance_index],
+            .bufferRowLength   = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel       = 0,
+                .baseArrayLayer = 0,
+                .layerCount     = 1,
+            },
+            .imageOffset =
+            {
+                .x = 0,
+                .y = 0,
+                .z = 0,
+            },
+            .imageExtent = image->extent,
+        };
+        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, image_data_buffer->hnd, image->hnd,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+        // Transition image layout for use in shader.
+        VkImageMemoryBarrier post_copy_mem_barrier =
+        {
+            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image               = image->hnd,
+            .subresourceRange =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = 1,
+                .baseArrayLayer = 0,
+                .layerCount     = 1,
+            },
+        };
+        vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
+                             0, // Dependency Flags
+                             0, // Memory Barrier Count
+                             NULL, // Memory Barriers
+                             0, // Buffer Memory Barrier Count
+                             NULL, // Buffer Memory Barriers
+                             1, // Image Memory Barrier Count
+                             &post_copy_mem_barrier); // Image Memory Barriers
+    SubmitTempCommandBuffer();
 }
 
 static VkSampler CreateSampler(VkSamplerCreateInfo* info)

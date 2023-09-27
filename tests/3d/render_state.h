@@ -1,22 +1,3 @@
-#pragma once
-
-#include "ctk3/ctk3.h"
-#include "ctk3/debug.h"
-#include "ctk3/math.h"
-#include "ctk3/stack.h"
-#include "ctk3/free_list.h"
-#include "ctk3/array.h"
-#include "ctk3/thread_pool.h"
-#include "rtk/rtk.h"
-#include "rtk/tests/3d/defs.h"
-#include "rtk/tests/3d/game_state.h"
-
-using namespace CTK;
-using namespace RTK;
-
-namespace Test3D
-{
-
 /// Data
 ////////////////////////////////////////////////////////////
 struct EntityBuffer
@@ -25,76 +6,44 @@ struct EntityBuffer
     uint32 texture_indexes[MAX_ENTITIES];
 };
 
-struct MVPMatrixState
-{
-    BatchRange    batch_range;
-    Matrix        view_projection_matrix;
-    EntityBuffer* frame_entity_buffer;
-    EntityData*   entity_data;
-};
-
 struct RenderCommandState
 {
     uint32     thread_index;
     BatchRange batch_range;
     Mesh*      mesh;
-};
-
-template<typename StateType>
-struct Job
-{
-    Array<StateType> states;
-    Array<TaskHnd>   tasks;
+    Stack*     temp_stack;
 };
 
 struct RenderState
 {
-    VertexLayout vertex_layout;
-    VkSampler    sampler;
+    Job<RenderCommandState> render_command_job;
+    uint32                  entity_count;
+    Array<Stack>            render_thread_temp_stacks;
 
-    struct
-    {
-        Job<MVPMatrixState>     update_mvp_matrixes;
-        Job<RenderCommandState> record_render_commands;
-    }
-    job;
-
-    // Memory
+    // Device Memory
     BufferStack device_stack;
     BufferStack host_stack;
     Buffer      staging_buffer;
 
-    // Resources
-    RenderTarget* render_target;
-    struct
-    {
-        ShaderData* entity_buffer;
-        ShaderData* textures;
-    }
-    data;
-    struct
-    {
-        ShaderDataSet* entity_data;
-        ShaderDataSet* textures;
-    }
-    data_set;
-    struct
-    {
-        Shader* vert;
-        Shader* frag;
-    }
-    shader;
-    Pipeline* pipeline;
-    struct
-    {
-        MeshData* data;
-        Mesh*     cube;
-        Mesh*     quad;
-    }
-    mesh;
-};
+    // Rendering State
+    RenderTarget render_target;
+    Shader       vert_shader;
+    Shader       frag_shader;
+    MeshData     mesh_data;
+    Mesh         cube_mesh;
+    Mesh         quad_mesh;
 
-static constexpr uint32 RENDER_THREAD_COUNT = 6;
+    // Descriptor Datas
+    Buffer          entity_buffer;
+    Array<ImageHnd> textures;
+    VkSampler       texture_sampler;
+
+    // Descriptor Sets/Pipelines
+    DescriptorSet entity_descriptor_set;
+    DescriptorSet textures_descriptor_set;
+    VertexLayout  vertex_layout;
+    Pipeline      pipeline;
+};
 
 static constexpr const char* TEXTURE_IMAGE_PATHS[] =
 {
@@ -107,10 +56,19 @@ static_assert(TEXTURE_COUNT == MAX_TEXTURES);
 
 /// Instance
 ////////////////////////////////////////////////////////////
-static RenderState global_rs;
+static RenderState render_state;
 
 /// Utils
 ////////////////////////////////////////////////////////////
+static void InitRenderThreadTempStacks(Stack* perm_stack, uint32 render_thread_count)
+{
+    InitArray(&render_state.render_thread_temp_stacks, &perm_stack->allocator, render_thread_count);
+    for (uint32 i = 0; i < render_thread_count; ++i)
+    {
+        InitStack(Push(&render_state.render_thread_temp_stacks), &perm_stack->allocator, Kilobyte32<1>());
+    }
+}
+
 static void InitDeviceMemory()
 {
     BufferStackInfo host_stack_info =
@@ -123,8 +81,7 @@ static void InitDeviceMemory()
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    InitBufferStack(&global_rs.host_stack, &host_stack_info);
-
+    InitBufferStack(&render_state.host_stack, &host_stack_info);
     BufferStackInfo device_stack_info =
     {
         .size               = Megabyte32<64>(),
@@ -134,18 +91,18 @@ static void InitDeviceMemory()
                               VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    InitBufferStack(&global_rs.device_stack, &device_stack_info);
-
+    InitBufferStack(&render_state.device_stack, &device_stack_info);
     BufferInfo staging_buffer_info =
     {
         .type             = BufferType::BUFFER,
         .size             = Megabyte32<4>(),
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .instance_count   = 1,
     };
-    InitBuffer(&global_rs.staging_buffer, &global_rs.host_stack, &staging_buffer_info);
+    InitBuffer(&render_state.staging_buffer, &render_state.host_stack, &staging_buffer_info);
 }
 
-static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
+static void InitRenderTargets(Stack* temp_stack, FreeList* free_list)
 {
     VkClearValue attachment_clear_values[] =
     {
@@ -157,25 +114,90 @@ static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* fr
         .depth_testing           = true,
         .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
     };
-    global_rs.render_target = CreateRenderTarget(&perm_stack->allocator, temp_stack, free_list, &info);
+    InitRenderTarget(&render_state.render_target, temp_stack, free_list, &info);
 }
 
-static void InitVertexLayout(Stack* perm_stack)
+static void InitShaders(Stack* temp_stack)
 {
-    VertexLayout* vertex_layout = &global_rs.vertex_layout;
-
-    // Init pipeline vertex layout.
-    InitArray(&vertex_layout->bindings, &perm_stack->allocator, 1);
-    PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
-
-    InitArray(&vertex_layout->attributes, &perm_stack->allocator, 4);
-    PushAttribute(vertex_layout, 3, ATTRIBUTE_TYPE_FLOAT32); // Position
-    PushAttribute(vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // UV
+    InitShader(&render_state.vert_shader, temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    InitShader(&render_state.frag_shader, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
-static void InitSampler()
+static void InitMeshes()
 {
-    VkSamplerCreateInfo info =
+    MeshDataInfo mesh_data_info =
+    {
+        .vertex_buffer_size = Megabyte32<1>(),
+        .index_buffer_size  = Megabyte32<1>(),
+    };
+    InitMeshData(&render_state.mesh_data, &render_state.device_stack, &mesh_data_info);
+
+    {
+        #include "rtk/meshes/cube.h"
+        InitDeviceMesh(&render_state.cube_mesh, &render_state.mesh_data,
+                       CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                       &render_state.staging_buffer);
+    }
+
+    {
+        #include "rtk/meshes/quad.h"
+        InitDeviceMesh(&render_state.quad_mesh, &render_state.mesh_data,
+                       CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                       &render_state.staging_buffer);
+    }
+}
+
+static void InitDescriptorDatas(Stack* perm_stack)
+{
+    // Entity Buffer
+    BufferInfo entity_buffer_info =
+    {
+        .type             = BufferType::UNIFORM,
+        .size             = sizeof(EntityBuffer),
+        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .instance_count   = GetFrameCount(),
+    };
+    InitBuffer(&render_state.entity_buffer, &render_state.host_stack, &entity_buffer_info);
+
+    // Textures
+    InitImageState(&perm_stack->allocator, 16);
+    InitArray(&render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
+    VkImageCreateInfo texture_create_info =
+    {
+        .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+        .pNext     = NULL,
+        .flags     = 0,
+        .imageType = VK_IMAGE_TYPE_2D,
+        .format    = GetSwapchain()->surface_format.format,
+        .extent =
+        {
+            .width  = 64,
+            .height = 32,
+            .depth  = 1
+        },
+        .mipLevels             = 1,
+        .arrayLayers           = 1,
+        .samples               = VK_SAMPLE_COUNT_1_BIT,
+        .tiling                = VK_IMAGE_TILING_OPTIMAL,
+        .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                 VK_IMAGE_USAGE_SAMPLED_BIT,
+        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+        .queueFamilyIndexCount = 0,
+        .pQueueFamilyIndices   = NULL,
+        .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+    };
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        Push(&render_state.textures, CreateImage(&texture_create_info));
+    }
+    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        LoadImage(Get(&render_state.textures, i), &render_state.staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
+    }
+
+    // Texture Sampler
+    VkSamplerCreateInfo texture_sampler_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
         .pNext                   = NULL,
@@ -196,128 +218,66 @@ static void InitSampler()
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    global_rs.sampler = CreateSampler(&info);
+    render_state.texture_sampler = CreateSampler(&texture_sampler_info);
 }
 
-static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
+static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
 {
-    // Load image data and write to staging buffer.
-    ImageData image_data = {};
-    LoadImageData(&image_data, image_path);
-    WriteHostBuffer(staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
-    DestroyImageData(&image_data);
-
-    // Copy image data in staging buffer to shader data images.
-    uint32 image_count = GetImageCount(sd);
-    for (uint32 i = 0; i < image_count; ++i)
+    // Entity
     {
-        WriteToShaderDataImage(sd, 0, index, staging_buffer);
-    }
-}
-
-static void InitShaderDatas(Stack* perm_stack)
-{
-    // Buffers
-    {
-        ShaderDataInfo info =
+        DescriptorData datas[] =
         {
-            .stages      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            .type        = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .per_frame   = true,
-            .count       = 1,
-            .buffer =
             {
-                .stack = &global_rs.host_stack,
-                .size  = sizeof(EntityBuffer),
+                .type       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .stages     = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                .count      = 1,
+                .buffers    = &render_state.entity_buffer,
             },
         };
-        global_rs.data.entity_buffer = CreateShaderData(&perm_stack->allocator, &info);
+        InitDescriptorSet(&render_state.entity_descriptor_set, perm_stack, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 
     // Textures
     {
-        ShaderDataInfo info =
+        DescriptorData datas[] =
         {
-            .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .per_frame = false,
-            .count     = 3,
-            .image =
             {
-                .image =
-                {
-                    .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-                    .pNext     = NULL,
-                    .flags     = 0,
-                    .imageType = VK_IMAGE_TYPE_2D,
-                    .format    = GetSwapchain()->surface_format.format,
-                    .extent =
-                    {
-                        .width  = 64,
-                        .height = 32,
-                        .depth  = 1
-                    },
-                    .mipLevels             = 1,
-                    .arrayLayers           = 1,
-                    .samples               = VK_SAMPLE_COUNT_1_BIT,
-                    .tiling                = VK_IMAGE_TILING_OPTIMAL,
-                    .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                             VK_IMAGE_USAGE_SAMPLED_BIT,
-                    .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-                    .queueFamilyIndexCount = 0,
-                    .pQueueFamilyIndices   = NULL,
-                    .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-                },
-                .sampler = global_rs.sampler,
+                .type       = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                .stages     = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .count      = render_state.textures.count,
+                .image_hnds = render_state.textures.data,
+            },
+            {
+                .type       = VK_DESCRIPTOR_TYPE_SAMPLER,
+                .stages     = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .count      = 1,
+                .samplers   = &render_state.texture_sampler,
             },
         };
-        global_rs.data.textures = CreateShaderData(&perm_stack->allocator, &info);
-
-        // Write image data to textures.
-        BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-        {
-            WriteImageToTexture(global_rs.data.textures, i, &global_rs.staging_buffer, TEXTURE_IMAGE_PATHS[i]);
-        }
+        InitDescriptorSet(&render_state.textures_descriptor_set, perm_stack, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 }
 
-static void InitShaderDataSets(Stack* perm_stack, Stack* temp_stack)
+static void InitVertexLayout(Stack* perm_stack)
 {
-    // data_set.entity_buffer
-    {
-        ShaderData* datas[] =
-        {
-            global_rs.data.entity_buffer,
-        };
-        global_rs.data_set.entity_data = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-    }
+    VertexLayout* vertex_layout = &render_state.vertex_layout;
 
-    // data_set.textures
-    {
-        ShaderData* datas[] =
-        {
-            global_rs.data.textures,
-        };
-        global_rs.data_set.textures = CreateShaderDataSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
-    }
+    // Init pipeline vertex layout.
+    InitArray(&vertex_layout->bindings, &perm_stack->allocator, 1);
+    PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
+
+    InitArray(&vertex_layout->attributes, &perm_stack->allocator, 4);
+    PushAttribute(vertex_layout, 3, ATTRIBUTE_TYPE_FLOAT32); // Position
+    PushAttribute(vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // UV
 }
 
-static void InitShaders(Stack* perm_stack, Stack* temp_stack)
-{
-    global_rs.shader.vert =
-        CreateShader(&perm_stack->allocator, temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    global_rs.shader.frag =
-        CreateShader(&perm_stack->allocator, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-}
-
-static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
+static void InitPipelines(Stack* temp_stack, FreeList* free_list)
 {
     // Pipeline Layout
-    ShaderDataSet* shader_data_sets[] =
+    VkDescriptorSetLayout descriptor_set_layouts[] =
     {
-        global_rs.data_set.entity_data,
-        global_rs.data_set.textures,
+        render_state.entity_descriptor_set.layout,
+        render_state.textures_descriptor_set.layout,
     };
     // VkPushConstantRange push_constant_ranges[] =
     // {
@@ -329,8 +289,8 @@ static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_l
     // };
     PipelineLayoutInfo pipeline_layout_info =
     {
-        .shader_data_sets     = CTK_WRAP_ARRAY(shader_data_sets),
-        // .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
+        .descriptor_set_layouts = CTK_WRAP_ARRAY(descriptor_set_layouts),
+        // .push_constant_ranges   = CTK_WRAP_ARRAY(push_constant_ranges),
     };
 
     // Pipeline Info
@@ -348,116 +308,34 @@ static void InitPipelines(Stack* perm_stack, Stack* temp_stack, FreeList* free_l
     };
     Shader* shaders[] =
     {
-        global_rs.shader.vert,
-        global_rs.shader.frag,
+        &render_state.vert_shader,
+        &render_state.frag_shader,
     };
     PipelineInfo pipeline_info =
     {
         .shaders       = CTK_WRAP_ARRAY(shaders),
         .viewports     = CTK_WRAP_ARRAY(viewports),
-        .vertex_layout = &global_rs.vertex_layout,
+        .vertex_layout = &render_state.vertex_layout,
         .depth_testing = true,
-        .render_target = global_rs.render_target,
+        .render_target = &render_state.render_target,
     };
 
-    global_rs.pipeline = CreatePipeline(&perm_stack->allocator, temp_stack, free_list, &pipeline_info,
-                                        &pipeline_layout_info);
-}
-
-static void InitMeshes(Stack* perm_stack)
-{
-    MeshDataInfo mesh_data_info =
-    {
-        .vertex_buffer_size = Megabyte32<1>(),
-        .index_buffer_size  = Megabyte32<1>(),
-    };
-    global_rs.mesh.data = CreateMeshData(&perm_stack->allocator, &global_rs.device_stack, &mesh_data_info);
-
-    {
-        #include "rtk/meshes/cube.h"
-        global_rs.mesh.cube = CreateDeviceMesh(&perm_stack->allocator, global_rs.mesh.data,
-                                               CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                                               &global_rs.staging_buffer);
-    }
-
-    {
-        #include "rtk/meshes/quad.h"
-        global_rs.mesh.quad = CreateDeviceMesh(&perm_stack->allocator, global_rs.mesh.data,
-                                               CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                                               &global_rs.staging_buffer);
-    }
-}
-
-template<typename StateType>
-static void InitThreadPoolJob(Job<StateType>* job, Stack* perm_stack, uint32 thread_count)
-{
-    InitArrayFull(&job->states, &perm_stack->allocator, thread_count);
-    InitArrayFull(&job->tasks, &perm_stack->allocator, thread_count);
-}
-
-static void InitThreadPoolJobs(Stack* perm_stack, ThreadPool* thread_pool)
-{
-    InitThreadPoolJob(&global_rs.job.update_mvp_matrixes, perm_stack, thread_pool->size);
-    InitThreadPoolJob(&global_rs.job.record_render_commands, perm_stack, RENDER_THREAD_COUNT);
-}
-
-static Matrix GetViewProjectionMatrix(View* view)
-{
-    // View Matrix
-    Matrix view_model_matrix = ID_MATRIX;
-    view_model_matrix = RotateX(view_model_matrix, view->rotation.x);
-    view_model_matrix = RotateY(view_model_matrix, view->rotation.y);
-    view_model_matrix = RotateZ(view_model_matrix, view->rotation.z);
-    Vec3<float32> forward =
-    {
-        .x = Get(&view_model_matrix, 0, 2),
-        .y = Get(&view_model_matrix, 1, 2),
-        .z = Get(&view_model_matrix, 2, 2),
-    };
-    Matrix view_matrix = LookAt(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
-
-    // Projection Matrix
-    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
-    float32 swapchain_aspect_ratio = (float32)swapchain_extent.width / swapchain_extent.height;
-    Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, swapchain_aspect_ratio,
-                                                    view->z_near, view->z_far);
-
-    return projection_matrix * view_matrix;
-}
-
-static void UpdateMVPMatrixesThread(void* data)
-{
-    auto state = (MVPMatrixState*)data;
-    BatchRange batch_range = state->batch_range;
-    Matrix view_projection_matrix = state->view_projection_matrix;
-    EntityBuffer* frame_entity_buffer = state->frame_entity_buffer;
-    EntityData* entity_data = state->entity_data;
-
-    // Update entity MVP matrixes.
-    for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
-    {
-        Transform* entity_transform = GetTransformPtr(entity_data, i);
-        Matrix model_matrix = ID_MATRIX;
-        model_matrix = Translate(model_matrix, entity_transform->position);
-        model_matrix = RotateX(model_matrix, entity_transform->rotation.x);
-        model_matrix = RotateY(model_matrix, entity_transform->rotation.y);
-        model_matrix = RotateZ(model_matrix, entity_transform->rotation.z);
-        // model_matrix = Scale(model_matrix, entity_transform->scale);
-
-        frame_entity_buffer->mvp_matrixes[i] = view_projection_matrix * model_matrix;
-        frame_entity_buffer->texture_indexes[i] = entity_data->texture_indexes[i];
-    }
+    InitPipeline(&render_state.pipeline, temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
 }
 
 static void RecordRenderCommandsThread(void* data)
 {
     auto state = (RenderCommandState*)data;
-    VkCommandBuffer command_buffer = BeginRenderCommands(global_rs.render_target, state->thread_index);
-        Pipeline* pipeline = global_rs.pipeline;
+    VkCommandBuffer command_buffer = BeginRenderCommands(&render_state.render_target, state->thread_index);
+        Pipeline* pipeline = &render_state.pipeline;
         BindPipeline(command_buffer, pipeline);
-        BindShaderDataSet(command_buffer, global_rs.data_set.entity_data, pipeline, 0);
-        BindShaderDataSet(command_buffer, global_rs.data_set.textures, pipeline, 1);
-        BindMeshData(command_buffer, global_rs.mesh.data);
+        DescriptorSet* descriptor_sets[] =
+        {
+            &render_state.entity_descriptor_set,
+            &render_state.textures_descriptor_set,
+        };
+        BindDescriptorSets(command_buffer, pipeline, state->temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
+        BindMeshData(command_buffer, &render_state.mesh_data);
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
     EndRenderCommands(command_buffer);
 }
@@ -473,77 +351,49 @@ static void UpdateAllPipelineViewports(FreeList* free_list)
             .width    = (float32)swapchain_extent.width,
             .height   = (float32)swapchain_extent.height,
             .minDepth = 0,
-            .maxDepth = 1
+            .maxDepth = 1,
         },
     };
-    UpdatePipelineViewports(global_rs.pipeline, free_list, CTK_WRAP_ARRAY(viewports));
+    UpdatePipelineViewports(&render_state.pipeline, free_list, CTK_WRAP_ARRAY(viewports));
 }
 
 static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_list)
 {
-    UpdateRenderTargetAttachments(global_rs.render_target, temp_stack, free_list);
+    UpdateRenderTargetAttachments(&render_state.render_target, temp_stack, free_list);
 }
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ThreadPool* thread_pool)
+static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, uint32 render_thread_count)
 {
-    InitVertexLayout(perm_stack);
-    InitSampler();
+    InitThreadPoolJob(&render_state.render_command_job, perm_stack, render_thread_count);
+    InitRenderThreadTempStacks(perm_stack, render_thread_count);
 
     InitDeviceMemory();
 
-    InitImageState(&perm_stack->allocator, 16);
-    InitShaderDatas(perm_stack);
+    InitRenderTargets(temp_stack, free_list);
+    InitShaders(temp_stack);
+    InitMeshes();
 
-    InitShaderDataSets(perm_stack, temp_stack);
-    InitRenderTargets(perm_stack, temp_stack, free_list);
-    InitShaders(perm_stack, temp_stack);
-    InitPipelines(perm_stack, temp_stack, free_list);
-    InitMeshes(perm_stack);
-    InitThreadPoolJobs(perm_stack, thread_pool);
-
-}
-
-static void UpdateMVPMatrixes(ThreadPool* thread_pool)
-{
-    Job<MVPMatrixState>* job = &global_rs.job.update_mvp_matrixes;
-    Matrix view_projection_matrix = GetViewProjectionMatrix(&game_state.view);
-    auto frame_entity_buffer = GetCurrentFrameBufferMem<EntityBuffer>(global_rs.data.entity_buffer, 0);
-    uint32 thread_count = thread_pool->size;
-
-    // Initialize thread states and submit tasks.
-    for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
-    {
-        MVPMatrixState* state = GetPtr(&job->states, thread_index);
-        state->batch_range            = GetBatchRange(thread_index, thread_count, game_state.entity_data.count);
-        state->view_projection_matrix = view_projection_matrix;
-        state->frame_entity_buffer    = frame_entity_buffer;
-        state->entity_data            = &game_state.entity_data;
-
-        Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, UpdateMVPMatrixesThread));
-    }
-
-    // Wait for tasks to complete.
-    for (uint32 i = 0; i < thread_count; ++i)
-    {
-        Wait(thread_pool, Get(&job->tasks, i));
-    }
+    InitDescriptorDatas(perm_stack);
+    InitDescriptorSets(perm_stack, temp_stack);
+    InitVertexLayout(perm_stack);
+    InitPipelines(temp_stack, free_list);
 }
 
 static void RecordRenderCommands(ThreadPool* thread_pool)
 {
-    Job<RenderCommandState>* job = &global_rs.job.record_render_commands;
+    Job<RenderCommandState>* job = &render_state.render_command_job;
 
     static Mesh* meshes[] =
     {
-        global_rs.mesh.quad,
-        global_rs.mesh.cube,
+        &render_state.quad_mesh,
+        &render_state.cube_mesh,
     };
     static constexpr uint32 TEXTURE_COUNT = 3;
     static constexpr uint32 MESH_COUNT    = CTK_ARRAY_SIZE(meshes);
     static constexpr uint32 THREAD_COUNT  = TEXTURE_COUNT * MESH_COUNT;
-    static_assert(THREAD_COUNT <= RENDER_THREAD_COUNT);
+    CTK_ASSERT(THREAD_COUNT <= RENDER_THREAD_COUNT);
 
     for (uint32 texture_index = 0; texture_index < TEXTURE_COUNT; ++texture_index)
     {
@@ -553,7 +403,8 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
             RenderCommandState* state = GetPtr(&job->states, thread_index);
             state->thread_index = thread_index;
             state->mesh         = meshes[mesh_index];
-            state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, game_state.entity_data.count);
+            state->batch_range  = GetBatchRange(thread_index, THREAD_COUNT, render_state.entity_count);
+            state->temp_stack   = GetPtr(&render_state.render_thread_temp_stacks, thread_index);
 
             Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));
         }
@@ -568,7 +419,16 @@ static void RecordRenderCommands(ThreadPool* thread_pool)
 
 static RenderTarget* GetRenderTarget()
 {
-    return global_rs.render_target;
+    return &render_state.render_target;
 }
 
+static Buffer* GetEntityBuffer()
+{
+    return &render_state.entity_buffer;
+}
+
+static void SetEntityCount(uint32 entity_count)
+{
+    CTK_ASSERT(entity_count <= MAX_ENTITIES);
+    render_state.entity_count = entity_count;
 }

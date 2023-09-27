@@ -31,17 +31,15 @@ struct BufferInfo
     BufferType   type;
     VkDeviceSize size;
     VkDeviceSize offset_alignment;
-    uint32       instance_count;
 };
 
 struct Buffer
 {
     VkBuffer     hnd;
-    uint8*       mapped_mem;
+    VkDeviceSize offset;
     VkDeviceSize size;
-    uint32       instance_count;
-    VkDeviceSize offsets[MAX_FRAME_COUNT];
-    VkDeviceSize indexes[MAX_FRAME_COUNT];
+    VkDeviceSize index;
+    uint8*       mapped_mem;
 };
 
 /// Interface
@@ -103,39 +101,32 @@ static BufferStack* CreateBufferStack(const Allocator* allocator, BufferStackInf
 
 static void InitBuffer(Buffer* buffer, BufferStack* buffer_stack, BufferInfo* info)
 {
-    CTK_ASSERT(info->instance_count > 0);
-    CTK_ASSERT(info->instance_count <= MAX_FRAME_COUNT);
+    PhysicalDevice* physical_device = GetPhysicalDevice();
 
-    VkPhysicalDeviceLimits* limits = &GetPhysicalDevice()->properties.limits;
+    VkDeviceSize offset_alignment = info->offset_alignment;
     if (info->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
-        info->offset_alignment = info->type == BufferType::UNIFORM ? limits->minUniformBufferOffsetAlignment :
-                                 info->type == BufferType::STORAGE ? limits->minStorageBufferOffsetAlignment :
-                                 4;
+        info->offset_alignment =
+            info->type == BufferType::UNIFORM ? physical_device->properties.limits.minUniformBufferOffsetAlignment :
+            info->type == BufferType::STORAGE ? physical_device->properties.limits.minStorageBufferOffsetAlignment :
+            4;
     }
+    VkDeviceSize offset_aligned_index = MultipleOf(buffer_stack->index, info->offset_alignment);
 
-    VkDeviceSize aligned_offset = MultipleOf(buffer_stack->index, info->offset_alignment);
-    VkDeviceSize aligned_size = MultipleOf(info->size, info->offset_alignment);
-    uint32 total_aligned_size = aligned_size * info->instance_count;
-    if (aligned_offset + total_aligned_size > buffer_stack->size)
+    if (offset_aligned_index + info->size > buffer_stack->size)
     {
-        CTK_FATAL("can't sub-allocate %u offset-aligned %u-byte buffer(s) (%u-bytes total) from buffer-stack at "
-                  "offset-aligned index %u: allocation would exceed buffer-stack size of %u",
-                  info->instance_count, aligned_size, total_aligned_size, info->offset_alignment, aligned_offset,
-                  buffer_stack->size);
+        CTK_FATAL("can't sub-allocate %u-byte buffer for from buffer-stack at %u-byte offset-aligned index %u: "
+                  "allocation would exceed buffer-stack size of %u",
+                  info->size, info->offset_alignment, offset_aligned_index, buffer_stack->size);
     }
 
-    buffer->hnd            = buffer_stack->hnd;
-    buffer->mapped_mem     = buffer_stack->mapped_mem;
-    buffer->size           = aligned_size;
-    buffer->instance_count = info->instance_count;
-    for (uint32 i = 0; i < info->instance_count; ++i)
-    {
-        buffer->offsets[i] = aligned_offset + (aligned_size * i);
-        buffer->indexes[i] = 0;
-    }
+    buffer->hnd        = buffer_stack->hnd;
+    buffer->offset     = offset_aligned_index;
+    buffer->size       = info->size;
+    buffer->index      = 0;
+    buffer->mapped_mem = buffer_stack->mapped_mem == NULL ? NULL : buffer_stack->mapped_mem + buffer->offset;
 
-    buffer_stack->index = aligned_offset + total_aligned_size;
+    buffer_stack->index = offset_aligned_index + info->size;
 }
 
 static Buffer* CreateBuffer(const Allocator* allocator, BufferStack* buffer_stack, BufferInfo* info)
@@ -145,41 +136,39 @@ static Buffer* CreateBuffer(const Allocator* allocator, BufferStack* buffer_stac
     return buffer;
 }
 
-static void WriteHostBuffer(Buffer* buffer, uint32 instance_index, void* data, VkDeviceSize data_size)
+static void WriteHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
 {
     CTK_ASSERT(buffer->mapped_mem != NULL);
-    CTK_ASSERT(instance_index < buffer->instance_count);
 
     if (data_size > buffer->size)
     {
         CTK_FATAL("can't write %u bytes to host-buffer: write would exceed size of %u", data_size, buffer->size);
     }
 
-    memcpy(buffer->mapped_mem + buffer->offsets[instance_index], data, data_size);
-    buffer->indexes[instance_index] = data_size;
+    memcpy(buffer->mapped_mem, data, data_size);
+    buffer->index = data_size;
 }
 
-static void AppendHostBuffer(Buffer* buffer, uint32 instance_index, void* data, VkDeviceSize data_size)
+static void AppendHostBuffer(Buffer* buffer, void* data, VkDeviceSize data_size)
 {
     CTK_ASSERT(buffer->mapped_mem != NULL);
-    CTK_ASSERT(instance_index < buffer->instance_count);
 
-    if (buffer->indexes[instance_index] + data_size > buffer->size)
+    if (buffer->index + data_size > buffer->size)
     {
         CTK_FATAL("can't append %u bytes to host-buffer at index %u: append would exceed size of %u", data_size,
-                  buffer->indexes[instance_index], buffer->size);
+                  buffer->index, buffer->size);
     }
 
-    memcpy(buffer->mapped_mem + buffer->offsets[instance_index] + buffer->indexes[instance_index], data, data_size);
-    buffer->indexes[instance_index] += data_size;
+    memcpy(buffer->mapped_mem + buffer->index, data, data_size);
+    buffer->index += data_size;
 }
 
-static void WriteDeviceBufferCmd(Buffer* buffer, uint32 instance_index,
-                                 Buffer* src_buffer, uint32 src_instance_index,
-                                 VkDeviceSize offset, VkDeviceSize size)
+static void WriteDeviceBufferCmd(Buffer* buffer, Buffer* staging_buffer, VkDeviceSize offset = 0, VkDeviceSize size = 0)
 {
-    CTK_ASSERT(src_buffer->instance_count == 1);
-    CTK_ASSERT(instance_index < buffer->instance_count);
+    if (size == 0)
+    {
+        size = staging_buffer->index;
+    }
 
     if (size > buffer->size)
     {
@@ -189,49 +178,39 @@ static void WriteDeviceBufferCmd(Buffer* buffer, uint32 instance_index,
 
     VkBufferCopy copy =
     {
-        .srcOffset = src_buffer->offsets[src_instance_index] + offset,
-        .dstOffset = buffer->offsets[instance_index],
+        .srcOffset = staging_buffer->offset + offset,
+        .dstOffset = buffer->offset,
         .size      = size,
     };
-    vkCmdCopyBuffer(global_ctx.temp_command_buffer, src_buffer->hnd, buffer->hnd, 1, &copy);
-    buffer->indexes[instance_index] = size;
+    vkCmdCopyBuffer(global_ctx.temp_command_buffer, staging_buffer->hnd, buffer->hnd, 1, &copy);
+    buffer->index = size;
 }
 
-static void AppendDeviceBufferCmd(Buffer* buffer, uint32 instance_index,
-                                  Buffer* src_buffer, uint32 src_instance_index,
-                                  VkDeviceSize offset, VkDeviceSize size)
+static void AppendDeviceBufferCmd(Buffer* buffer, Buffer* staging_buffer, VkDeviceSize offset = 0,
+                                  VkDeviceSize size = 0)
 {
-    CTK_ASSERT(src_buffer->instance_count == 1);
-    CTK_ASSERT(instance_index < buffer->instance_count);
+    if (size == 0)
+    {
+        size = staging_buffer->index;
+    }
 
-    if (buffer->indexes[instance_index] + size > buffer->size)
+    if (buffer->index + size > buffer->size)
     {
         CTK_FATAL("can't append %u bytes to device-buffer at index %u: append would exceed size of %u",
-                  size, buffer->indexes[instance_index], buffer->size);
+                  size, buffer->index, buffer->size);
     }
 
     VkBufferCopy copy =
     {
-        .srcOffset = src_buffer->offsets[src_instance_index] + offset,
-        .dstOffset = buffer->offsets[instance_index] + buffer->indexes[instance_index],
+        .srcOffset = staging_buffer->offset + offset,
+        .dstOffset = buffer->offset + buffer->index,
         .size      = size,
     };
-    vkCmdCopyBuffer(global_ctx.temp_command_buffer, src_buffer->hnd, buffer->hnd, 1, &copy);
-    buffer->indexes[instance_index] += size;
-}
-
-template<typename Type>
-static Type* GetMappedMem(Buffer* buffer, uint32 instance_index)
-{
-    CTK_ASSERT(buffer->mapped_mem != NULL);
-    CTK_ASSERT(instance_index < buffer->instance_count);
-    return (Type*)(buffer->mapped_mem + buffer->offsets[instance_index]);
+    vkCmdCopyBuffer(global_ctx.temp_command_buffer, staging_buffer->hnd, buffer->hnd, 1, &copy);
+    buffer->index += size;
 }
 
 static void Clear(Buffer* buffer)
 {
-    for (uint32 i = 0; i < buffer->instance_count; ++i)
-    {
-        buffer->indexes[i] = 0;
-    }
+    buffer->index = 0;
 }

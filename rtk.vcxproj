@@ -147,39 +147,6 @@
   <ItemGroup>
     <ClCompile Include="test.cc" />
   </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="buffer.h" />
-    <ClInclude Include="buffer_2.h" />
-    <ClInclude Include="context.h" />
-    <ClInclude Include="debug.h" />
-    <ClInclude Include="descriptor_set.h" />
-    <ClInclude Include="descriptor_set_2.h" />
-    <ClInclude Include="device_features.h" />
-    <ClInclude Include="enum_names.h" />
-    <ClInclude Include="frame_metrics.h" />
-    <ClInclude Include="image.h" />
-    <ClInclude Include="image_2.h" />
-    <ClInclude Include="mesh.h" />
-    <ClInclude Include="mesh_2.h" />
-    <ClInclude Include="pipeline.h" />
-    <ClInclude Include="pipeline_2.h" />
-    <ClInclude Include="pipeline_defaults.h" />
-    <ClInclude Include="rendering.h" />
-    <ClInclude Include="rendering_2.h" />
-    <ClInclude Include="render_target.h" />
-    <ClInclude Include="rtk.h" />
-    <ClInclude Include="shader.h" />
-    <ClInclude Include="shader_data.h" />
-    <ClInclude Include="stb\stb_image.h" />
-    <ClInclude Include="tests\3d\defs.h" />
-    <ClInclude Include="tests\3d\game_state.h" />
-    <ClInclude Include="tests\3d\main.h" />
-    <ClInclude Include="tests\3d\render_state.h" />
-    <ClInclude Include="tests\debug\defs.h" />
-    <ClInclude Include="tests\debug\main.h" />
-    <ClInclude Include="tests\shared.h" />
-    <ClInclude Include="vk_array.h" />
-  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

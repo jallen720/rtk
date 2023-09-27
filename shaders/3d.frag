@@ -17,9 +17,11 @@ layout(set = 0, binding = 0, std430) uniform EntityBuffer
 }
 entity;
 
-layout(set = 1, binding = 0) uniform sampler2D textures[MAX_TEXTURES];
+layout(set = 1, binding = 0) uniform texture2D textures[MAX_TEXTURES];
+layout(set = 1, binding = 1) uniform sampler texture_sampler;
 
 void main()
 {
-    out_color = texture(textures[nonuniformEXT(entity.texture_indexes[in_entity_index])], in_vert_uv);
+    out_color = texture(sampler2D(textures[nonuniformEXT(entity.texture_indexes[in_entity_index])], texture_sampler),
+                        in_vert_uv);
 }

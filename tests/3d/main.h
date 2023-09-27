@@ -2,7 +2,10 @@
 
 #include <windows.h>
 #include "ctk3/ctk3.h"
+#include "ctk3/debug.h"
+#include "ctk3/math.h"
 #include "ctk3/stack.h"
+#include "ctk3/array.h"
 #include "ctk3/free_list.h"
 #include "ctk3/thread_pool.h"
 #include "ctk3/profile.h"
@@ -13,14 +16,17 @@
 
 #include "rtk/tests/shared.h"
 #include "rtk/tests/3d/defs.h"
-#include "rtk/tests/3d/game_state.h"
-#include "rtk/tests/3d/render_state.h"
 
 using namespace CTK;
 using namespace RTK;
 
 namespace Test3D
 {
+
+static constexpr uint32 RENDER_THREAD_COUNT = 6;
+
+#include "rtk/tests/3d/render_state.h"
+#include "rtk/tests/3d/game_state.h"
 
 static void Run()
 {
@@ -85,8 +91,8 @@ LogPhysicalDevice(global_ctx.physical_device);
 
     // Initialize other test state.
     ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
-    InitGameState();
-    InitRenderState(perm_stack, temp_stack, free_list, thread_pool);
+    InitRenderState(perm_stack, temp_stack, free_list, RENDER_THREAD_COUNT);
+    InitGameState(perm_stack, thread_pool->size);
 
     // Run game.
     for (;;)

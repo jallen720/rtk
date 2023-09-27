@@ -7,7 +7,7 @@
 #include "ctk3/window.h"
 
 #define RTK_ENABLE_VALIDATION
-#include "rtk/rtk_2.h"
+#include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
 #include "rtk/tests/debug/defs.h"
@@ -20,19 +20,18 @@ namespace TestDebug
 
 struct RenderState
 {
-    BufferStack     host_stack;
-    BufferStack     device_stack;
-    Buffer          staging_buffer;
-    RenderTarget    render_target;
-    Buffer          entity_buffer;
-    Array<ImageHnd> textures;
-    VkSampler       texture_sampler;
-    DescriptorSet   descriptor_set;
-    Shader          vert_shader;
-    Shader          frag_shader;
-    Pipeline        pipeline;
-    MeshData        mesh_data;
-    Mesh            quad_mesh;
+    BufferStack*   host_stack;
+    BufferStack*   device_stack;
+    Buffer*        staging_buffer;
+    RenderTarget*  render_target;
+    ShaderData*    textures;
+    ShaderData*    entity_buffer;
+    ShaderDataSet* shader_data_set;
+    Shader*        vert_shader;
+    Shader*        frag_shader;
+    Pipeline*      pipeline;
+    MeshData*      mesh_data;
+    Mesh*          quad_mesh;
 };
 
 struct EntityBuffer
@@ -51,20 +50,27 @@ static constexpr const char* TEXTURE_IMAGE_PATHS[] =
 static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
 static_assert(TEXTURE_COUNT == MAX_TEXTURES);
 
+static void WriteImageToTexture(ShaderData* sd, uint32 index, Buffer* staging_buffer, const char* image_path)
+{
+    // Load image data and write to staging buffer.
+    ImageData image_data = {};
+    LoadImageData(&image_data, image_path);
+    WriteHostBuffer(staging_buffer, image_data.data, (VkDeviceSize)image_data.size);
+    DestroyImageData(&image_data);
+
+    // Copy image data in staging buffer to shader data images.
+    uint32 image_count = GetImageCount(sd);
+    for (uint32 i = 0; i < image_count; ++i)
+    {
+        WriteToShaderDataImage(sd, 0, index, staging_buffer);
+    }
+}
+
 static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
     Stack frame = CreateFrame(temp_stack);
 
-    BufferStackInfo device_stack_info =
-    {
-        .size               = Megabyte32<16>(),
-        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
-                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    };
-    InitBufferStack(&rs->device_stack, &device_stack_info);
+    // Device Memory
     BufferStackInfo host_stack_info =
     {
         .size               = Megabyte32<16>(),
@@ -75,15 +81,27 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .mem_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    InitBufferStack(&rs->host_stack, &host_stack_info);
+    rs->host_stack = CreateBufferStack(&perm_stack->allocator, &host_stack_info);
+    BufferStackInfo device_stack_info =
+    {
+        .size               = Megabyte32<16>(),
+        .usage_flags        = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+                              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                              VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .mem_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    rs->device_stack = CreateBufferStack(&perm_stack->allocator, &device_stack_info);
     BufferInfo staging_buffer_info =
     {
         .type             = BufferType::BUFFER,
         .size             = Megabyte32<4>(),
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .instance_count   = 1,
     };
-    InitBuffer(&rs->staging_buffer, &rs->host_stack, &staging_buffer_info);
+    rs->staging_buffer = CreateBuffer(&perm_stack->allocator, rs->host_stack, &staging_buffer_info);
+
+    // Image State
+    InitImageState(&perm_stack->allocator, 8);
 
     // Render Target
     VkClearValue attachment_clear_values[] = { { .color = { 0.0f, 0.1f, 0.2f, 1.0f } } };
@@ -92,75 +110,24 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .depth_testing           = false,
         .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
     };
-    InitRenderTarget(&rs->render_target, &frame, free_list, &rt_info);
+    rs->render_target = CreateRenderTarget(&perm_stack->allocator, &frame, free_list, &rt_info);
 
-    // Shaders
-    InitShader(&rs->vert_shader, &frame, "shaders/bin/debug_2.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    InitShader(&rs->frag_shader, &frame, "shaders/bin/debug_2.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    // Meshes
-    MeshDataInfo mesh_data_info =
+    // Entity-Buffer Shader Data
+    ShaderDataInfo entity_buffer_info =
     {
-        .vertex_buffer_size = Megabyte32<1>(),
-        .index_buffer_size  = Megabyte32<1>(),
-    };
-    InitMeshData(&rs->mesh_data, &rs->device_stack, &mesh_data_info);
-    {
-        #include "rtk/meshes/quad.h"
-        InitDeviceMesh(&rs->quad_mesh, &rs->mesh_data, CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                       &rs->staging_buffer);
-    }
-
-    // Descriptor Datas
-
-    // Entity Buffer
-    BufferInfo entity_buffer_info =
-    {
-        .type             = BufferType::UNIFORM,
-        .size             = sizeof(EntityBuffer),
-        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .instance_count   = GetFrameCount(),
-    };
-    InitBuffer(&rs->entity_buffer, &rs->host_stack, &entity_buffer_info);
-
-    // Textures
-    InitImageState(&perm_stack->allocator, 8);
-    InitArray(&rs->textures, &perm_stack->allocator, TEXTURE_COUNT);
-    VkImageCreateInfo texture_create_info =
-    {
-        .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .pNext     = NULL,
-        .flags     = 0,
-        .imageType = VK_IMAGE_TYPE_2D,
-        .format    = GetSwapchain()->surface_format.format,
-        .extent =
+        .stages    = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .type      = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .per_frame = true,
+        .count     = 1,
+        .buffer =
         {
-            .width  = 64,
-            .height = 32,
-            .depth  = 1
+            .stack = rs->host_stack,
+            .size  = sizeof(EntityBuffer),
         },
-        .mipLevels             = 1,
-        .arrayLayers           = 1,
-        .samples               = VK_SAMPLE_COUNT_1_BIT,
-        .tiling                = VK_IMAGE_TILING_OPTIMAL,
-        .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                 VK_IMAGE_USAGE_SAMPLED_BIT,
-        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 0,
-        .pQueueFamilyIndices   = NULL,
-        .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
     };
-    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-    {
-        Push(&rs->textures, CreateImage(&texture_create_info));
-    }
-    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-    {
-        LoadImage(Get(&rs->textures, i), &rs->staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
-    }
+    rs->entity_buffer = CreateShaderData(&perm_stack->allocator, &entity_buffer_info);
 
-    // Texture Sampler
+    // Textures Shader Data
     VkSamplerCreateInfo texture_sampler_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -182,37 +149,68 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    rs->texture_sampler = CreateSampler(&texture_sampler_info);
-
-    // Descriptor Sets
-    DescriptorData descriptor_datas[] =
+    ShaderDataInfo texture_info =
     {
+        .stages    = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .type      = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .per_frame = false,
+        .count     = TEXTURE_COUNT,
+        .image =
         {
-            .type       = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .stages     = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            .count      = 1,
-            .buffers    = &rs->entity_buffer,
-        },
-        {
-            .type       = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .stages     = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .count      = rs->textures.count,
-            .image_hnds = rs->textures.data,
-        },
-        {
-            .type       = VK_DESCRIPTOR_TYPE_SAMPLER,
-            .stages     = VK_SHADER_STAGE_FRAGMENT_BIT,
-            .count      = 1,
-            .samplers   = &rs->texture_sampler,
+            .image =
+            {
+                .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+                .pNext     = NULL,
+                .flags     = 0,
+                .imageType = VK_IMAGE_TYPE_2D,
+                .format    = GetSwapchain()->surface_format.format,
+                .extent =
+                {
+                    .width  = 64,
+                    .height = 32,
+                    .depth  = 1
+                },
+                .mipLevels             = 1,
+                .arrayLayers           = 1,
+                .samples               = VK_SAMPLE_COUNT_1_BIT,
+                .tiling                = VK_IMAGE_TILING_OPTIMAL,
+                .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                         VK_IMAGE_USAGE_SAMPLED_BIT,
+                .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+                .queueFamilyIndexCount = 0,
+                .pQueueFamilyIndices   = NULL,
+                .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+            },
+            .sampler = CreateSampler(&texture_sampler_info),
         },
     };
-    InitDescriptorSet(&rs->descriptor_set, perm_stack, &frame, CTK_WRAP_ARRAY(descriptor_datas));
+    rs->textures = CreateShaderData(&perm_stack->allocator, &texture_info);
+
+    // Write image data to textures.
+    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        WriteImageToTexture(rs->textures, i, rs->staging_buffer, TEXTURE_IMAGE_PATHS[i]);
+    }
+
+    ShaderData* shader_datas[] =
+    {
+        rs->entity_buffer,
+        rs->textures,
+    };
+    rs->shader_data_set = CreateShaderDataSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(shader_datas));
+
+    // Shaders
+    rs->vert_shader = CreateShader(&perm_stack->allocator, &frame, "shaders/bin/debug.vert.spv",
+                                   VK_SHADER_STAGE_VERTEX_BIT);
+    rs->frag_shader = CreateShader(&perm_stack->allocator, &frame, "shaders/bin/debug.frag.spv",
+                                   VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Pipeline
     Shader* shaders[] =
     {
-        &rs->vert_shader,
-        &rs->frag_shader,
+        rs->vert_shader,
+        rs->frag_shader,
     };
     VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
     VkViewport viewports[] =
@@ -238,11 +236,11 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .viewports     = CTK_WRAP_ARRAY(viewports),
         .vertex_layout = &vertex_layout,
         .depth_testing = false,
-        .render_target = &rs->render_target,
+        .render_target = rs->render_target,
     };
-    VkDescriptorSetLayout descriptor_set_layouts[] =
+    ShaderDataSet* shader_data_sets[] =
     {
-        rs->descriptor_set.layout,
+        rs->shader_data_set,
     };
     VkPushConstantRange push_constant_ranges[] =
     {
@@ -254,10 +252,24 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     };
     PipelineLayoutInfo pipeline_layout_info =
     {
-        .descriptor_set_layouts = CTK_WRAP_ARRAY(descriptor_set_layouts),
-        .push_constant_ranges   = CTK_WRAP_ARRAY(push_constant_ranges),
+        .shader_data_sets     = CTK_WRAP_ARRAY(shader_data_sets),
+        .push_constant_ranges = CTK_WRAP_ARRAY(push_constant_ranges),
     };
-    InitPipeline(&rs->pipeline, &frame, free_list, &pipeline_info, &pipeline_layout_info);
+    rs->pipeline = CreatePipeline(&perm_stack->allocator, &frame, free_list, &pipeline_info, &pipeline_layout_info);
+
+    // Meshes
+    MeshDataInfo mesh_data_info =
+    {
+        .vertex_buffer_size = Megabyte32<1>(),
+        .index_buffer_size  = Megabyte32<1>(),
+    };
+    rs->mesh_data = CreateMeshData(&perm_stack->allocator, rs->device_stack, &mesh_data_info);
+    {
+        #include "rtk/meshes/quad.h"
+        rs->quad_mesh = CreateDeviceMesh(&perm_stack->allocator, rs->mesh_data,
+                                         CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                                         rs->staging_buffer);
+    }
 }
 
 static void Run()
@@ -328,6 +340,7 @@ static void Run()
     ///
     /// Test
     ///
+
     RenderState rs = {};
     InitRenderState(&rs, perm_stack, temp_stack, free_list);
 
@@ -338,7 +351,7 @@ static void Run()
     static constexpr float32 SCALE = 2.0f / ENTITY_COUNT;
     for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
     {
-        entity_buffer = GetMappedMem<EntityBuffer>(&rs.entity_buffer, frame_index);
+        entity_buffer = GetBufferMem<EntityBuffer>(rs.entity_buffer, frame_index, 0u);
         for (uint32 i = 0; i < ENTITY_COUNT; ++i)
         {
             entity_buffer->positions[i] = { SCALE * i, SCALE * i, 0, 1 };
@@ -373,7 +386,7 @@ static void Run()
             CTK_FATAL("next_frame_result != VK_SUCCESS");
         }
 
-entity_buffer = GetMappedMem<EntityBuffer>(&rs.entity_buffer, GetFrameIndex());
+entity_buffer = GetBufferMem<EntityBuffer>(rs.entity_buffer, GetFrameIndex(), 0u);
 static float32 x = 0.0f;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 {
@@ -391,17 +404,13 @@ if (KeyDown(KEY_F))
     }
 }
 
-        DescriptorSet* descriptor_sets[] =
-        {
-            &rs.descriptor_set,
-        };
-        VkCommandBuffer command_buffer = BeginRenderCommands(&rs.render_target, 0);
-            BindDescriptorSets(command_buffer, &rs.pipeline, CTK_WRAP_ARRAY(descriptor_sets), 0);
-            BindPipeline(command_buffer, &rs.pipeline);
-            BindMeshData(command_buffer, &rs.mesh_data);
-            DrawMesh(command_buffer, &rs.quad_mesh, 0, ENTITY_COUNT);
+        VkCommandBuffer command_buffer = BeginRenderCommands(rs.render_target, 0);
+            BindPipeline(command_buffer, rs.pipeline);
+            BindShaderDataSet(command_buffer, rs.shader_data_set, rs.pipeline, 0);
+            BindMeshData(command_buffer, rs.mesh_data);
+            DrawMesh(command_buffer, rs.quad_mesh, 0, ENTITY_COUNT);
         EndRenderCommands(command_buffer);
-        SubmitRenderCommands(&rs.render_target);
+        SubmitRenderCommands(rs.render_target);
     }
 }
 

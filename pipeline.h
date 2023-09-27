@@ -33,8 +33,8 @@ struct PipelineInfo
 
 struct PipelineLayoutInfo
 {
-    Array<ShaderDataSet*>      shader_data_sets;
-    Array<VkPushConstantRange> push_constant_ranges;
+    Array<VkDescriptorSetLayout> descriptor_set_layouts;
+    Array<VkPushConstantRange>   push_constant_ranges;
 };
 
 struct Pipeline
@@ -203,19 +203,9 @@ static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_l
     ////////////////////////////////////////////////////////////
 
     // Layout
-    Array<VkDescriptorSetLayout> descriptor_set_layouts = {};
-    if (layout_info->shader_data_sets.count > 0)
-    {
-        InitArray(&descriptor_set_layouts, &frame.allocator, layout_info->shader_data_sets.count);
-        for (uint32 i = 0; i < layout_info->shader_data_sets.count; ++i)
-        {
-            Push(&descriptor_set_layouts, Get(&layout_info->shader_data_sets, i)->layout);
-        }
-    }
-
     VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
-    layout_create_info.setLayoutCount         = descriptor_set_layouts.count;
-    layout_create_info.pSetLayouts            = descriptor_set_layouts.data;
+    layout_create_info.setLayoutCount         = layout_info->descriptor_set_layouts.count;
+    layout_create_info.pSetLayouts            = layout_info->descriptor_set_layouts.data;
     layout_create_info.pushConstantRangeCount = layout_info->push_constant_ranges.count;
     layout_create_info.pPushConstantRanges    = layout_info->push_constant_ranges.data;
 

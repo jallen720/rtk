@@ -28,6 +28,7 @@ static void InitMeshData(MeshData* mesh_data, BufferStack* buffer_stack, MeshDat
         .type             = BufferType::BUFFER,
         .size             = info->vertex_buffer_size,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .instance_count   = 1,
     };
     InitBuffer(&mesh_data->vertex_buffer, buffer_stack, &vertex_buffer_info);
 
@@ -36,6 +37,7 @@ static void InitMeshData(MeshData* mesh_data, BufferStack* buffer_stack, MeshDat
         .type             = BufferType::BUFFER,
         .size             = info->index_buffer_size,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .instance_count   = 1,
     };
     InitBuffer(&mesh_data->index_buffer, buffer_stack, &index_buffer_info);
 }
@@ -50,12 +52,12 @@ static MeshData* CreateMeshData(const Allocator* allocator, BufferStack* buffer_
 template<typename VertexType>
 static void InitHostMesh(Mesh* mesh, MeshData* mesh_data, Array<VertexType> vertexes, Array<uint32> indexes)
 {
-    mesh->vertex_offset = (sint32)(mesh_data->vertex_buffer.index / sizeof(VertexType));
-    mesh->index_offset  = (uint32)(mesh_data->index_buffer.index / sizeof(uint32));
+    mesh->vertex_offset = (sint32)(mesh_data->vertex_buffer.indexes[0] / sizeof(VertexType));
+    mesh->index_offset  = (uint32)(mesh_data->index_buffer.indexes[0] / sizeof(uint32));
     mesh->index_count   = indexes.count;
 
-    AppendHostBuffer(&mesh_data->vertex_buffer, vertexes.data, ByteSize(&vertexes));
-    AppendHostBuffer(&mesh_data->index_buffer, indexes.data, ByteSize(&indexes));
+    AppendHostBuffer(&mesh_data->vertex_buffer, 0, vertexes.data, ByteSize(&vertexes));
+    AppendHostBuffer(&mesh_data->index_buffer,  0, indexes.data, ByteSize(&indexes));
 }
 
 template<typename VertexType>
@@ -71,18 +73,18 @@ template<typename VertexType>
 static void InitDeviceMesh(Mesh* mesh, MeshData* mesh_data, Array<VertexType> vertexes, Array<uint32> indexes,
                            Buffer* staging_buffer)
 {
-    mesh->vertex_offset = (sint32)(mesh_data->vertex_buffer.index / sizeof(VertexType));
-    mesh->index_offset  = (uint32)(mesh_data->index_buffer.index / sizeof(uint32));
+    mesh->vertex_offset = (sint32)(mesh_data->vertex_buffer.indexes[0] / sizeof(VertexType));
+    mesh->index_offset  = (uint32)(mesh_data->index_buffer.indexes[0] / sizeof(uint32));
     mesh->index_count   = indexes.count;
 
     Clear(staging_buffer);
     VkDeviceSize vertexes_size = ByteSize(&vertexes);
     VkDeviceSize indexes_size  = ByteSize(&indexes);
-    AppendHostBuffer(staging_buffer, vertexes.data, vertexes_size);
-    AppendHostBuffer(staging_buffer, indexes.data,  indexes_size);
+    AppendHostBuffer(staging_buffer, 0, vertexes.data, vertexes_size);
+    AppendHostBuffer(staging_buffer, 0, indexes.data,  indexes_size);
     BeginTempCommandBuffer();
-        AppendDeviceBufferCmd(&mesh_data->vertex_buffer, staging_buffer, 0,             vertexes_size);
-        AppendDeviceBufferCmd(&mesh_data->index_buffer,  staging_buffer, vertexes_size, indexes_size);
+        AppendDeviceBufferCmd(&mesh_data->vertex_buffer, 0, staging_buffer, 0, 0,             vertexes_size);
+        AppendDeviceBufferCmd(&mesh_data->index_buffer,  0, staging_buffer, 0, vertexes_size, indexes_size);
     SubmitTempCommandBuffer();
 }
 

@@ -2,31 +2,25 @@
 
 #include <windows.h>
 #include "ctk3/ctk3.h"
-#include "ctk3/debug.h"
-#include "ctk3/math.h"
 #include "ctk3/stack.h"
-#include "ctk3/array.h"
 #include "ctk3/free_list.h"
 #include "ctk3/thread_pool.h"
 #include "ctk3/profile.h"
 #include "ctk3/window.h"
 
 #define RTK_ENABLE_VALIDATION
-#include "rtk/rtk_2.h"
+#include "rtk/rtk.h"
 
 #include "rtk/tests/shared.h"
 #include "rtk/tests/3d/defs.h"
+#include "rtk/tests/3d/game_state.h"
+#include "rtk/tests/3d/render_state.h"
 
 using namespace CTK;
 using namespace RTK;
 
 namespace Test3D
 {
-
-static constexpr uint32 JOB_TASK_COUNT = 6;
-
-#include "rtk/tests/3d/render_state_2.h"
-#include "rtk/tests/3d/game_state_2.h"
 
 static void Run()
 {
@@ -85,14 +79,14 @@ static void Run()
     };
     context_info.descriptor_pool_sizes = CTK_WRAP_ARRAY(descriptor_pool_sizes),
 
-    context_info.render_thread_count = JOB_TASK_COUNT,
+    context_info.render_thread_count = RENDER_THREAD_COUNT,
     InitContext(perm_stack, temp_stack, free_list, &context_info);
 LogPhysicalDevice(global_ctx.physical_device);
 
     // Initialize other test state.
     ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
-    InitRenderState(perm_stack, temp_stack, free_list, JOB_TASK_COUNT);
-    InitGameState(perm_stack, thread_pool->size);
+    InitGameState();
+    InitRenderState(perm_stack, temp_stack, free_list, thread_pool);
 
     // Run game.
     for (;;)

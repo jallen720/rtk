@@ -391,11 +391,11 @@ if (KeyDown(KEY_F))
     }
 }
 
-        DescriptorSet* descriptor_sets[] =
-        {
-            &rs.descriptor_set,
-        };
         VkCommandBuffer command_buffer = BeginRenderCommands(&rs.render_target, 0);
+            DescriptorSet* descriptor_sets[] =
+            {
+                &rs.descriptor_set,
+            };
             BindDescriptorSets(command_buffer, &rs.pipeline, temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
             BindPipeline(command_buffer, &rs.pipeline);
             BindMeshData(command_buffer, &rs.mesh_data);

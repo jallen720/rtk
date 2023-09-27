@@ -1,5 +1,8 @@
 /// Data
 ////////////////////////////////////////////////////////////
+using ImageHnd = uint32;
+using ImageGroupHnd = uint32;
+
 struct ImageMemoryType
 {
     VkDeviceMemory mem;
@@ -25,44 +28,49 @@ struct ImageData
     uint8* data;
 };
 
-using ImageHnd = uint32;
-
-static struct ImageState
+struct ImageGroup
 {
-    Image*          data;
+    Image*          images;
     uint32*         mem_type_indexes;
     uint32          count;
-    uint32          max;
+    uint32          size;
     ImageMemoryType mem_types[VK_MAX_MEMORY_TYPES];
-}
-global_image_state;
+};
+
+static Array<ImageGroup> global_image_groups;
 
 /// Debug
 ////////////////////////////////////////////////////////////
-static void LogImageState()
+static void LogImageGroups()
 {
-    PrintLine("images:");
-    for (uint32 i = 0; i < global_image_state.count; ++i)
+    for (uint32 image_group_index = 0; image_group_index < global_image_groups.count; ++image_group_index)
     {
-        Image* image = global_image_state.data + i;
-        PrintLine("    [%3u] hnd:       %llu", i, image->hnd);
-        PrintLine("          view:      %llu", image->default_view);
-        PrintLine("          extent:    { w: %u, h: %u, d: %u }",
-                  image->extent.width,
-                  image->extent.height,
-                  image->extent.depth);
-        PrintLine("          size:      %llu", image->mem_requirements.size);
-        PrintLine("          alignment: %llu", image->mem_requirements.alignment);
-        PrintLine();
-    }
+        ImageGroup* image_group = GetPtr(&global_image_groups, image_group_index);
 
-    PrintLine("memory types:");
-    for (uint32 i = 0; i < global_image_state.count; ++i)
-    {
-        ImageMemoryType* mem_type = global_image_state.mem_types + i;
-        PrintLine("    [%3u] hnd:    %llu", i, mem_type->mem);
-        PrintLine("          size:   %u", mem_type->size);
-        PrintLine();
+        PrintLine("image group %u:", image_group_index);
+        PrintLine("    images:");
+        for (uint32 i = 0; i < image_group->count; ++i)
+        {
+            Image* image = image_group->images + i;
+            PrintLine("        [%3u] hnd:       %llu", i, image->hnd);
+            PrintLine("              view:      %llu", image->default_view);
+            PrintLine("              extent:    { w: %u, h: %u, d: %u }",
+                      image->extent.width,
+                      image->extent.height,
+                      image->extent.depth);
+            PrintLine("              size:      %llu", image->mem_requirements.size);
+            PrintLine("              alignment: %llu", image->mem_requirements.alignment);
+            PrintLine();
+        }
+
+        PrintLine("    memory types:");
+        for (uint32 i = 0; i < image_group->count; ++i)
+        {
+            ImageMemoryType* mem_type = image_group->mem_types + i;
+            PrintLine("        [%3u] hnd:    %llu", i, mem_type->mem);
+            PrintLine("              size:   %u", mem_type->size);
+            PrintLine();
+        }
     }
 }
 
@@ -73,26 +81,75 @@ static bool ImageMemAlignmentDesc(Image* a, Image* b)
     return b->mem_requirements.alignment > a->mem_requirements.alignment;
 }
 
-/// Interface
-////////////////////////////////////////////////////////////
-static void InitImageState(Allocator* allocator, uint32 max)
+static uint32 GetImageGroupIndex(ImageHnd image_hnd)
 {
-    global_image_state.data             = Allocate<Image>(allocator, max);
-    global_image_state.mem_type_indexes = Allocate<uint32>(allocator, max);
-    global_image_state.count            = 0;
-    global_image_state.max              = max;
+    return 0xFFFF & image_hnd;
 }
 
-static ImageHnd CreateImage(VkImageCreateInfo* info)
+static uint32 GetImageIndex(ImageHnd image_hnd)
 {
-    if (global_image_state.count >= global_image_state.max)
+    return image_hnd >> 16;
+}
+
+/// Interface
+////////////////////////////////////////////////////////////
+static void InitImageGroups(const Allocator* allocator, uint32 max)
+{
+    CTK_ASSERT(max <= 0xFFFF);
+    InitArray(&global_image_groups, allocator, max);
+}
+
+static ImageGroupHnd CreateImageGroup(const Allocator* allocator, uint32 size)
+{
+    if (global_image_groups.count >= global_image_groups.size)
     {
-        CTK_FATAL("can't create image: already at max image count of %u", global_image_state.max);
+        CTK_FATAL("can't create image group; already at max image group count of %u", global_image_groups.size);
     }
 
-    ImageHnd image_hnd = global_image_state.count;
-    Image* image = global_image_state.data + image_hnd;
-    ++global_image_state.count;
+    ImageGroupHnd image_group_hnd = global_image_groups.count;
+
+    ImageGroup* image_group = Push(&global_image_groups);
+    image_group->images           = Allocate<Image>(allocator, size);
+    image_group->mem_type_indexes = Allocate<uint32>(allocator, size);
+    image_group->count            = 0;
+    image_group->size             = size;
+
+    return image_group_hnd;
+}
+
+static ImageGroup* GetImageGroup(ImageGroupHnd image_group_hnd)
+{
+    if (image_group_hnd >= global_image_groups.count)
+    {
+        CTK_FATAL("can't get image group for handle %u: handle exceeds max of %u",
+                  image_group_hnd, global_image_groups.count - 1);
+    }
+    return GetPtr(&global_image_groups, image_group_hnd);
+}
+
+static ImageGroup* GetImageGroupFromImage(ImageHnd image_hnd)
+{
+    uint32 image_group_index = GetImageGroupIndex(image_hnd);
+    if (image_group_index >= global_image_groups.count)
+    {
+        CTK_FATAL("can't get image group for image handle %u: image group index (%u) exceeds max of %u",
+                  image_hnd, image_group_index, global_image_groups.count - 1);
+    }
+    return GetPtr(&global_image_groups, image_group_index);
+}
+
+static ImageHnd CreateImage(ImageGroupHnd image_group_hnd, VkImageCreateInfo* info)
+{
+    ImageGroup* image_group = GetImageGroup(image_group_hnd);
+    if (image_group->count >= image_group->size)
+    {
+        CTK_FATAL("can't create image: image group %u already at max image count of %u",
+                  image_group_hnd, image_group->size - 1);
+    }
+
+    uint32 image_index = image_group->count;
+    Image* image = image_group->images + image_index;
+    ++image_group->count;
 
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
@@ -107,30 +164,43 @@ static ImageHnd CreateImage(VkImageCreateInfo* info)
     image->format = info->format;
     image->extent = info->extent;
 
-    return image_hnd;
+    return (image_index << 16) | image_group_hnd;
 }
 
-static void BackImagesWithMemory(VkMemoryPropertyFlags mem_properties)
+static Image* GetImage(ImageHnd image_hnd)
+{
+    ImageGroup* image_group = GetImageGroupFromImage(image_hnd);
+    uint32 image_index = GetImageIndex(image_hnd);
+    if (image_index >= image_group->count)
+    {
+        CTK_FATAL("can't get image with handle %u: index (%u) exceeds max image count of %u",
+                  image_hnd, image_index, image_group->count - 1);
+    }
+    return image_group->images + image_index;
+}
+
+static void BackWithMemory(ImageGroupHnd image_group_hnd, VkMemoryPropertyFlags mem_properties)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = global_ctx.device;
+    ImageGroup* image_group = GetImageGroup(image_group_hnd);
 
     // Ensure images are sorted in descending order of alignment.
-    InsertionSort(global_image_state.data, global_image_state.count, ImageMemAlignmentDesc);
+    InsertionSort(image_group->images, image_group->count, ImageMemAlignmentDesc);
 
     // Set memory type sizes based on size of images that will be backed with that memory type.
-    for (uint32 i = 0; i < global_image_state.count; ++i)
+    for (uint32 i = 0; i < image_group->count; ++i)
     {
-        Image* image = global_image_state.data + i;
+        Image* image = image_group->images + i;
         uint32 mem_type_index = GetCapableMemoryTypeIndex(image->mem_requirements.memoryTypeBits, mem_properties);
-        global_image_state.mem_type_indexes[i] = mem_type_index;
-        global_image_state.mem_types[mem_type_index].size += image->mem_requirements.size;
+        image_group->mem_type_indexes[i] = mem_type_index;
+        image_group->mem_types[mem_type_index].size += image->mem_requirements.size;
     }
 
     // Allocate memory for each memory type.
     for (uint32 mem_type_index = 0; mem_type_index < VK_MAX_MEMORY_TYPES; ++mem_type_index)
     {
-        ImageMemoryType* mem_type = global_image_state.mem_types + mem_type_index;
+        ImageMemoryType* mem_type = image_group->mem_types + mem_type_index;
         if (mem_type->size > 0)
         {
             mem_type->mem = AllocateDeviceMemory(mem_type_index, mem_type->size, NULL);
@@ -139,18 +209,18 @@ static void BackImagesWithMemory(VkMemoryPropertyFlags mem_properties)
 
     // Bind images to memory.
     VkDeviceSize mem_type_offsets[VK_MAX_MEMORY_TYPES] = {};
-    for (uint32 i = 0; i < global_image_state.count; ++i)
+    for (uint32 i = 0; i < image_group->count; ++i)
     {
-        Image* image = global_image_state.data + i;
-        uint32 mem_type_index = global_image_state.mem_type_indexes[i];
-        res = vkBindImageMemory(device, image->hnd, global_image_state.mem_types[mem_type_index].mem,
+        Image* image = image_group->images + i;
+        uint32 mem_type_index = image_group->mem_type_indexes[i];
+        res = vkBindImageMemory(device, image->hnd, image_group->mem_types[mem_type_index].mem,
                                 mem_type_offsets[mem_type_index]);
         Validate(res, "vkBindImageMemory() failed");
         mem_type_offsets[mem_type_index] += image->mem_requirements.size;
     }
 
     // Create default views now that images have been backed with memory.
-    CTK_ITER_PTR(image, global_image_state.data, global_image_state.count)
+    CTK_ITER_PTR(image, image_group->images, image_group->count)
     {
         // Create default view.
         VkImageViewCreateInfo view_info =
@@ -183,15 +253,6 @@ static void BackImagesWithMemory(VkMemoryPropertyFlags mem_properties)
         res = vkCreateImageView(device, &view_info, NULL, &image->default_view);
         Validate(res, "vkCreateImageView() failed");
     }
-}
-
-static Image* GetImage(ImageHnd hnd)
-{
-    if (hnd >= global_image_state.count)
-    {
-        CTK_FATAL("can't access image for handle %u: handle exceeds max of %u", hnd, global_image_state.count);
-    }
-    return global_image_state.data + hnd;
 }
 
 static void LoadImageData(ImageData* image_data, const char* path)
@@ -308,12 +369,4 @@ static void LoadImage(ImageHnd image_hnd, Buffer* image_data_buffer, uint32 inst
                              1, // Image Memory Barrier Count
                              &post_copy_mem_barrier); // Image Memory Barriers
     SubmitTempCommandBuffer();
-}
-
-static VkSampler CreateSampler(VkSamplerCreateInfo* info)
-{
-    VkSampler sampler = VK_NULL_HANDLE;
-    VkResult res = vkCreateSampler(global_ctx.device, info, NULL, &sampler);
-    Validate(res, "vkCreateSampler() failed");
-    return sampler;
 }

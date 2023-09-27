@@ -25,6 +25,7 @@ struct RenderState
     Buffer          staging_buffer;
     RenderTarget    render_target;
     Buffer          entity_buffer;
+    ImageGroupHnd   textures_group;
     Array<ImageHnd> textures;
     VkSampler       texture_sampler;
     DescriptorSet   descriptor_set;
@@ -124,7 +125,8 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     InitBuffer(&rs->entity_buffer, &rs->host_stack, &entity_buffer_info);
 
     // Textures
-    InitImageState(&perm_stack->allocator, 8);
+    InitImageGroups(&perm_stack->allocator, 4);
+    rs->textures_group = CreateImageGroup(&perm_stack->allocator, 4);
     InitArray(&rs->textures, &perm_stack->allocator, TEXTURE_COUNT);
     VkImageCreateInfo texture_create_info =
     {
@@ -152,9 +154,9 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     };
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
-        Push(&rs->textures, CreateImage(&texture_create_info));
+        Push(&rs->textures, CreateImage(rs->textures_group, &texture_create_info));
     }
-    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    BackWithMemory(rs->textures_group, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
         LoadImage(Get(&rs->textures, i), &rs->staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
@@ -182,7 +184,8 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    rs->texture_sampler = CreateSampler(&texture_sampler_info);
+    VkResult res = vkCreateSampler(GetDevice(), &texture_sampler_info, NULL, &rs->texture_sampler);
+    Validate(res, "vkCreateSampler() failed");
 
     // Descriptor Sets
     DescriptorData descriptor_datas[] =

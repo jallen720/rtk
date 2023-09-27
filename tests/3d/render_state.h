@@ -35,6 +35,7 @@ struct RenderState
 
     // Descriptor Datas
     Buffer          entity_buffer;
+    ImageGroupHnd   textures_group;
     Array<ImageHnd> textures;
     VkSampler       texture_sampler;
 
@@ -164,7 +165,7 @@ static void InitDescriptorDatas(Stack* perm_stack)
     InitBuffer(&render_state.entity_buffer, &render_state.host_stack, &entity_buffer_info);
 
     // Textures
-    InitImageState(&perm_stack->allocator, 16);
+    render_state.textures_group = CreateImageGroup(&perm_stack->allocator, 16);
     InitArray(&render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
     VkImageCreateInfo texture_create_info =
     {
@@ -192,9 +193,9 @@ static void InitDescriptorDatas(Stack* perm_stack)
     };
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
-        Push(&render_state.textures, CreateImage(&texture_create_info));
+        Push(&render_state.textures, CreateImage(render_state.textures_group, &texture_create_info));
     }
-    BackImagesWithMemory(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    BackWithMemory(render_state.textures_group, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
         LoadImage(Get(&render_state.textures, i), &render_state.staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
@@ -222,7 +223,8 @@ static void InitDescriptorDatas(Stack* perm_stack)
         .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
         .unnormalizedCoordinates = VK_FALSE,
     };
-    render_state.texture_sampler = CreateSampler(&texture_sampler_info);
+    VkResult res = vkCreateSampler(GetDevice(), &texture_sampler_info, NULL, &render_state.texture_sampler);
+    Validate(res, "vkCreateSampler() failed");
 }
 
 static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
@@ -370,6 +372,8 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
+    InitImageGroups(&perm_stack->allocator, 4);
+
     InitRenderJob(perm_stack);
     InitDeviceMemory();
 

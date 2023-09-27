@@ -115,7 +115,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <DisableSpecificWarnings>4668;4311;4312;4774;4505;5039;4820;5045;4711;4710;5219</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4668;4311;4312;4774;4505;5039;4820;5045;4711;4710;5219;4061</DisableSpecificWarnings>
       <TreatSpecificWarningsAsErrors>4100;4715;4456</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>
@@ -133,7 +133,7 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <DisableSpecificWarnings>4668;4311;4312;4774;4505;5039;4820;5045;4711;4710;5219</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4668;4311;4312;4774;4505;5039;4820;5045;4711;4710;5219;4061</DisableSpecificWarnings>
       <TreatSpecificWarningsAsErrors>4100;4715;4456</TreatSpecificWarningsAsErrors>
     </ClCompile>
     <Link>

@@ -388,7 +388,7 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
-    InitImageGroups(&perm_stack->allocator, 4);
+    InitImageModule(&perm_stack->allocator, 4);
 
     InitRenderJob(perm_stack);
     InitDeviceMemory();

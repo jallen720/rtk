@@ -329,18 +329,17 @@ static void Run()
     ///
     /// Test
     ///
-    InitImageGroups(&perm_stack->allocator, 4);
+    InitImageModule(&perm_stack->allocator, 4);
     RenderState rs = {};
     InitRenderState(&rs, perm_stack, temp_stack, free_list);
 
     // Initialize entities.
-    EntityBuffer* entity_buffer = NULL;
     static constexpr uint32 ENTITY_COUNT = MAX_ENTITIES;
     static_assert(ENTITY_COUNT <= MAX_ENTITIES);
     static constexpr float32 SCALE = 2.0f / ENTITY_COUNT;
     for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
     {
-        entity_buffer = GetMappedMem<EntityBuffer>(&rs.entity_buffer, frame_index);
+        EntityBuffer* entity_buffer = GetMappedMem<EntityBuffer>(&rs.entity_buffer, frame_index);
         for (uint32 i = 0; i < ENTITY_COUNT; ++i)
         {
             entity_buffer->positions[i] = { SCALE * i, SCALE * i, 0, 1 };
@@ -375,7 +374,7 @@ static void Run()
             CTK_FATAL("next_frame_result != VK_SUCCESS");
         }
 
-entity_buffer = GetMappedMem<EntityBuffer>(&rs.entity_buffer, GetFrameIndex());
+EntityBuffer* entity_buffer = GetMappedMem<EntityBuffer>(&rs.entity_buffer, GetFrameIndex());
 static float32 x = 0.0f;
 for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 {

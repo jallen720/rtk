@@ -93,10 +93,10 @@ static uint32 GetImageIndex(ImageHnd image_hnd)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitImageGroups(const Allocator* allocator, uint32 max)
+static void InitImageModule(const Allocator* allocator, uint32 max_image_groups)
 {
-    CTK_ASSERT(max <= 0xFFFF);
-    InitArray(&global_image_groups, allocator, max);
+    CTK_ASSERT(max_image_groups <= 0xFFFF);
+    InitArray(&global_image_groups, allocator, max_image_groups);
 }
 
 static ImageGroupHnd CreateImageGroup(const Allocator* allocator, uint32 size)
@@ -121,8 +121,8 @@ static ImageGroup* GetImageGroup(ImageGroupHnd image_group_hnd)
 {
     if (image_group_hnd.index >= global_image_groups.count)
     {
-        CTK_FATAL("can't get image group for image group handle: image group index %u exceeds max of %u",
-                  image_group_hnd.index, global_image_groups.count - 1);
+        CTK_FATAL("can't get image group for image group handle: image group index %u exceeds count %u",
+                  image_group_hnd.index, global_image_groups.count);
     }
     return GetPtr(&global_image_groups, image_group_hnd.index);
 }
@@ -132,8 +132,8 @@ static ImageGroup* GetImageGroup(ImageHnd image_hnd)
     uint32 image_group_index = GetImageGroupIndex(image_hnd);
     if (image_group_index >= global_image_groups.count)
     {
-        CTK_FATAL("can't get image group for image handle: image group index %u exceeds max of %u",
-                  image_group_index, global_image_groups.count - 1);
+        CTK_FATAL("can't get image group for image handle: image group index %u exceeds count %u",
+                  image_group_index, global_image_groups.count);
     }
     return GetPtr(&global_image_groups, image_group_index);
 }
@@ -144,7 +144,7 @@ static ImageHnd CreateImage(ImageGroupHnd image_group_hnd, VkImageCreateInfo* in
     if (image_group->count >= image_group->size)
     {
         CTK_FATAL("can't create image: image group at index %u already at max image count of %u",
-                  image_group_hnd.index, image_group->size - 1);
+                  image_group_hnd.index, image_group->size);
     }
 
     uint32 image_index = image_group->count;
@@ -175,7 +175,7 @@ static Image* GetImage(ImageHnd image_hnd)
     {
         CTK_FATAL("can't get image for image handle: image index %u exceeds max image count of %u for image group "
                   "index %u",
-                  image_index, image_group->count - 1, image_group - global_image_groups.data);
+                  image_index, image_group->count, image_group - global_image_groups.data);
     }
     return image_group->images + image_index;
 }

@@ -100,7 +100,6 @@ struct Context
     Swapchain            swapchain;
     Array<VkCommandPool> render_command_pools;
     RingBuffer<Frame>    frames;
-    VkDescriptorPool     descriptor_pool;
 };
 
 /// Instance

@@ -103,7 +103,7 @@ static ImageGroupHnd CreateImageGroup(const Allocator* allocator, uint32 size)
 {
     if (global_image_groups.count >= global_image_groups.size)
     {
-        CTK_FATAL("can't create image group; already at max image group count of %u", global_image_groups.size);
+        CTK_FATAL("can't create image group; already at max of %u", global_image_groups.size);
     }
 
     ImageGroupHnd image_group_hnd = { .index = global_image_groups.count };
@@ -143,8 +143,8 @@ static ImageHnd CreateImage(ImageGroupHnd image_group_hnd, VkImageCreateInfo* in
     ImageGroup* image_group = GetImageGroup(image_group_hnd);
     if (image_group->count >= image_group->size)
     {
-        CTK_FATAL("can't create image: image group at index %u already at max image count of %u",
-                  image_group_hnd.index, image_group->size);
+        CTK_FATAL("can't create image: already at max of %u in image group at index %u",
+                  image_group->size, image_group_hnd.index);
     }
 
     uint32 image_index = image_group->count;
@@ -173,8 +173,7 @@ static Image* GetImage(ImageHnd image_hnd)
     uint32 image_index = GetImageIndex(image_hnd);
     if (image_index >= image_group->count)
     {
-        CTK_FATAL("can't get image for image handle: image index %u exceeds max image count of %u for image group "
-                  "index %u",
+        CTK_FATAL("can't get image for image handle: image index %u exceeds count of %u for image group at index %u",
                   image_index, image_group->count, image_group - global_image_groups.data);
     }
     return image_group->images + image_index;

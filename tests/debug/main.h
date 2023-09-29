@@ -57,6 +57,9 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
 {
     Stack frame = CreateFrame(temp_stack);
 
+    InitImageModule(&perm_stack->allocator, 4);
+    InitDescriptorSetModule(&perm_stack->allocator, 16);
+
     BufferStackInfo device_stack_info =
     {
         .size               = Megabyte32<16>(),
@@ -187,7 +190,7 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     VkResult res = vkCreateSampler(GetDevice(), &texture_sampler_info, NULL, &rs->texture_sampler);
     Validate(res, "vkCreateSampler() failed");
 
-    InitDescriptorSetModule(&perm_stack->allocator, 16);
+    // Descriptor Sets
     DescriptorData descriptor_datas[] =
     {
         {
@@ -317,7 +320,6 @@ static void Run()
     ///
     /// Test
     ///
-    InitImageModule(&perm_stack->allocator, 4);
     RenderState rs = {};
     InitRenderState(&rs, perm_stack, temp_stack, free_list);
 

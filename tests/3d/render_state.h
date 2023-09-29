@@ -231,8 +231,6 @@ static void InitDescriptorDatas(Stack* perm_stack)
 
 static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
 {
-    InitDescriptorSetModule(&perm_stack->allocator, 16);
-
     // Entity
     {
         DescriptorData datas[] =
@@ -382,6 +380,7 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
     InitImageModule(&perm_stack->allocator, 4);
+    InitDescriptorSetModule(&perm_stack->allocator, 16);
 
     InitRenderJob(perm_stack);
     InitDeviceMemory();

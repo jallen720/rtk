@@ -28,7 +28,8 @@ struct RenderState
     ImageGroupHnd   textures_group;
     Array<ImageHnd> textures;
     VkSampler       texture_sampler;
-    DescriptorSet   descriptor_set;
+    // DescriptorSet   descriptor_set;
+    DescriptorSetHnd descriptor_set;
     Shader          vert_shader;
     Shader          frag_shader;
     Pipeline        pipeline;
@@ -186,22 +187,7 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     VkResult res = vkCreateSampler(GetDevice(), &texture_sampler_info, NULL, &rs->texture_sampler);
     Validate(res, "vkCreateSampler() failed");
 
-    // Descriptor Sets
-    VkDescriptorPoolSize descriptor_pool_sizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
-    };
-    InitDescriptorPool(CTK_WRAP_ARRAY(descriptor_pool_sizes));
+    InitDescriptorSetModule(&perm_stack->allocator, 16);
     DescriptorData descriptor_datas[] =
     {
         {
@@ -223,7 +209,9 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
             .samplers   = &rs->texture_sampler,
         },
     };
-    InitDescriptorSet(&rs->descriptor_set, perm_stack, &frame, CTK_WRAP_ARRAY(descriptor_datas));
+    rs->descriptor_set = CreateDescriptorSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(descriptor_datas));
+    AllocateDescriptorSets();
+    BindDescriptorSets(&frame);
 
     // Pipeline
     Shader* shaders[] =
@@ -259,7 +247,7 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     };
     VkDescriptorSetLayout descriptor_set_layouts[] =
     {
-        rs->descriptor_set.layout,
+        GetLayout(rs->descriptor_set),
     };
     VkPushConstantRange push_constant_ranges[] =
     {
@@ -383,9 +371,9 @@ for (uint32 i = 0; i < ENTITY_COUNT; ++i)
 x += 0.005f;
 
         VkCommandBuffer command_buffer = BeginRenderCommands(&rs.render_target, 0);
-            DescriptorSet* descriptor_sets[] =
+            DescriptorSetHnd descriptor_sets[] =
             {
-                &rs.descriptor_set,
+                rs.descriptor_set,
             };
             BindDescriptorSets(command_buffer, &rs.pipeline, temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
             BindPipeline(command_buffer, &rs.pipeline);

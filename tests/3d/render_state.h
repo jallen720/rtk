@@ -40,8 +40,10 @@ struct RenderState
     VkSampler       texture_sampler;
 
     // Descriptor Sets/Pipelines
-    DescriptorSet entity_descriptor_set;
-    DescriptorSet textures_descriptor_set;
+    // DescriptorSet entity_descriptor_set;
+    // DescriptorSet textures_descriptor_set;
+    DescriptorSetHnd entity_descriptor_set;
+    DescriptorSetHnd textures_descriptor_set;
     VertexLayout  vertex_layout;
     Pipeline      pipeline;
 };
@@ -229,21 +231,7 @@ static void InitDescriptorDatas(Stack* perm_stack)
 
 static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
 {
-    VkDescriptorPoolSize descriptor_pool_sizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_SAMPLER,                1024 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1024 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,          1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER,   1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,         1024 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1024 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT,       1024 },
-    };
-    InitDescriptorPool(CTK_WRAP_ARRAY(descriptor_pool_sizes));
+    InitDescriptorSetModule(&perm_stack->allocator, 16);
 
     // Entity
     {
@@ -256,7 +244,8 @@ static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
                 .buffers    = &render_state.entity_buffer,
             },
         };
-        InitDescriptorSet(&render_state.entity_descriptor_set, perm_stack, temp_stack, CTK_WRAP_ARRAY(datas));
+        render_state.entity_descriptor_set = CreateDescriptorSet(&perm_stack->allocator, temp_stack,
+                                                                 CTK_WRAP_ARRAY(datas));
     }
 
     // Textures
@@ -276,8 +265,12 @@ static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
                 .samplers   = &render_state.texture_sampler,
             },
         };
-        InitDescriptorSet(&render_state.textures_descriptor_set, perm_stack, temp_stack, CTK_WRAP_ARRAY(datas));
+        render_state.textures_descriptor_set = CreateDescriptorSet(&perm_stack->allocator, temp_stack,
+                                                                   CTK_WRAP_ARRAY(datas));
     }
+
+    AllocateDescriptorSets();
+    BindDescriptorSets(temp_stack);
 }
 
 static void InitVertexLayout(Stack* perm_stack)
@@ -298,8 +291,8 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
     // Pipeline Layout
     VkDescriptorSetLayout descriptor_set_layouts[] =
     {
-        render_state.entity_descriptor_set.layout,
-        render_state.textures_descriptor_set.layout,
+        GetLayout(render_state.entity_descriptor_set),
+        GetLayout(render_state.textures_descriptor_set),
     };
     // VkPushConstantRange push_constant_ranges[] =
     // {
@@ -351,10 +344,10 @@ static void RecordRenderCommandsThread(void* data)
     VkCommandBuffer command_buffer = BeginRenderCommands(&render_state.render_target, state->thread_index);
         Pipeline* pipeline = &render_state.pipeline;
         BindPipeline(command_buffer, pipeline);
-        DescriptorSet* descriptor_sets[] =
+        DescriptorSetHnd descriptor_sets[] =
         {
-            &render_state.entity_descriptor_set,
-            &render_state.textures_descriptor_set,
+            render_state.entity_descriptor_set,
+            render_state.textures_descriptor_set,
         };
         BindDescriptorSets(command_buffer, pipeline, state->temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
         BindMeshData(command_buffer, &render_state.mesh_data);

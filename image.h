@@ -3,9 +3,9 @@
 struct ImageHnd { uint32 index; };
 struct ImageGroupHnd { uint32 index; };
 
-struct ImageMemoryType
+struct ImageMemory
 {
-    VkDeviceMemory mem;
+    VkDeviceMemory hnd;
     VkDeviceSize   size;
 };
 
@@ -13,6 +13,7 @@ struct Image
 {
     VkImage              hnd;
     VkMemoryRequirements mem_requirements;
+    uint32               mem_index;
     VkImageType          type;
     VkFormat             format;
     VkExtent3D           extent;
@@ -30,11 +31,10 @@ struct ImageData
 
 struct ImageGroup
 {
-    Image*          images;
-    uint32*         mem_type_indexes;
-    uint32          count;
-    uint32          size;
-    ImageMemoryType mem_types[VK_MAX_MEMORY_TYPES];
+    Image*      images;
+    uint32      count;
+    uint32      size;
+    ImageMemory mem[VK_MAX_MEMORY_TYPES];
 };
 
 static Array<ImageGroup> global_image_groups;
@@ -52,23 +52,24 @@ static void LogImageGroups()
         for (uint32 i = 0; i < image_group->count; ++i)
         {
             Image* image = image_group->images + i;
-            PrintLine("        [%3u] hnd:       %llu", i, image->hnd);
-            PrintLine("              view:      %llu", image->default_view);
-            PrintLine("              extent:    { w: %u, h: %u, d: %u }",
+            PrintLine("        [%3u] hnd:          %llu", i, image->hnd);
+            PrintLine("              size:         %llu", image->mem_requirements.size);
+            PrintLine("              alignment:    %llu", image->mem_requirements.alignment);
+            PrintLine("              mem_index:    %u", image->mem_index);
+            PrintLine("              default_view: %llu", image->default_view);
+            PrintLine("              extent:       { w: %u, h: %u, d: %u }",
                       image->extent.width,
                       image->extent.height,
                       image->extent.depth);
-            PrintLine("              size:      %llu", image->mem_requirements.size);
-            PrintLine("              alignment: %llu", image->mem_requirements.alignment);
             PrintLine();
         }
 
         PrintLine("    memory types:");
         for (uint32 i = 0; i < image_group->count; ++i)
         {
-            ImageMemoryType* mem_type = image_group->mem_types + i;
-            PrintLine("        [%3u] hnd:    %llu", i, mem_type->mem);
-            PrintLine("              size:   %u", mem_type->size);
+            ImageMemory* mem = image_group->mem + i;
+            PrintLine("        [%3u] hnd:    %llu", i, mem->hnd);
+            PrintLine("              size:   %u", mem->size);
             PrintLine();
         }
     }
@@ -109,10 +110,9 @@ static ImageGroupHnd CreateImageGroup(const Allocator* allocator, uint32 size)
     ImageGroupHnd image_group_hnd = { .index = global_image_groups.count };
 
     ImageGroup* image_group = Push(&global_image_groups);
-    image_group->images           = Allocate<Image>(allocator, size);
-    image_group->mem_type_indexes = Allocate<uint32>(allocator, size);
-    image_group->count            = 0;
-    image_group->size             = size;
+    image_group->images = Allocate<Image>(allocator, size);
+    image_group->count  = 0;
+    image_group->size   = size;
 
     return image_group_hnd;
 }
@@ -189,34 +189,31 @@ static void BackWithMemory(ImageGroupHnd image_group_hnd, VkMemoryPropertyFlags 
     InsertionSort(image_group->images, image_group->count, ImageMemAlignmentDesc);
 
     // Set memory type sizes based on size of images that will be backed with that memory type.
-    for (uint32 i = 0; i < image_group->count; ++i)
+    CTK_ITER_PTR(image, image_group->images, image_group->count)
     {
-        Image* image = image_group->images + i;
-        uint32 mem_type_index = GetCapableMemoryTypeIndex(image->mem_requirements.memoryTypeBits, mem_properties);
-        image_group->mem_type_indexes[i] = mem_type_index;
-        image_group->mem_types[mem_type_index].size += image->mem_requirements.size;
+        image->mem_index = GetCapableMemoryTypeIndex(image->mem_requirements.memoryTypeBits, mem_properties);
+        image_group->mem[image->mem_index].size += image->mem_requirements.size;
     }
 
     // Allocate memory for each memory type.
-    for (uint32 mem_type_index = 0; mem_type_index < VK_MAX_MEMORY_TYPES; ++mem_type_index)
+    for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        ImageMemoryType* mem_type = image_group->mem_types + mem_type_index;
-        if (mem_type->size > 0)
+        ImageMemory* mem = image_group->mem + mem_index;
+        if (mem->size > 0)
         {
-            mem_type->mem = AllocateDeviceMemory(mem_type_index, mem_type->size, NULL);
+            mem->hnd = AllocateDeviceMemory(mem_index, mem->size, NULL);
         }
     }
 
     // Bind images to memory.
-    VkDeviceSize mem_type_offsets[VK_MAX_MEMORY_TYPES] = {};
+    VkDeviceSize mem_offsets[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 i = 0; i < image_group->count; ++i)
     {
         Image* image = image_group->images + i;
-        uint32 mem_type_index = image_group->mem_type_indexes[i];
-        res = vkBindImageMemory(device, image->hnd, image_group->mem_types[mem_type_index].mem,
-                                mem_type_offsets[mem_type_index]);
+        res = vkBindImageMemory(device, image->hnd, image_group->mem[image->mem_index].hnd,
+                                mem_offsets[image->mem_index]);
         Validate(res, "vkBindImageMemory() failed");
-        mem_type_offsets[mem_type_index] += image->mem_requirements.size;
+        mem_offsets[image->mem_index] += image->mem_requirements.size;
     }
 
     // Create default views now that images have been backed with memory.

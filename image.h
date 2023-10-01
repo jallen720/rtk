@@ -191,7 +191,7 @@ static void BackWithMemory(ImageGroupHnd image_group_hnd, VkMemoryPropertyFlags 
     // Set memory type sizes based on size of images that will be backed with that memory type.
     CTK_ITER_PTR(image, image_group->images, image_group->count)
     {
-        image->mem_index = GetCapableMemoryTypeIndex(image->mem_requirements.memoryTypeBits, mem_properties);
+        image->mem_index = GetCapableMemoryTypeIndex(&image->mem_requirements, mem_properties);
         image_group->mem[image->mem_index].size += image->mem_requirements.size;
     }
 

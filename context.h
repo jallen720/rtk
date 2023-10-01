@@ -945,14 +945,14 @@ static void WaitIdle()
     vkDeviceWaitIdle(global_ctx.device);
 }
 
-static uint32 GetCapableMemoryTypeIndex(uint32 memory_type_bits, VkMemoryPropertyFlags mem_properties)
+static uint32 GetCapableMemoryTypeIndex(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFlags mem_properties)
 {
     // Reference: https://registry.khronos.org/vulkan/specs/1.3/html/vkspec.html#memory-device
     VkPhysicalDeviceMemoryProperties* device_mem_properties = &global_ctx.physical_device->mem_properties;
     for (uint32 i = 0; i < device_mem_properties->memoryTypeCount; ++i)
     {
         // Memory type at index must be supported for resource.
-        if ((memory_type_bits & (1 << i)) == 0)
+        if ((mem_requirements->memoryTypeBits & (1 << i)) == 0)
         {
             continue;
         }
@@ -978,7 +978,7 @@ AllocateDeviceMemory(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFla
     {
         .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .allocationSize  = mem_requirements->size * allocation_count,
-        .memoryTypeIndex = GetCapableMemoryTypeIndex(mem_requirements->memoryTypeBits, mem_properties),
+        .memoryTypeIndex = GetCapableMemoryTypeIndex(mem_requirements, mem_properties),
     };
     VkDeviceMemory mem = VK_NULL_HANDLE;
     VkResult res = vkAllocateMemory(global_ctx.device, &info, allocators, &mem);

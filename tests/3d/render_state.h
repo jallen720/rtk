@@ -40,12 +40,10 @@ struct RenderState
     VkSampler       texture_sampler;
 
     // Descriptor Sets/Pipelines
-    // DescriptorSet entity_descriptor_set;
-    // DescriptorSet textures_descriptor_set;
     DescriptorSetHnd entity_descriptor_set;
     DescriptorSetHnd textures_descriptor_set;
-    VertexLayout  vertex_layout;
-    Pipeline      pipeline;
+    VertexLayout     vertex_layout;
+    Pipeline         pipeline;
 };
 
 static constexpr const char* TEXTURE_IMAGE_PATHS[] =

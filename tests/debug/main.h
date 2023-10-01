@@ -20,21 +20,20 @@ namespace TestDebug
 
 struct RenderState
 {
-    BufferStack     host_stack;
-    BufferStack     device_stack;
-    Buffer          staging_buffer;
-    RenderTarget    render_target;
-    Buffer          entity_buffer;
-    ImageGroupHnd   textures_group;
-    Array<ImageHnd> textures;
-    VkSampler       texture_sampler;
-    // DescriptorSet   descriptor_set;
+    BufferStack      host_stack;
+    BufferStack      device_stack;
+    Buffer           staging_buffer;
+    RenderTarget     render_target;
+    Buffer           entity_buffer;
+    ImageGroupHnd    textures_group;
+    Array<ImageHnd>  textures;
+    VkSampler        texture_sampler;
     DescriptorSetHnd descriptor_set;
-    Shader          vert_shader;
-    Shader          frag_shader;
-    Pipeline        pipeline;
-    MeshData        mesh_data;
-    Mesh            quad_mesh;
+    Shader           vert_shader;
+    Shader           frag_shader;
+    Pipeline         pipeline;
+    MeshData         mesh_data;
+    Mesh             quad_mesh;
 };
 
 struct EntityBuffer
@@ -272,7 +271,8 @@ static void Run()
 {
     Stack* perm_stack = CreateStack(&win32_allocator, Megabyte32<8>());
     Stack* temp_stack = CreateStack(&perm_stack->allocator, Megabyte32<1>());
-    FreeList* free_list = CreateFreeList(&perm_stack->allocator, Kilobyte32<16>(), 16, 256);
+    FreeList* free_list = CreateFreeList(&perm_stack->allocator, Kilobyte32<16>(),
+                                         { .chunk_byte_size = 16, .max_range_count = 256 });
 
     ///
     /// Initialization

@@ -32,7 +32,8 @@ static void Run()
 {
     Stack* perm_stack = CreateStack(&win32_allocator, Megabyte32<8>());
     Stack* temp_stack = CreateStack(&perm_stack->allocator, Megabyte32<1>());
-    FreeList* free_list = CreateFreeList(&perm_stack->allocator, Kilobyte32<16>(), 16, 256);
+    FreeList* free_list = CreateFreeList(&perm_stack->allocator, Kilobyte32<16>(),
+                                         { .chunk_byte_size = 16, .max_range_count = 256 });
 
     // Make win32 process DPI aware so windows scale properly.
     SetProcessDPIAware();

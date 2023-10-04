@@ -31,7 +31,6 @@ using namespace CTK;
 namespace RTK
 {
 
-#include "rtk/enum_names.h"
 #include "rtk/debug.h"
 #include "rtk/vk_array.h"
 #include "rtk/device_features.h"

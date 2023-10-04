@@ -6,7 +6,7 @@
 #include "rtk/tests/3d/main.h"
 #include "rtk/tests/debug/main.h"
 #else
-#include "rtk/tests/3d/main_2.h"
+// #include "rtk/tests/3d/main_2.h"
 #include "rtk/tests/debug/main_2.h"
 #endif
 

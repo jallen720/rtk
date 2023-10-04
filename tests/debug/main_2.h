@@ -20,8 +20,8 @@ namespace TestDebug
 
 struct RenderState
 {
-    BufferStack      host_stack;
-    BufferStack      device_stack;
+    // BufferStack      host_stack;
+    // BufferStack      device_stack;
     Buffer           staging_buffer;
     RenderTarget     render_target;
     Buffer           entity_buffer;
@@ -317,48 +317,71 @@ static void Run()
 
     InitContext(perm_stack, temp_stack, free_list, &context_info);
 
-    VkBufferUsageFlagBits flags[] =
+    InitBufferModule(&perm_stack->allocator, 32);
+
+    VkBufferUsageFlags buffer_usage_flags[] =
     {
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_BUFFER_USAGE_TRANSFER_DST_BIT,
         VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT,
         VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT,
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,
     };
-
-    VkResult res;
-    for (uint32 i0 = 0; i0 < CTK_ARRAY_SIZE(flags); ++i0)
-    for (uint32 i1 = i0; i1 < CTK_ARRAY_SIZE(flags); ++i1)
+    VkMemoryPropertyFlags mem_properties[] =
     {
-        VkBufferCreateInfo create_info =
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    };
+    CTK_ITER_PTR(mem_props, mem_properties, CTK_ARRAY_SIZE(mem_properties))
+    CTK_ITER_PTR(buffer_usage, buffer_usage_flags, CTK_ARRAY_SIZE(buffer_usage_flags))
+    {
+        BufferInfo info =
         {
-            .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .pNext                 = NULL,
-            .flags                 = 0,
-            .size                  = 123123123,
-            .usage                 = (VkBufferUsageFlags)(flags[i0] | flags[i1]),
-            .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-            .queueFamilyIndexCount = 0,
-            .pQueueFamilyIndices   = NULL,
+            .size             = 4,
+            .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
+            .per_frame        = (buffer_usage - buffer_usage_flags) % 2 == 1,
+            .mem_properties   = *mem_props,
+            .usage            = *buffer_usage,
         };
-        VkBuffer buffer = VK_NULL_HANDLE;
-        res = vkCreateBuffer(GetDevice(), &create_info, NULL, &buffer);
-        Validate(res, "vkCreateBuffer() failed");
-
-        VkMemoryRequirements mem_reqs = {};
-        vkGetBufferMemoryRequirements(GetDevice(), buffer, &mem_reqs);
-        Validate(res, "vkCreateBuffer() failed");
-
-        PrintLine("buffer usage: %s | %s", VkBufferUsageName(flags[i0]), VkBufferUsageName(flags[i1]));
-        PrintMemoryRequirements(&mem_reqs, 1);
-        PrintLine("    mem_type index: %u", GetCapableMemoryTypeIndex(&mem_reqs, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
-
-        vkDestroyBuffer(GetDevice(), buffer, NULL);
+        CreateBuffer(&info);
     }
+    BackBuffersWithMemory(temp_stack);
+    LogBuffers();
+    LogBufferMems();
+
+    // VkResult res;
+    // for (uint32 i0 = 0; i0 < CTK_ARRAY_SIZE(flags); ++i0)
+    // for (uint32 i1 = i0; i1 < CTK_ARRAY_SIZE(flags); ++i1)
+    // {
+    //     VkBufferCreateInfo create_info =
+    //     {
+    //         .sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+    //         .pNext                 = NULL,
+    //         .flags                 = 0,
+    //         .size                  = 123123123,
+    //         .usage                 = (VkBufferUsageFlags)(flags[i0] | flags[i1]),
+    //         .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+    //         .queueFamilyIndexCount = 0,
+    //         .pQueueFamilyIndices   = NULL,
+    //     };
+    //     VkBuffer buffer = VK_NULL_HANDLE;
+    //     res = vkCreateBuffer(GetDevice(), &create_info, NULL, &buffer);
+    //     Validate(res, "vkCreateBuffer() failed");
+
+    //     VkMemoryRequirements mem_reqs = {};
+    //     vkGetBufferMemoryRequirements(GetDevice(), buffer, &mem_reqs);
+    //     Validate(res, "vkCreateBuffer() failed");
+
+    //     PrintLine("buffer usage: %s | %s", VkBufferUsageName(flags[i0]), VkBufferUsageName(flags[i1]));
+    //     PrintMemoryRequirements(&mem_reqs, 1);
+    //     PrintLine("    mem_type index: %u", GetCapableMemoryTypeIndex(&mem_reqs, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT));
+
+    //     vkDestroyBuffer(GetDevice(), buffer, NULL);
+    // }
 
 //     ///
 //     /// Test

@@ -12,16 +12,7 @@ struct BufferInfo
     VkMemoryPropertyFlags mem_properties;
     VkBufferUsageFlags    usage;
 };
-
-struct Buffer
-{
-    VkDeviceSize          size;
-    VkDeviceSize          offset_alignment;
-    bool                  per_frame;
-    VkMemoryPropertyFlags mem_properties;
-    VkBufferUsageFlags    usage;
-    uint32                mem_index;
-};
+using Buffer = BufferInfo; // Stored information for Buffer is same as information used to create it.
 
 struct BufferMemory
 {
@@ -35,11 +26,12 @@ struct BufferMemory
 
 static struct BufferState
 {
-    Buffer*       buffers; // size: size
-    VkDeviceSize* offsets; // size: size * frame_count
-    VkDeviceSize* indexes; // size: size * frame_count
-    uint32        count;
-    uint32        size;
+    Buffer*       buffers;     // size: max_buffers
+    uint32*       mem_indexes; // size: max_buffers
+    VkDeviceSize* offsets;     // size: max_buffers * frame_count
+    VkDeviceSize* indexes;     // size: max_buffers * frame_count
+    uint32        max_buffers;
+    uint32        buffer_count;
     uint32        frame_count;
 
     FArray<BufferMemory, VK_MAX_MEMORY_TYPES> buffer_mems;
@@ -51,7 +43,7 @@ g_buffer_state;
 static void LogBuffers()
 {
     PrintLine("buffers:");
-    for (uint32 buffer_index = 0; buffer_index < g_buffer_state.count; ++buffer_index)
+    for (uint32 buffer_index = 0; buffer_index < g_buffer_state.buffer_count; ++buffer_index)
     {
         Buffer* buffer = g_buffer_state.buffers + buffer_index;
         PrintLine("   [%2u] mem_properties:", buffer_index);
@@ -61,13 +53,13 @@ static void LogBuffers()
         PrintLine("        size:             %u", buffer->size);
         PrintLine("        offset_alignment: %u", buffer->offset_alignment);
         PrintLine("        per_frame:        %s", buffer->per_frame ? "true" : "false");
-        PrintLine("        mem_index:        %u", buffer->mem_index);
+        PrintLine("        mem_index:        %u", g_buffer_state.mem_indexes[buffer_index]);
         PrintLine("        offsets:");
         if (buffer->per_frame)
         {
             for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
             {
-                uint32 frame_offset = frame_index * g_buffer_state.count;
+                uint32 frame_offset = frame_index * g_buffer_state.buffer_count;
                 PrintLine("            [%u] %u", frame_index, g_buffer_state.offsets[frame_offset + buffer_index]);
             }
         }
@@ -103,20 +95,21 @@ static Buffer* GetBufferUtil(BufferHnd hnd)
 
 static BufferMemory* GetBufferMemoryUtil(BufferHnd hnd)
 {
-    return GetPtr(&g_buffer_state.buffer_mems, GetBufferUtil(hnd)->mem_index);
+    return GetPtr(&g_buffer_state.buffer_mems, g_buffer_state.mem_indexes[hnd.index]);
 }
 
 static uint32 GetBufferFrameIndex(BufferHnd hnd, uint32 frame_index)
 {
-    uint32 buffer_frame_offset = GetBufferUtil(hnd)->per_frame ? frame_index * g_buffer_state.size : 0;
+    uint32 buffer_frame_offset = GetBufferUtil(hnd)->per_frame ? frame_index * g_buffer_state.max_buffers : 0;
     return buffer_frame_offset + hnd.index;
 }
 
 static void ValidateBufferHnd(BufferHnd hnd, const char* action)
 {
-    if (hnd.index >= g_buffer_state.count)
+    if (hnd.index >= g_buffer_state.buffer_count)
     {
-        CTK_FATAL("%s: buffer handle index %u exceeds max buffer count of %u", action, hnd.index, g_buffer_state.count);
+        CTK_FATAL("%s: buffer handle index %u exceeds max buffer count of %u",
+                  action, hnd.index, g_buffer_state.buffer_count);
     }
 }
 
@@ -125,58 +118,54 @@ static void ValidateBufferHnd(BufferHnd hnd, const char* action)
 static void InitBufferModule(const Allocator* allocator, uint32 max_buffers)
 {
     uint32 frame_count = GetFrameCount();
-    g_buffer_state.buffers     = Allocate<Buffer>(allocator, max_buffers);
-    g_buffer_state.offsets     = Allocate<VkDeviceSize>(allocator, max_buffers * frame_count);
-    g_buffer_state.indexes     = Allocate<VkDeviceSize>(allocator, max_buffers * frame_count);
-    g_buffer_state.count       = 0;
-    g_buffer_state.size        = max_buffers;
-    g_buffer_state.frame_count = frame_count;
+    g_buffer_state.buffers      = Allocate<Buffer>      (allocator, max_buffers);
+    g_buffer_state.mem_indexes  = Allocate<uint32>      (allocator, max_buffers);
+    g_buffer_state.offsets      = Allocate<VkDeviceSize>(allocator, max_buffers * frame_count);
+    g_buffer_state.indexes      = Allocate<VkDeviceSize>(allocator, max_buffers * frame_count);
+    g_buffer_state.max_buffers  = max_buffers;
+    g_buffer_state.buffer_count = 0;
+    g_buffer_state.frame_count  = frame_count;
 }
 
 static BufferHnd CreateBuffer(BufferInfo* info)
 {
-    if (g_buffer_state.count >= g_buffer_state.size)
+    if (g_buffer_state.buffer_count >= g_buffer_state.max_buffers)
     {
-        CTK_FATAL("can't create buffer: already at max buffer count of %u", g_buffer_state.size);
+        CTK_FATAL("can't create buffer: already at max buffer count of %u", g_buffer_state.max_buffers);
     }
 
-    BufferHnd hnd = { .index = g_buffer_state.count };
-    ++g_buffer_state.count;
+    BufferHnd hnd = { .index = g_buffer_state.buffer_count };
+    ++g_buffer_state.buffer_count;
+    Buffer* buffer = g_buffer_state.buffers + hnd.index;
+    *buffer = *info; // Buffer is exact copy of info passed to CreateBuffer().
 
     // Figure out minimum offset alignment if requested.
-    if (info->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
+    if (buffer->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
         VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
-        info->offset_alignment = 4;
+        buffer->offset_alignment = 4;
 
         // Uniform
-        if ((info->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
-            info->offset_alignment < physical_device_limits->minUniformBufferOffsetAlignment)
+        if ((buffer->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
+            buffer->offset_alignment < physical_device_limits->minUniformBufferOffsetAlignment)
         {
-            info->offset_alignment = physical_device_limits->minUniformBufferOffsetAlignment;
+            buffer->offset_alignment = physical_device_limits->minUniformBufferOffsetAlignment;
         }
 
         // Storage
-        if ((info->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
-            info->offset_alignment < physical_device_limits->minStorageBufferOffsetAlignment)
+        if ((buffer->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
+            buffer->offset_alignment < physical_device_limits->minStorageBufferOffsetAlignment)
         {
-            info->offset_alignment = physical_device_limits->minStorageBufferOffsetAlignment;
+            buffer->offset_alignment = physical_device_limits->minStorageBufferOffsetAlignment;
         }
 
         // Texel
-        if ((info->usage & (VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT)) &&
-            info->offset_alignment < physical_device_limits->minTexelBufferOffsetAlignment)
+        if ((buffer->usage & (VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT)) &&
+            buffer->offset_alignment < physical_device_limits->minTexelBufferOffsetAlignment)
         {
-            info->offset_alignment = physical_device_limits->minTexelBufferOffsetAlignment;
+            buffer->offset_alignment = physical_device_limits->minTexelBufferOffsetAlignment;
         }
     }
-
-    Buffer* buffer = g_buffer_state.buffers + hnd.index;
-    buffer->size             = info->size;
-    buffer->offset_alignment = info->offset_alignment;
-    buffer->per_frame        = info->per_frame;
-    buffer->usage            = info->usage;
-    buffer->mem_properties   = info->mem_properties;
 
     return hnd;
 }
@@ -188,7 +177,7 @@ static void BackBuffersWithMemory()
     VkResult res = VK_SUCCESS;
 
     // Calculate buffer memory information and buffer offsets.
-    for (uint32 buffer_index = 0; buffer_index < g_buffer_state.count; ++buffer_index)
+    for (uint32 buffer_index = 0; buffer_index < g_buffer_state.buffer_count; ++buffer_index)
     {
         Buffer* buffer = g_buffer_state.buffers + buffer_index;
 
@@ -196,6 +185,7 @@ static void BackBuffersWithMemory()
         uint32 buffer_aligned_size = MultipleOf(buffer->size, buffer->offset_alignment);
         uint32 buffer_aligned_total_size = buffer_aligned_size * (buffer->per_frame ? g_buffer_state.frame_count : 1);
 
+        // Get mem index and calculate base offset.
         bool buffer_mem_exists = false;
         uint32 buffer_aligned_base_offset = UINT32_MAX;
         uint32 mem_index = UINT32_MAX;
@@ -223,12 +213,14 @@ static void BackBuffersWithMemory()
                      .usage          = buffer->usage,
                  });
         }
+        g_buffer_state.mem_indexes[buffer_index] = mem_index;
 
+        // Calculate offsets (if per-frame).
         if (buffer->per_frame)
         {
             for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
             {
-                uint32 frame_offset = frame_index * g_buffer_state.count;
+                uint32 frame_offset = frame_index * g_buffer_state.buffer_count;
                 uint32 offset = buffer_aligned_base_offset + (buffer_aligned_size * frame_index);
                 g_buffer_state.offsets[frame_offset + buffer_index] = offset;
             }
@@ -240,7 +232,6 @@ static void BackBuffersWithMemory()
             g_buffer_state.offsets[frame_offset + buffer_index] = offset;
         }
 
-        buffer->mem_index = mem_index;
     }
 
     // Initialize and allocate buffer memory.

@@ -298,7 +298,7 @@ static void WriteHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDev
         CTK_FATAL("can't write %u bytes to host buffer: write would exceed size of %u", data_size, buffer->size);
     }
 
-    BufferMemory* buffer_mem = GetPtr(&g_buffer_state.buffer_mems, buffer->mem_index);
+    BufferMemory* buffer_mem = GetBufferMemoryUtil(hnd);
     CTK_ASSERT(buffer_mem->mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     uint32 buffer_frame_index = GetBufferFrameIndex(hnd, frame_index);
@@ -319,7 +319,7 @@ static void AppendHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDe
                   buffer_index, buffer->size);
     }
 
-    BufferMemory* buffer_mem = GetPtr(&g_buffer_state.buffer_mems, buffer->mem_index);
+    BufferMemory* buffer_mem = GetBufferMemoryUtil(hnd);
     CTK_ASSERT(buffer_mem->mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     uint32 buffer_frame_index = GetBufferFrameIndex(hnd, frame_index);

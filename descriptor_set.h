@@ -9,9 +9,9 @@ struct DescriptorData
     uint32             count;
     union
     {
-        Buffer*    buffers;
-        VkSampler* samplers;
+        BufferHnd* buffer_hnds;
         ImageHnd*  image_hnds;
+        VkSampler* samplers;
         struct
         {
             ImageHnd* image_hnds;
@@ -204,14 +204,13 @@ static void BindDescriptorSets(Stack* temp_stack)
                     data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
                 {
                     write->pBufferInfo = End(buffer_infos);
-                    CTK_ITER_PTR(buffer, data_binding->buffers, data_binding->count)
+                    CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnds, data_binding->count)
                     {
-                        uint32 instance_index = buffer->instance_count == frame_count ? frame_index : 0;
                         Push(buffer_infos,
                         {
-                            .buffer = buffer->hnd,
-                            .offset = buffer->offsets[instance_index],
-                            .range  = buffer->size,
+                            .buffer = GetBufferMemory(*buffer_hnd)->hnd,
+                            .offset = GetOffset(*buffer_hnd, frame_index),
+                            .range  = GetBuffer(*buffer_hnd)->size,
                         });
                     }
                 }
@@ -233,11 +232,10 @@ static void BindDescriptorSets(Stack* temp_stack)
                     write->pImageInfo = End(image_infos);
                     CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
                     {
-                        Image* image = GetImage(*image_hnd);
                         Push(image_infos,
                         {
                             .sampler     = VK_NULL_HANDLE,
-                            .imageView   = image->default_view,
+                            .imageView   = GetImage(*image_hnd)->default_view,
                             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         });
                     }
@@ -247,11 +245,10 @@ static void BindDescriptorSets(Stack* temp_stack)
                     write->pImageInfo = End(image_infos);
                     CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnds, data_binding->count)
                     {
-                        Image* image = GetImage(*image_hnd);
                         Push(image_infos,
                         {
                             .sampler     = data_binding->combined_image_samplers.sampler,
-                            .imageView   = image->default_view,
+                            .imageView   = GetImage(*image_hnd)->default_view,
                             .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                         });
                     }

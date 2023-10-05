@@ -256,7 +256,7 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool)
 {
     Job<MVPMatrixState>* job = &game_state.mvp_matrix_job;
     Matrix view_projection_matrix = GetViewProjectionMatrix();
-    auto frame_entity_buffer = GetMappedMem<EntityBuffer>(GetEntityBuffer(), GetFrameIndex());
+    auto frame_entity_buffer = GetHostMemory<EntityBuffer>(GetEntityBuffer(), GetFrameIndex());
     uint32 thread_count = thread_pool->size;
 
     // Initialize thread states and submit tasks.

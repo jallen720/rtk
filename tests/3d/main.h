@@ -78,44 +78,44 @@ LogPhysicalDevice(global_ctx.physical_device);
     // Initialize other test state.
     ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
     InitRenderState(perm_stack, temp_stack, free_list);
-    InitGameState(perm_stack, thread_pool->size);
+    // InitGameState(perm_stack, thread_pool->size);
 
-    // Run game.
-    for (;;)
-    {
-        ProcessWindowEvents();
-        if (!WindowIsOpen())
-        {
-            break; // Quit event closed window.
-        }
+    // // Run game.
+    // for (;;)
+    // {
+    //     ProcessWindowEvents();
+    //     if (!WindowIsOpen())
+    //     {
+    //         break; // Quit event closed window.
+    //     }
 
-        UpdateGame();
-        if (!WindowIsOpen())
-        {
-            break; // Game controls closed window.
-        }
+    //     UpdateGame();
+    //     if (!WindowIsOpen())
+    //     {
+    //         break; // Game controls closed window.
+    //     }
 
-        if (!WindowIsActive())
-        {
-            Sleep(1);
-            continue;
-        }
+    //     if (!WindowIsActive())
+    //     {
+    //         Sleep(1);
+    //         continue;
+    //     }
 
-        // NextFrame() will only return VK_SUCCESS, VK_SUBOPTIMAL_KHR or VK_ERROR_OUT_OF_DATE_KHR.
-        VkResult next_frame_result = NextFrame();
-        if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
-        {
-            WaitIdle();
-            UpdateSwapchainSurfaceExtent(temp_stack, free_list);
-            UpdateAllPipelineViewports(free_list);
-            UpdateAllRenderTargetAttachments(temp_stack, free_list);
-            continue;
-        }
+    //     // NextFrame() will only return VK_SUCCESS, VK_SUBOPTIMAL_KHR or VK_ERROR_OUT_OF_DATE_KHR.
+    //     VkResult next_frame_result = NextFrame();
+    //     if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
+    //     {
+    //         WaitIdle();
+    //         UpdateSwapchainSurfaceExtent(temp_stack, free_list);
+    //         UpdateAllPipelineViewports(free_list);
+    //         UpdateAllRenderTargetAttachments(temp_stack, free_list);
+    //         continue;
+    //     }
 
-        UpdateMVPMatrixes(thread_pool);
-        RecordRenderCommands(thread_pool, GetEntityCount());
-        SubmitRenderCommands(GetRenderTarget());
-    }
+    //     UpdateMVPMatrixes(thread_pool);
+    //     RecordRenderCommands(thread_pool, GetEntityCount());
+    //     SubmitRenderCommands(GetRenderTarget());
+    // }
 }
 
 }

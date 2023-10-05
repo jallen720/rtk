@@ -269,14 +269,14 @@ static void DestroyImageData(ImageData* image_data)
     *image_data = {};
 }
 
-static void LoadImage(ImageHnd image_hnd, Buffer* image_data_buffer, uint32 instance_index, const char* path)
+static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint32 frame_index, const char* path)
 {
     Image* image = GetImage(image_hnd);
 
     // Load image data and write to staging buffer.
     ImageData image_data = {};
     LoadImageData(&image_data, path);
-    WriteHostBuffer(image_data_buffer, 0, image_data.data, (VkDeviceSize)image_data.size);
+    WriteHostBuffer(image_data_buffer_hnd, frame_index, image_data.data, (VkDeviceSize)image_data.size);
     DestroyImageData(&image_data);
 
     // Copy image data from buffer memory to image memory.
@@ -314,7 +314,7 @@ static void LoadImage(ImageHnd image_hnd, Buffer* image_data_buffer, uint32 inst
 
         VkBufferImageCopy copy =
         {
-            .bufferOffset      = image_data_buffer->offsets[instance_index],
+            .bufferOffset      = GetOffset(image_data_buffer_hnd, frame_index),
             .bufferRowLength   = 0,
             .bufferImageHeight = 0,
             .imageSubresource =
@@ -332,7 +332,7 @@ static void LoadImage(ImageHnd image_hnd, Buffer* image_data_buffer, uint32 inst
             },
             .imageExtent = image->extent,
         };
-        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, image_data_buffer->hnd, image->hnd,
+        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, GetBufferMemory(image_data_buffer_hnd)->hnd, image->hnd,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.

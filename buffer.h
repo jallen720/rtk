@@ -235,8 +235,11 @@ static void BackBuffersWithMemory()
         }
         else
         {
-            g_buffer_state.offsets[buffer_index] = buffer_aligned_base_offset;
+            uint32 frame_offset = 0;
+            uint32 offset = buffer_aligned_base_offset;
+            g_buffer_state.offsets[frame_offset + buffer_index] = offset;
         }
+
         buffer->mem_index = mem_index;
     }
 

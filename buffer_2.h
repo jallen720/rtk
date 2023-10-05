@@ -28,7 +28,7 @@ struct BufferMemory
     VkBuffer              hnd;
     VkDeviceSize          size;
     VkDeviceMemory        device_mem;
-    uint8*                mapped_mem;
+    uint8*                host_mem;
     VkMemoryPropertyFlags mem_properties;
     VkBufferUsageFlags    usage;
 };
@@ -94,6 +94,32 @@ static void LogBufferMems()
     }
 }
 
+/// Utils
+////////////////////////////////////////////////////////////
+static Buffer* GetBufferUtil(BufferHnd hnd)
+{
+    return g_buffer_state.buffers + hnd.index;
+}
+
+static BufferMemory* GetBufferMemoryUtil(BufferHnd hnd)
+{
+    return GetPtr(&g_buffer_state.buffer_mems, GetBufferUtil(hnd)->mem_index);
+}
+
+static uint32 GetBufferFrameIndex(BufferHnd hnd, uint32 frame_index)
+{
+    uint32 buffer_frame_offset = GetBufferUtil(hnd)->per_frame ? frame_index * g_buffer_state.size : 0;
+    return buffer_frame_offset + hnd.index;
+}
+
+static void ValidateBufferHnd(BufferHnd hnd, const char* action)
+{
+    if (hnd.index >= g_buffer_state.count)
+    {
+        CTK_FATAL("%s: buffer handle index %u exceeds max buffer count of %u", action, hnd.index, g_buffer_state.count);
+    }
+}
+
 /// Interface
 ////////////////////////////////////////////////////////////
 static void InitBufferModule(const Allocator* allocator, uint32 max_buffers)
@@ -155,11 +181,8 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     return hnd;
 }
 
-static void BackBuffersWithMemory(Stack* temp_stack)
+static void BackBuffersWithMemory()
 {
-    CTK_TODO("temp_stack needed?")
-    Stack frame = CreateFrame(temp_stack);
-
     PhysicalDevice* physical_device = GetPhysicalDevice();
     VkDevice device = GetDevice();
     VkResult res = VK_SUCCESS;
@@ -256,155 +279,163 @@ PrintResourceMemoryInfo("buffer-mem", &mem_requirements, buffer_mem->mem_propert
         // Map host visible buffer memory.
         if (buffer_mem->mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         {
-            vkMapMemory(device, buffer_mem->device_mem, 0, buffer_mem->size, 0, (void**)&buffer_mem->mapped_mem);
+            vkMapMemory(device, buffer_mem->device_mem, 0, buffer_mem->size, 0, (void**)&buffer_mem->host_mem);
         }
     }
 }
 
-static void WriteHostBuffer(BufferHnd buffer_hnd, uint32 frame_index, void* data, VkDeviceSize data_size)
+static void WriteHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDeviceSize data_size)
 {
-    if (buffer_hnd.index >= g_buffer_state.count)
-    {
-        CTK_FATAL("can't write to host buffer: buffer handle index %u exceeds max buffer count of %u",
-                  buffer_hnd.index, g_buffer_state.count);
-    }
+    ValidateBufferHnd(hnd, "can't write to host buffer");
     CTK_ASSERT(frame_index < g_buffer_state.frame_count);
 
-    Buffer* buffer = g_buffer_state.buffers + buffer_hnd.index;
+    Buffer* buffer = GetBufferUtil(hnd);
     if (data_size > buffer->size)
     {
-        CTK_FATAL("can't write %u bytes to host-buffer: write would exceed size of %u", data_size, buffer->size);
+        CTK_FATAL("can't write %u bytes to host buffer: write would exceed size of %u", data_size, buffer->size);
     }
 
     BufferMemory* buffer_mem = GetPtr(&g_buffer_state.buffer_mems, buffer->mem_index);
-    CTK_ASSERT(buffer_mem->mapped_mem != NULL);
+    CTK_ASSERT(buffer_mem->mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    uint32 frame_offset = buffer->per_frame ? frame_index * g_buffer_state.count : 0;
-    uint32 buffer_frame_index = frame_offset + buffer_hnd.index;
-    memcpy(buffer_mem->mapped_mem + g_buffer_state.offsets[buffer_frame_index], data, data_size);
+    uint32 buffer_frame_index = GetBufferFrameIndex(hnd, frame_index);
+    memcpy(buffer_mem->host_mem + g_buffer_state.offsets[buffer_frame_index], data, data_size);
     g_buffer_state.indexes[buffer_frame_index] = data_size;
 }
 
-static void AppendHostBuffer(BufferHnd buffer_hnd, uint32 frame_index, void* data, VkDeviceSize data_size)
+static void AppendHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDeviceSize data_size)
 {
-    // CTK_ASSERT(buffer->mapped_mem != NULL);
-    // CTK_ASSERT(frame_index < buffer->frame_count);
+    ValidateBufferHnd(hnd, "can't append to host buffer");
+    CTK_ASSERT(frame_index < g_buffer_state.frame_count);
 
-    // if (buffer->indexes[frame_index] + data_size > buffer->size)
-    // {
-    //     CTK_FATAL("can't append %u bytes to host-buffer at index %u: append would exceed size of %u", data_size,
-    //               buffer->indexes[frame_index], buffer->size);
-    // }
+    Buffer* buffer = GetBufferUtil(hnd);
+    uint32 buffer_index = g_buffer_state.indexes[GetBufferFrameIndex(hnd, frame_index)];
+    if (buffer_index + data_size > buffer->size)
+    {
+        CTK_FATAL("can't append %u bytes to host buffer at index %u: append would exceed size of %u", data_size,
+                  buffer_index, buffer->size);
+    }
 
-    // memcpy(buffer->mapped_mem + buffer->offsets[frame_index] + buffer->indexes[frame_index], data, data_size);
-    // buffer->indexes[frame_index] += data_size;
+    BufferMemory* buffer_mem = GetPtr(&g_buffer_state.buffer_mems, buffer->mem_index);
+    CTK_ASSERT(buffer_mem->mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+    uint32 buffer_frame_index = GetBufferFrameIndex(hnd, frame_index);
+    memcpy(buffer_mem->host_mem + g_buffer_state.offsets[buffer_frame_index] + buffer_index, data, data_size);
+    g_buffer_state.indexes[buffer_frame_index] += data_size;
 }
 
 static void WriteDeviceBufferCmd(BufferHnd buffer_hnd, uint32 frame_index,
-                                 BufferHnd src_buffer_hnd, uint32 src_instance_index,
+                                 BufferHnd src_buffer_hnd, uint32 src_frame_index,
                                  VkDeviceSize offset, VkDeviceSize size)
 {
-    // CTK_ASSERT(src_buffer->frame_count == 1);
-    // CTK_ASSERT(frame_index < buffer->frame_count);
+    ValidateBufferHnd(buffer_hnd, "can't write to device buffer");
+    ValidateBufferHnd(src_buffer_hnd, "can't write to device buffer");
+    CTK_ASSERT(frame_index < g_buffer_state.frame_count);
 
-    // if (size > buffer->size)
-    // {
-    //     CTK_FATAL("can't write %u bytes to device-buffer: write would exceed size of %u", size,
-    //               buffer->size);
-    // }
+    Buffer* buffer = GetBufferUtil(buffer_hnd);
+    if (size > buffer->size)
+    {
+        CTK_FATAL("can't write %u bytes to device buffer: write would exceed size of %u", size,
+                  buffer->size);
+    }
 
-    // VkBufferCopy copy =
-    // {
-    //     .srcOffset = src_buffer->offsets[src_instance_index] + offset,
-    //     .dstOffset = buffer->offsets[frame_index],
-    //     .size      = size,
-    // };
-    // vkCmdCopyBuffer(g_ctx.temp_command_buffer, src_buffer->hnd, buffer->hnd, 1, &copy);
-    // buffer->indexes[frame_index] = size;
+    uint32 buffer_frame_index = GetBufferFrameIndex(buffer_hnd, frame_index);
+    VkBufferCopy copy =
+    {
+        .srcOffset = g_buffer_state.offsets[GetBufferFrameIndex(src_buffer_hnd, frame_index)] + offset,
+        .dstOffset = g_buffer_state.offsets[buffer_frame_index],
+        .size      = size,
+    };
+    vkCmdCopyBuffer(global_ctx.temp_command_buffer,
+                    GetBufferMemoryUtil(src_buffer_hnd)->hnd,
+                    GetBufferMemoryUtil(buffer_hnd)->hnd,
+                    1, &copy);
+    g_buffer_state.indexes[buffer_frame_index] = size;
 }
 
 static void AppendDeviceBufferCmd(BufferHnd buffer_hnd, uint32 frame_index,
-                                  BufferHnd src_buffer_hnd, uint32 src_instance_index,
+                                  BufferHnd src_buffer_hnd, uint32 src_frame_index,
                                   VkDeviceSize offset, VkDeviceSize size)
 {
-    // CTK_ASSERT(src_buffer->frame_count == 1);
-    // CTK_ASSERT(frame_index < buffer->frame_count);
+    ValidateBufferHnd(buffer_hnd, "can't append to device buffer");
+    ValidateBufferHnd(src_buffer_hnd, "can't append to device buffer");
+    CTK_ASSERT(frame_index < g_buffer_state.frame_count);
 
-    // if (buffer->indexes[frame_index] + size > buffer->size)
-    // {
-    //     CTK_FATAL("can't append %u bytes to device-buffer at index %u: append would exceed size of %u",
-    //               size, buffer->indexes[frame_index], buffer->size);
-    // }
+    Buffer* buffer = GetBufferUtil(buffer_hnd);
+    uint32 buffer_frame_index = GetBufferFrameIndex(buffer_hnd, frame_index);
+    uint32 buffer_index = g_buffer_state.indexes[buffer_frame_index];
+    if (buffer_index + size > buffer->size)
+    {
+        CTK_FATAL("can't append %u bytes to device buffer at index %u: append would exceed size of %u", size,
+                  buffer_index, buffer->size);
+    }
 
-    // VkBufferCopy copy =
-    // {
-    //     .srcOffset = src_buffer->offsets[src_instance_index] + offset,
-    //     .dstOffset = buffer->offsets[frame_index] + buffer->indexes[frame_index],
-    //     .size      = size,
-    // };
-    // vkCmdCopyBuffer(g_ctx.temp_command_buffer, src_buffer->hnd, buffer->hnd, 1, &copy);
-    // buffer->indexes[frame_index] += size;
+    VkBufferCopy copy =
+    {
+        .srcOffset = g_buffer_state.offsets[GetBufferFrameIndex(src_buffer_hnd, frame_index)] + offset,
+        .dstOffset = g_buffer_state.offsets[buffer_frame_index] + buffer_index,
+        .size      = size,
+    };
+    vkCmdCopyBuffer(global_ctx.temp_command_buffer,
+                    GetBufferMemoryUtil(src_buffer_hnd)->hnd,
+                    GetBufferMemoryUtil(buffer_hnd)->hnd,
+                    1, &copy);
+    g_buffer_state.indexes[buffer_frame_index] += size;
 }
 
-static VkBuffer GetBufferMem(BufferHnd hnd)
+static Buffer* GetBuffer(BufferHnd hnd)
 {
-    if (hnd.index >= g_buffer_state.count)
-    {
-        CTK_FATAL("can't get buffer offset: buffer handle index %u exceeds max buffer count of %u",
-                  hnd.index, g_buffer_state.count);
-    }
-    Buffer* buffer = g_buffer_state.buffers + hnd.index;
-    return GetPtr(&g_buffer_state.buffer_mems, buffer->mem_index)->hnd;
+    ValidateBufferHnd(hnd, "can't get buffer");
+    return GetBufferUtil(hnd);
+}
+
+static BufferMemory* GetBufferMemory(BufferHnd hnd)
+{
+    ValidateBufferHnd(hnd, "can't get buffer memory");
+    return GetBufferMemoryUtil(hnd);
 }
 
 static VkDeviceSize GetOffset(BufferHnd hnd, uint32 frame_index)
 {
-    if (hnd.index >= g_buffer_state.count)
-    {
-        CTK_FATAL("can't get buffer offset: buffer handle index %u exceeds max buffer count of %u",
-                  hnd.index, g_buffer_state.count);
-    }
+    ValidateBufferHnd(hnd, "can't get buffer offset");
     CTK_ASSERT(frame_index < g_buffer_state.frame_count);
-    uint32 frame_offset = frame_index * g_buffer_state.size;
-    return g_buffer_state.offsets[frame_offset + hnd.index];
+
+    return g_buffer_state.offsets[GetBufferFrameIndex(hnd, frame_index)];
 }
 
 static VkDeviceSize GetIndex(BufferHnd hnd, uint32 frame_index)
 {
-    if (hnd.index >= g_buffer_state.count)
-    {
-        CTK_FATAL("can't get buffer index: buffer handle index %u exceeds max buffer count of %u",
-                  hnd.index, g_buffer_state.count);
-    }
+    ValidateBufferHnd(hnd, "can't get buffer index");
     CTK_ASSERT(frame_index < g_buffer_state.frame_count);
-    uint32 frame_offset = frame_index * g_buffer_state.size;
-    return g_buffer_state.indexes[frame_offset + hnd.index];
+
+    return g_buffer_state.indexes[GetBufferFrameIndex(hnd, frame_index)];
 }
 
 static void SetIndex(BufferHnd hnd, uint32 frame_index, VkDeviceSize index)
 {
-    if (hnd.index >= g_buffer_state.count)
-    {
-        CTK_FATAL("can't set buffer index: buffer handle index %u exceeds max buffer count of %u",
-                  hnd.index, g_buffer_state.count);
-    }
+    ValidateBufferHnd(hnd, "can't set buffer index");
     CTK_ASSERT(frame_index < g_buffer_state.frame_count);
-    uint32 frame_offset = frame_index * g_buffer_state.size;
-    g_buffer_state.indexes[frame_offset + hnd.index] = index;
+
+    g_buffer_state.indexes[GetBufferFrameIndex(hnd, frame_index)] = index;
 }
 
 template<typename Type>
-static Type* GetMappedMem(BufferHnd buffer_hnd, uint32 frame_index)
+static Type* GetHostMemory(BufferHnd hnd, uint32 frame_index)
 {
-    // CTK_ASSERT(buffer->mapped_mem != NULL);
-    // CTK_ASSERT(frame_index < buffer->frame_count);
-    // return (Type*)(buffer->mapped_mem + buffer->offsets[frame_index]);
+    ValidateBufferHnd(hnd, "can't get buffer mapped memory");
+    CTK_ASSERT(frame_index < g_buffer_state.frame_count);
+
+    BufferMemory* buffer_mem = GetBufferMemoryUtil(hnd);
+    CTK_ASSERT(buffer_mem->mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+
+    return (Type*)(buffer_mem->host_mem + g_buffer_state.offsets[GetBufferFrameIndex(hnd, frame_index)]);
 }
 
-static void Clear(BufferHnd buffer_hnd)
+static void Clear(BufferHnd hnd)
 {
-    // for (uint32 i = 0; i < buffer->frame_count; ++i)
-    // {
-    //     buffer->indexes[i] = 0;
-    // }
+    ValidateBufferHnd(hnd, "can't clear buffer");
+    for (uint32 frame_index = 0; frame_index < g_buffer_state.frame_count; ++frame_index)
+    {
+        SetIndex(hnd, frame_index, 0);
+    }
 }

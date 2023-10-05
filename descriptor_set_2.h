@@ -9,9 +9,9 @@ struct DescriptorData
     uint32             count;
     union
     {
-        Buffer*    buffers;
-        VkSampler* samplers;
+        BufferHnd* buffer_hnds;
         ImageHnd*  image_hnds;
+        VkSampler* samplers;
         struct
         {
             ImageHnd* image_hnds;
@@ -150,122 +150,119 @@ static void AllocateDescriptorSets()
 
 static void BindDescriptorSets(Stack* temp_stack)
 {
-    // Stack frame = CreateFrame(temp_stack);
-    // uint32 frame_count = global_descriptor_state.frame_count;
+    Stack frame = CreateFrame(temp_stack);
+    uint32 frame_count = global_descriptor_state.frame_count;
 
-    // // Add up total number of data bindings for all descriptor sets.
-    // uint32 buffer_write_count = 0;
-    // uint32 image_write_count  = 0;
-    // CTK_ITER_PTR(data_bindings, global_descriptor_state.data_bindings, global_descriptor_state.set_count)
-    // {
-    //     CTK_ITER(data_binding, data_bindings)
-    //     {
-    //         if (data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
-    //             data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
-    //         {
-    //             buffer_write_count += data_binding->count;
-    //         }
-    //         else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
-    //                  data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
-    //                  data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
-    //         {
-    //             image_write_count += data_binding->count;
-    //         }
-    //         else
-    //         {
-    //             CTK_FATAL("unhandled descriptor type: %u", (uint32)data_binding->type);
-    //         }
-    //     }
-    // }
+    // Add up total number of data bindings for all descriptor sets.
+    uint32 buffer_write_count = 0;
+    uint32 image_write_count  = 0;
+    CTK_ITER_PTR(data_bindings, global_descriptor_state.data_bindings, global_descriptor_state.set_count)
+    {
+        CTK_ITER(data_binding, data_bindings)
+        {
+            if (data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+                data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+            {
+                buffer_write_count += data_binding->count;
+            }
+            else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER ||
+                     data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE ||
+                     data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
+            {
+                image_write_count += data_binding->count;
+            }
+            else
+            {
+                CTK_FATAL("unhandled descriptor type: %u", (uint32)data_binding->type);
+            }
+        }
+    }
 
-    // // Generate writes from data bindings.
-    // auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, buffer_write_count * frame_count);
-    // auto image_infos  = CreateArray<VkDescriptorImageInfo> (&frame.allocator, image_write_count  * frame_count);
-    // auto writes       = CreateArray<VkWriteDescriptorSet>  (&frame.allocator, buffer_infos->size + image_infos->size);
-    // for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
-    // {
-    //     uint32 frame_offset = frame_index * global_descriptor_state.set_count;
-    //     for (uint32 set_index = 0; set_index < global_descriptor_state.set_count; ++set_index)
-    //     {
-    //         Array<DescriptorData>* data_bindings = global_descriptor_state.data_bindings + set_index;
-    //         VkDescriptorSet descriptor_set = global_descriptor_state.sets[frame_offset + set_index];
-    //         for (uint32 binding_index = 0; binding_index < data_bindings->count; ++binding_index)
-    //         {
-    //             DescriptorData* data_binding = GetPtr(data_bindings, binding_index);
-    //             VkWriteDescriptorSet* write = Push(writes);
-    //             write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    //             write->dstSet          = descriptor_set;
-    //             write->dstBinding      = binding_index;
-    //             write->dstArrayElement = 0;
-    //             write->descriptorType  = data_binding->type;
-    //             write->descriptorCount = data_binding->count;
+    // Generate writes from data bindings.
+    auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, buffer_write_count * frame_count);
+    auto image_infos  = CreateArray<VkDescriptorImageInfo> (&frame.allocator, image_write_count  * frame_count);
+    auto writes       = CreateArray<VkWriteDescriptorSet>  (&frame.allocator, buffer_infos->size + image_infos->size);
+    for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+    {
+        uint32 frame_offset = frame_index * global_descriptor_state.set_count;
+        for (uint32 set_index = 0; set_index < global_descriptor_state.set_count; ++set_index)
+        {
+            Array<DescriptorData>* data_bindings = global_descriptor_state.data_bindings + set_index;
+            VkDescriptorSet descriptor_set = global_descriptor_state.sets[frame_offset + set_index];
+            for (uint32 binding_index = 0; binding_index < data_bindings->count; ++binding_index)
+            {
+                DescriptorData* data_binding = GetPtr(data_bindings, binding_index);
+                VkWriteDescriptorSet* write = Push(writes);
+                write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                write->dstSet          = descriptor_set;
+                write->dstBinding      = binding_index;
+                write->dstArrayElement = 0;
+                write->descriptorType  = data_binding->type;
+                write->descriptorCount = data_binding->count;
 
-    //             if (data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
-    //                 data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
-    //             {
-    //                 write->pBufferInfo = End(buffer_infos);
-    //                 CTK_ITER_PTR(buffer, data_binding->buffers, data_binding->count)
-    //                 {
-    //                     uint32 instance_index = buffer->instance_count == frame_count ? frame_index : 0;
-    //                     Push(buffer_infos,
-    //                     {
-    //                         .buffer = buffer->hnd,
-    //                         .offset = buffer->offsets[instance_index],
-    //                         .range  = buffer->size,
-    //                     });
-    //                 }
-    //             }
-    //             else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
-    //             {
-    //                 write->pImageInfo = End(image_infos);
-    //                 CTK_ITER_PTR(sampler, data_binding->samplers, data_binding->count)
-    //                 {
-    //                     Push(image_infos,
-    //                     {
-    //                         .sampler     = *sampler,
-    //                         .imageView   = VK_NULL_HANDLE,
-    //                         .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-    //                     });
-    //                 }
-    //             }
-    //             else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
-    //             {
-    //                 write->pImageInfo = End(image_infos);
-    //                 CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
-    //                 {
-    //                     Image* image = GetImage(*image_hnd);
-    //                     Push(image_infos,
-    //                     {
-    //                         .sampler     = VK_NULL_HANDLE,
-    //                         .imageView   = image->default_view,
-    //                         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    //                     });
-    //                 }
-    //             }
-    //             else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
-    //             {
-    //                 write->pImageInfo = End(image_infos);
-    //                 CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnds, data_binding->count)
-    //                 {
-    //                     Image* image = GetImage(*image_hnd);
-    //                     Push(image_infos,
-    //                     {
-    //                         .sampler     = data_binding->combined_image_samplers.sampler,
-    //                         .imageView   = image->default_view,
-    //                         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-    //                     });
-    //                 }
-    //             }
-    //             else
-    //             {
-    //                 CTK_FATAL("unhandled descriptor type: %u", (uint32)data_binding->type);
-    //             }
-    //         }
-    //     }
-    // }
+                if (data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
+                    data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
+                {
+                    write->pBufferInfo = End(buffer_infos);
+                    CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnds, data_binding->count)
+                    {
+                        Push(buffer_infos,
+                        {
+                            .buffer = GetBufferMemory(*buffer_hnd)->hnd,
+                            .offset = GetOffset(*buffer_hnd, frame_index),
+                            .range  = GetBuffer(*buffer_hnd)->size,
+                        });
+                    }
+                }
+                else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
+                {
+                    write->pImageInfo = End(image_infos);
+                    CTK_ITER_PTR(sampler, data_binding->samplers, data_binding->count)
+                    {
+                        Push(image_infos,
+                        {
+                            .sampler     = *sampler,
+                            .imageView   = VK_NULL_HANDLE,
+                            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                        });
+                    }
+                }
+                else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+                {
+                    write->pImageInfo = End(image_infos);
+                    CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
+                    {
+                        Push(image_infos,
+                        {
+                            .sampler     = VK_NULL_HANDLE,
+                            .imageView   = GetImage(*image_hnd)->default_view,
+                            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                        });
+                    }
+                }
+                else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                {
+                    write->pImageInfo = End(image_infos);
+                    CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnds, data_binding->count)
+                    {
+                        Push(image_infos,
+                        {
+                            .sampler     = data_binding->combined_image_samplers.sampler,
+                            .imageView   = GetImage(*image_hnd)->default_view,
+                            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                        });
+                    }
+                }
+                else
+                {
+                    CTK_FATAL("unhandled descriptor type: %u", (uint32)data_binding->type);
+                }
+            }
+        }
+    }
 
-    // // Update all descriptor sets with writes from data bindings.
-    // vkUpdateDescriptorSets(GetDevice(), writes->count, writes->data, 0, NULL);
+    // Update all descriptor sets with writes from data bindings.
+    vkUpdateDescriptorSets(GetDevice(), writes->count, writes->data, 0, NULL);
 }
 
 static VkDescriptorSetLayout GetLayout(DescriptorSetHnd hnd)

@@ -332,7 +332,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
             },
             .imageExtent = image->extent,
         };
-        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, GetBufferMem(image_data_buffer_hnd), image->hnd,
+        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, GetBufferMemory(image_data_buffer_hnd)->hnd, image->hnd,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.

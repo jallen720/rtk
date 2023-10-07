@@ -233,18 +233,22 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
         .push_constant_ranges   = CTK_WRAP_ARRAY(push_constant_ranges),
     };
     InitPipeline(&rs->pipeline, &frame, free_list, &pipeline_info, &pipeline_layout_info);
+}
 
-    // Back resources with memory.
-    BackBuffersWithMemory();
-    BackWithMemory(rs->textures_group, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    AllocateDescriptorSets();
+static void AllocateResources(RenderState* rs, Stack* temp_stack)
+{
+    AllocateBuffers();
+    AllocateImageGroup(rs->textures_group, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    AllocateDescriptorSets(temp_stack);
+}
 
-    // Load data to resources.
+static void WriteResources(RenderState* rs)
+{
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
         LoadImage(Get(&rs->textures, i), rs->staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
     }
-    BindDescriptorSets(&frame);
+
     {
         #include "rtk/meshes/quad.h"
         InitDeviceMesh(&rs->quad_mesh, &rs->mesh_data, CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
@@ -307,6 +311,8 @@ static void Run()
     ///
     RenderState rs = {};
     InitRenderState(&rs, perm_stack, temp_stack, free_list);
+    AllocateResources(&rs, temp_stack);
+    WriteResources(&rs);
 
     // Initialize entities.
     static constexpr uint32 ENTITY_COUNT = MAX_ENTITIES;

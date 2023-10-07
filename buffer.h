@@ -170,7 +170,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     return hnd;
 }
 
-static void BackBuffersWithMemory()
+static void AllocateBuffers()
 {
     PhysicalDevice* physical_device = GetPhysicalDevice();
     VkDevice device = GetDevice();

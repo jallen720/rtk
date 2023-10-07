@@ -179,7 +179,7 @@ static Image* GetImage(ImageHnd image_hnd)
     return image_group->images + image_index;
 }
 
-static void BackWithMemory(ImageGroupHnd image_group_hnd, VkMemoryPropertyFlags mem_properties)
+static void AllocateImageGroup(ImageGroupHnd image_group_hnd, VkMemoryPropertyFlags mem_properties)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = global_ctx.device;

@@ -291,6 +291,36 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
     InitPipeline(&g_render_state.pipeline, temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
 }
 
+static void AllocateResources(Stack* temp_stack)
+{
+    AllocateBuffers();
+    AllocateImageGroup(g_render_state.textures_group, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    AllocateDescriptorSets(temp_stack);
+}
+
+static void WriteResources()
+{
+    // Images
+    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    {
+        LoadImage(Get(&g_render_state.textures, i), g_render_state.staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
+    }
+
+    // Meshes
+    {
+        #include "rtk/meshes/cube.h"
+        InitDeviceMesh(&g_render_state.cube_mesh, &g_render_state.mesh_data,
+                       CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                       g_render_state.staging_buffer);
+    }
+    {
+        #include "rtk/meshes/quad.h"
+        InitDeviceMesh(&g_render_state.quad_mesh, &g_render_state.mesh_data,
+                       CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
+                       g_render_state.staging_buffer);
+    }
+}
+
 static void RecordRenderCommandsThread(void* data)
 {
     auto state = (RenderCommandState*)data;
@@ -350,27 +380,8 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitVertexLayout(perm_stack);
     InitPipelines(temp_stack, free_list);
 
-    BackBuffersWithMemory();
-    BackWithMemory(g_render_state.textures_group, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    AllocateDescriptorSets();
-
-    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-    {
-        LoadImage(Get(&g_render_state.textures, i), g_render_state.staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
-    }
-    BindDescriptorSets(temp_stack);
-    {
-        #include "rtk/meshes/cube.h"
-        InitDeviceMesh(&g_render_state.cube_mesh, &g_render_state.mesh_data,
-                       CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                       g_render_state.staging_buffer);
-    }
-    {
-        #include "rtk/meshes/quad.h"
-        InitDeviceMesh(&g_render_state.quad_mesh, &g_render_state.mesh_data,
-                       CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                       g_render_state.staging_buffer);
-    }
+    AllocateResources(temp_stack);
+    WriteResources();
 }
 
 static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)

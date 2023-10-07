@@ -95,10 +95,15 @@ static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* t
     return hnd;
 }
 
-static void AllocateDescriptorSets()
+static void AllocateDescriptorSets(Stack* temp_stack)
 {
+    Stack frame = CreateFrame(temp_stack);
     VkDevice device = GetDevice();
     uint32 frame_count = global_descriptor_state.frame_count;
+
+    ///
+    /// Allocate Descriptor Sets
+    ///
 
     // Create descriptor pool based on descriptor set data bindings for all descriptor sets.
     static constexpr uint32 DESCRIPTOR_TYPE_COUNT = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT + 1;
@@ -146,12 +151,10 @@ static void AllocateDescriptorSets()
         res = vkAllocateDescriptorSets(device, &allocate_info, global_descriptor_state.sets + frame_offset);
         Validate(res, "vkAllocateDescriptorSets() failed");
     }
-}
 
-static void BindDescriptorSets(Stack* temp_stack)
-{
-    Stack frame = CreateFrame(temp_stack);
-    uint32 frame_count = global_descriptor_state.frame_count;
+    ///
+    /// Bind Resources To Descriptor Sets
+    ///
 
     // Add up total number of data bindings for all descriptor sets.
     uint32 buffer_write_count = 0;

@@ -394,22 +394,17 @@ static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
         &g_render_state.cube_mesh,
     };
     static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(meshes);
-    uint32 texture_count = g_render_state.textures.count;
-    uint32 render_thread_count = GetRenderThreadCount();
-    CTK_ASSERT(texture_count * MESH_COUNT == render_thread_count);
-    for (uint32 texture_index = 0; texture_index < texture_count; ++texture_index)
-    {
-        for (uint32 mesh_index = 0; mesh_index < MESH_COUNT; ++mesh_index)
-        {
-            uint32 thread_index = (texture_index * MESH_COUNT) + mesh_index;
-            RenderCommandState* state = GetPtr(&job->states, thread_index);
-            state->thread_index = thread_index;
-            state->mesh         = meshes[mesh_index];
-            state->batch_range  = GetBatchRange(thread_index, render_thread_count, entity_count);
-            state->temp_stack   = GetPtr(&g_render_state.render_thread_temp_stacks, thread_index);
 
-            Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));
-        }
+    uint32 render_thread_count = GetRenderThreadCount();
+    for (uint32 thread_index = 0; thread_index < render_thread_count; ++thread_index)
+    {
+        RenderCommandState* state = GetPtr(&job->states, thread_index);
+        state->thread_index = thread_index;
+        state->mesh         = meshes[thread_index % MESH_COUNT];
+        state->batch_range  = GetBatchRange(thread_index, render_thread_count, entity_count);
+        state->temp_stack   = GetPtr(&g_render_state.render_thread_temp_stacks, thread_index);
+
+        Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));
     }
 
     // Wait for tasks to complete.

@@ -56,7 +56,7 @@ static void InitView()
 {
     game_state.view =
     {
-        .position     = { 0, 0, -1 },
+        .position     = { 128 * 1.5f, 0, -1 },
         .rotation     = { 0, 0, 0 },
         .vertical_fov = 90.0f,
         .z_near       = 0.1f,

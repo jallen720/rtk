@@ -200,8 +200,8 @@ static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
                 .buffer_hnds = &g_render_state.entity_buffer,
             },
         };
-        g_render_state.entity_descriptor_set = CreateDescriptorSet(&perm_stack->allocator, temp_stack,
-                                                                   CTK_WRAP_ARRAY(datas));
+        g_render_state.entity_descriptor_set =
+            CreateDescriptorSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 
     // Textures
@@ -221,8 +221,8 @@ static void InitDescriptorSets(Stack* perm_stack, Stack* temp_stack)
                 .samplers   = &g_render_state.texture_sampler,
             },
         };
-        g_render_state.textures_descriptor_set = CreateDescriptorSet(&perm_stack->allocator, temp_stack,
-                                                                     CTK_WRAP_ARRAY(datas));
+        g_render_state.textures_descriptor_set =
+            CreateDescriptorSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
 }
 
@@ -408,9 +408,9 @@ static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
     }
 
     // Wait for tasks to complete.
-    for (uint32 i = 0; i < render_thread_count; ++i)
+    CTK_ITER(task, &job->tasks)
     {
-        Wait(thread_pool, Get(&job->tasks, i));
+        Wait(thread_pool, *task);
     }
 }
 

@@ -272,9 +272,9 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool)
     }
 
     // Wait for tasks to complete.
-    for (uint32 i = 0; i < thread_count; ++i)
+    CTK_ITER(task, &job->tasks)
     {
-        Wait(thread_pool, Get(&job->tasks, i));
+        Wait(thread_pool, *task);
     }
 }
 

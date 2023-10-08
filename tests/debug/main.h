@@ -89,7 +89,9 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     };
     InitMeshData(&rs->mesh_data, &mesh_data_info);
 
-//     // Descriptor Datas
+    ///
+    /// Descriptor Datas
+    ///
 
     // Entity Buffer
     BufferInfo entity_buffer_info =

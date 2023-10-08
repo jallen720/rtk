@@ -56,7 +56,7 @@ static void InitView()
 {
     game_state.view =
     {
-        .position     = { 128 * 1.5f, 0, -1 },
+        .position     = { 32 * 1.5f, 32 * 1.5f, -32 },
         .rotation     = { 0, 0, 0 },
         .vertical_fov = 90.0f,
         .z_near       = 0.1f,
@@ -79,7 +79,7 @@ static uint32 PushEntity(EntityData* entity_data)
 
 static void InitEntities()
 {
-    static constexpr uint32 CUBE_SIZE = 128;
+    static constexpr uint32 CUBE_SIZE = 64;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
     static_assert(CUBE_ENTITY_COUNT <= MAX_ENTITIES);
     EntityData* entity_data = &game_state.entity_data;

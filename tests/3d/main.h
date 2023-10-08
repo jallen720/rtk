@@ -23,8 +23,6 @@ using namespace RTK;
 namespace Test3D
 {
 
-static constexpr uint32 RENDER_THREAD_COUNT = 6;
-
 #include "rtk/tests/3d/render_state.h"
 #include "rtk/tests/3d/game_state.h"
 

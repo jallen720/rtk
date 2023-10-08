@@ -59,7 +59,7 @@ static void LogBuffers()
         {
             for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
             {
-                uint32 frame_offset = frame_index * g_buffer_state.buffer_count;
+                uint32 frame_offset = frame_index * g_buffer_state.max_buffers;
                 PrintLine("            [%u] %u", frame_index, g_buffer_state.offsets[frame_offset + buffer_index]);
             }
         }
@@ -220,7 +220,7 @@ static void AllocateBuffers()
         {
             for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
             {
-                uint32 frame_offset = frame_index * g_buffer_state.buffer_count;
+                uint32 frame_offset = frame_index * g_buffer_state.max_buffers;
                 uint32 offset = buffer_aligned_base_offset + (buffer_aligned_size * frame_index);
                 g_buffer_state.offsets[frame_offset + buffer_index] = offset;
             }

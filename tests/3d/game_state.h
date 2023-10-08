@@ -79,7 +79,7 @@ static uint32 PushEntity(EntityData* entity_data)
 
 static void InitEntities()
 {
-    static constexpr uint32 CUBE_SIZE = 64;
+    static constexpr uint32 CUBE_SIZE = 66;
     static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
     static_assert(CUBE_ENTITY_COUNT <= MAX_ENTITIES);
     EntityData* entity_data = &game_state.entity_data;

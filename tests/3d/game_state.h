@@ -110,7 +110,7 @@ static void UpdateView()
 
     // Translation Input
     static constexpr float32 BASE_TRANSLATION_SPEED = 0.01f;
-    float32 mod = KeyDown(KEY_SHIFT) ? 8.0f : 1.0f;
+    float32 mod = KeyDown(KEY_SHIFT) ? 32.0f : 4.0f;
     float32 translation_speed = BASE_TRANSLATION_SPEED * mod;
     Vec3<float32> translation = {};
 

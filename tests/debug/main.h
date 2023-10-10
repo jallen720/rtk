@@ -29,6 +29,7 @@ struct RenderState
     DescriptorSetHnd descriptor_set;
     Shader           vert_shader;
     Shader           frag_shader;
+    VertexLayout     vertex_layout;
     Pipeline         pipeline;
     MeshData         mesh_data;
     Mesh             quad_mesh;
@@ -185,6 +186,14 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     };
     rs->descriptor_set = CreateDescriptorSet(&perm_stack->allocator, &frame, CTK_WRAP_ARRAY(descriptor_datas));
 
+    // Vertex Layout
+    VertexLayout* vertex_layout = &rs->vertex_layout;
+    InitArray(&vertex_layout->bindings, &perm_stack->allocator, 1);
+    PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
+    InitArray(&vertex_layout->attributes, &perm_stack->allocator, 2);
+    PushAttribute(vertex_layout, 3, ATTRIBUTE_TYPE_FLOAT32); // Position
+    PushAttribute(vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // UV
+
     // Pipeline
     Shader* shaders[] =
     {
@@ -203,17 +212,11 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
             .maxDepth = 1
         },
     };
-    VertexLayout vertex_layout = {};
-    InitArray(&vertex_layout.bindings, &frame.allocator, 1);
-    PushBinding(&vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
-    InitArray(&vertex_layout.attributes, &frame.allocator, 2);
-    PushAttribute(&vertex_layout, 3, ATTRIBUTE_TYPE_FLOAT32); // Position
-    PushAttribute(&vertex_layout, 2, ATTRIBUTE_TYPE_FLOAT32); // UV
     PipelineInfo pipeline_info =
     {
         .shaders       = CTK_WRAP_ARRAY(shaders),
         .viewports     = CTK_WRAP_ARRAY(viewports),
-        .vertex_layout = &vertex_layout,
+        .vertex_layout = vertex_layout,
         .depth_testing = false,
         .render_target = &rs->render_target,
     };
@@ -256,6 +259,28 @@ static void WriteResources(RenderState* rs)
         InitDeviceMesh(&rs->quad_mesh, &rs->mesh_data, CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
                        rs->staging_buffer);
     }
+}
+
+static void UpdateAllPipelineViewports(RenderState* rs, FreeList* free_list)
+{
+    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
+    VkViewport viewports[] =
+    {
+        {
+            .x        = 0,
+            .y        = 0,
+            .width    = (float32)swapchain_extent.width,
+            .height   = (float32)swapchain_extent.height,
+            .minDepth = 0,
+            .maxDepth = 1,
+        },
+    };
+    UpdatePipelineViewports(&rs->pipeline, free_list, CTK_WRAP_ARRAY(viewports));
+}
+
+static void UpdateAllRenderTargetAttachments(RenderState* rs, Stack* temp_stack, FreeList* free_list)
+{
+    UpdateRenderTargetAttachments(&rs->render_target, temp_stack, free_list);
 }
 
 static void Run()
@@ -352,9 +377,13 @@ static void Run()
         }
 
         VkResult next_frame_result = NextFrame();
-        if (next_frame_result != VK_SUCCESS)
+        if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
         {
-            CTK_FATAL("next_frame_result != VK_SUCCESS");
+            WaitIdle();
+            UpdateSwapchainSurfaceExtent(temp_stack, free_list);
+            UpdateAllPipelineViewports(&rs, free_list);
+            UpdateAllRenderTargetAttachments(&rs, temp_stack, free_list);
+            continue;
         }
 
 EntityBuffer* entity_buffer = GetHostMemory<EntityBuffer>(rs.entity_buffer, GetFrameIndex());

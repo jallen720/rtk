@@ -434,3 +434,13 @@ static constexpr const char* VkBufferUsageName(VkBufferUsageFlagBits buffer_usag
         default: CTK_FATAL("unknown VkBufferUsageFlagBits value: %u", (uint32)buffer_usage);
     }
 }
+
+static constexpr const char* VkVertexInputRateName(VkVertexInputRate input_rate)
+{
+    switch (input_rate)
+    {
+        RTK_ENUM_NAME_CASE(VK_VERTEX_INPUT_RATE_VERTEX)
+        RTK_ENUM_NAME_CASE(VK_VERTEX_INPUT_RATE_INSTANCE)
+        default: CTK_FATAL("unknown VkVertexInputRateName value: %u", (uint32)input_rate);
+    }
+}

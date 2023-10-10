@@ -5,7 +5,7 @@
 
 sint32 main()
 {
-    Test3D::Run();
-    // TestDebug::Run();
+    // Test3D::Run();
+    TestDebug::Run();
     return 0;
 }

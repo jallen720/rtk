@@ -184,7 +184,7 @@ static void SubmitRenderCommands(RenderTarget* render_target)
         .pResults           = NULL,
     };
     res = vkQueuePresentKHR(global_ctx.present_queue, &present_info);
-    if (res != VK_SUBOPTIMAL_KHR || res != VK_ERROR_OUT_OF_DATE_KHR)
+    if (res != VK_SUBOPTIMAL_KHR && res != VK_ERROR_OUT_OF_DATE_KHR)
     {
         Validate(res, "vkQueuePresentKHR() failed");
     }

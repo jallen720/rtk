@@ -70,7 +70,7 @@ struct Frame
     // Sync State
     VkSemaphore image_acquired;
     VkSemaphore render_finished;
-    VkFence     in_progress;
+    VkFence     command_buffers_complete;
 
     // Render State
     VkCommandBuffer        primary_render_command_buffer;
@@ -795,9 +795,9 @@ static void InitFrames(Stack* perm_stack)
     CTK_ITER(frame, &global_ctx.frames)
     {
         // Sync State
-        frame->image_acquired  = CreateSemaphore(device, VK_SEMAPHORE_TYPE_BINARY);
-        frame->render_finished = CreateSemaphore(device, VK_SEMAPHORE_TYPE_BINARY);
-        frame->in_progress     = CreateFence(device);
+        frame->image_acquired           = CreateSemaphore(device, VK_SEMAPHORE_TYPE_BINARY);
+        frame->render_finished          = CreateSemaphore(device, VK_SEMAPHORE_TYPE_BINARY);
+        frame->command_buffers_complete = CreateFence(device);
 
         // primary_render_command_buffer
         {

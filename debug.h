@@ -444,3 +444,97 @@ static constexpr const char* VkVertexInputRateName(VkVertexInputRate input_rate)
         default: CTK_FATAL("unknown VkVertexInputRateName value: %u", (uint32)input_rate);
     }
 }
+
+
+static constexpr const char* VkResultName(VkResult result)
+{
+    switch (result)
+    {
+        RTK_ENUM_NAME_CASE(VK_SUCCESS)
+        RTK_ENUM_NAME_CASE(VK_NOT_READY)
+        RTK_ENUM_NAME_CASE(VK_TIMEOUT)
+        RTK_ENUM_NAME_CASE(VK_EVENT_SET)
+        RTK_ENUM_NAME_CASE(VK_EVENT_RESET)
+        RTK_ENUM_NAME_CASE(VK_INCOMPLETE)
+        RTK_ENUM_NAME_CASE(VK_ERROR_OUT_OF_HOST_MEMORY)
+        RTK_ENUM_NAME_CASE(VK_ERROR_OUT_OF_DEVICE_MEMORY)
+        RTK_ENUM_NAME_CASE(VK_ERROR_INITIALIZATION_FAILED)
+        RTK_ENUM_NAME_CASE(VK_ERROR_DEVICE_LOST)
+        RTK_ENUM_NAME_CASE(VK_ERROR_MEMORY_MAP_FAILED)
+        RTK_ENUM_NAME_CASE(VK_ERROR_LAYER_NOT_PRESENT)
+        RTK_ENUM_NAME_CASE(VK_ERROR_EXTENSION_NOT_PRESENT)
+        RTK_ENUM_NAME_CASE(VK_ERROR_FEATURE_NOT_PRESENT)
+        RTK_ENUM_NAME_CASE(VK_ERROR_INCOMPATIBLE_DRIVER)
+        RTK_ENUM_NAME_CASE(VK_ERROR_TOO_MANY_OBJECTS)
+        RTK_ENUM_NAME_CASE(VK_ERROR_FORMAT_NOT_SUPPORTED)
+        RTK_ENUM_NAME_CASE(VK_ERROR_FRAGMENTED_POOL)
+        RTK_ENUM_NAME_CASE(VK_ERROR_UNKNOWN)
+        // Provided by VK_VERSION_1_1
+        RTK_ENUM_NAME_CASE(VK_ERROR_OUT_OF_POOL_MEMORY)
+        RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_EXTERNAL_HANDLE)
+        // Provided by VK_VERSION_1_2
+        RTK_ENUM_NAME_CASE(VK_ERROR_FRAGMENTATION)
+        RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS)
+        // Provided by VK_VERSION_1_3
+        RTK_ENUM_NAME_CASE(VK_PIPELINE_COMPILE_REQUIRED)
+        // Provided by VK_KHR_surface
+        RTK_ENUM_NAME_CASE(VK_ERROR_SURFACE_LOST_KHR)
+        RTK_ENUM_NAME_CASE(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR)
+        // Provided by VK_KHR_swapchain
+        RTK_ENUM_NAME_CASE(VK_SUBOPTIMAL_KHR)
+        RTK_ENUM_NAME_CASE(VK_ERROR_OUT_OF_DATE_KHR)
+        // Provided by VK_KHR_display_swapchain
+        RTK_ENUM_NAME_CASE(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR)
+        // Provided by VK_EXT_debug_report
+        RTK_ENUM_NAME_CASE(VK_ERROR_VALIDATION_FAILED_EXT)
+        // Provided by VK_NV_glsl_shader
+        RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_SHADER_NV)
+        // Provided by VK_KHR_video_queue
+        RTK_ENUM_NAME_CASE(VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR)
+        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR)
+        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR)
+        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR)
+        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR)
+        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR)
+        // Provided by VK_EXT_image_drm_format_modifier
+        RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT)
+        // Provided by VK_KHR_global_priority
+        RTK_ENUM_NAME_CASE(VK_ERROR_NOT_PERMITTED_KHR)
+        // Provided by VK_EXT_full_screen_exclusive
+        RTK_ENUM_NAME_CASE(VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
+        // Provided by VK_KHR_deferred_host_operations
+        RTK_ENUM_NAME_CASE(VK_THREAD_IDLE_KHR)
+        RTK_ENUM_NAME_CASE(VK_THREAD_DONE_KHR)
+        RTK_ENUM_NAME_CASE(VK_OPERATION_DEFERRED_KHR)
+        RTK_ENUM_NAME_CASE(VK_OPERATION_NOT_DEFERRED_KHR)
+#ifdef VK_ENABLE_BETA_EXTENSIONS
+        // Provided by VK_KHR_video_encode_queue
+        RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR)
+#endif
+        // Provided by VK_EXT_image_compression_control
+        RTK_ENUM_NAME_CASE(VK_ERROR_COMPRESSION_EXHAUSTED_EXT)
+        // Provided by VK_EXT_shader_object
+        RTK_ENUM_NAME_CASE(VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT)
+
+        ///
+        /// Duplicates
+        ///
+        // // Provided by VK_KHR_maintenance1
+        // RTK_ENUM_NAME_CASE(VK_ERROR_OUT_OF_POOL_MEMORY_KHR)
+        // // Provided by VK_KHR_external_memory
+        // RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_EXTERNAL_HANDLE_KHR)
+        // // Provided by VK_EXT_descriptor_indexing
+        // RTK_ENUM_NAME_CASE(VK_ERROR_FRAGMENTATION_EXT)
+        // // Provided by VK_EXT_global_priority
+        // RTK_ENUM_NAME_CASE(VK_ERROR_NOT_PERMITTED_EXT)
+        // // Provided by VK_EXT_buffer_device_address
+        // RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_DEVICE_ADDRESS_EXT)
+        // // Provided by VK_KHR_buffer_device_address
+        // RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS_KHR)
+        // // Provided by VK_EXT_pipeline_creation_cache_control
+        // RTK_ENUM_NAME_CASE(VK_PIPELINE_COMPILE_REQUIRED_EXT)
+        // RTK_ENUM_NAME_CASE(VK_ERROR_PIPELINE_COMPILE_REQUIRED_EXT)
+
+        default: CTK_FATAL("unknown VkResult value: %u", (uint32)result);
+    }
+}

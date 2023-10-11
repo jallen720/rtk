@@ -761,12 +761,19 @@ static VkFence CreateFence(VkDevice device)
     return fence;
 }
 
-static VkSemaphore CreateSemaphore(VkDevice device)
+static VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreType type)
 {
+    VkSemaphoreTypeCreateInfo type_info =
+    {
+        .sType         = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+        .pNext         = NULL,
+        .semaphoreType = type,
+        .initialValue  = 0,
+    };
     VkSemaphoreCreateInfo info =
     {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-        .pNext = NULL,
+        .pNext = &type_info,
         .flags = 0,
     };
     VkSemaphore semaphore = VK_NULL_HANDLE;
@@ -785,13 +792,11 @@ static void InitFrames(Stack* perm_stack)
     CTK_ASSERT(frame_count <= MAX_FRAME_COUNT);
 
     InitRingBuffer(&global_ctx.frames, &perm_stack->allocator, frame_count);
-    for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+    CTK_ITER(frame, &global_ctx.frames)
     {
-        Frame* frame = GetPtr(&global_ctx.frames, frame_index);
-
         // Sync State
-        frame->image_acquired  = CreateSemaphore(device);
-        frame->render_finished = CreateSemaphore(device);
+        frame->image_acquired  = CreateSemaphore(device, VK_SEMAPHORE_TYPE_BINARY);
+        frame->render_finished = CreateSemaphore(device, VK_SEMAPHORE_TYPE_BINARY);
         frame->in_progress     = CreateFence(device);
 
         // primary_render_command_buffer

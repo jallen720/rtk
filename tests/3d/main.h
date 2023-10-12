@@ -111,8 +111,8 @@ LogPhysicalDevice(GetPhysicalDevice());
         }
 
         NextFrame();
-        VkResult next_swapchain_image_res = NextSwapchainImage();
-        if (next_swapchain_image_res == VK_ERROR_OUT_OF_DATE_KHR)
+        VkResult acquire_swapchain_image_res = AcquireSwapchainImage();
+        if (acquire_swapchain_image_res == VK_ERROR_OUT_OF_DATE_KHR)
         {
             // Swapchain image acquisition failed, recreate swapchain, skip rendering and move to next iteration to
             // retry acquiring swapchain image.
@@ -121,7 +121,7 @@ LogPhysicalDevice(GetPhysicalDevice());
             RecreateSwapchain(temp_stack, free_list);
             continue;
         }
-        else if (next_swapchain_image_res == VK_SUBOPTIMAL_KHR)
+        else if (acquire_swapchain_image_res == VK_SUBOPTIMAL_KHR)
         {
             // Swapchain image acquisition succeeded but was suboptimal, continue rendering but flag swapchain to be
             // recreated afterwards.

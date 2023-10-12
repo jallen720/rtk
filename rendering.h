@@ -1,6 +1,6 @@
 /// Interface
 ////////////////////////////////////////////////////////////
-static VkResult NextSwapchainImage()
+static VkResult AcquireSwapchainImage()
 {
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;

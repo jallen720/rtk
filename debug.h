@@ -373,18 +373,6 @@ static void PrintBufferUsage(uint32 usage, uint32 tabs = 0)
     RTK_CHECK_PRINT_FLAG(usage, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 }
 
-static void PrintResourceMemoryInfo(const char* type, VkMemoryRequirements* mem_requirements, uint32 mem_property_flags)
-{
-    PrintLine();
-    PrintLine("%s memory:", type);
-    PrintTabs(1);
-    PrintLine("requirements:");
-    PrintMemoryRequirements(mem_requirements, 2);
-    PrintTabs(1);
-    PrintLine("properties:");
-    PrintMemoryProperties(mem_property_flags, 2);
-}
-
 static constexpr const char* VkPresentModeName(VkPresentModeKHR present_mode)
 {
     switch (present_mode)

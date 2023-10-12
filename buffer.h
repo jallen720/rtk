@@ -251,7 +251,6 @@ static void AllocateBuffers()
         VkMemoryRequirements mem_requirements = {};
         vkGetBufferMemoryRequirements(device, buffer_mem->hnd, &mem_requirements);
         buffer_mem->size = mem_requirements.size;
-PrintResourceMemoryInfo("buffer-mem", &mem_requirements, buffer_mem->mem_properties);
 
         buffer_mem->device_mem = AllocateDeviceMemory(&mem_requirements, buffer_mem->mem_properties, NULL);
         res = vkBindBufferMemory(device, buffer_mem->hnd, buffer_mem->device_mem, 0);

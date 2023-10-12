@@ -108,7 +108,7 @@ static Context global_ctx;
 
 /// Forward Declarations
 ////////////////////////////////////////////////////////////
-static VkSurfaceCapabilitiesKHR GetSurfaceCapabilities();
+static void GetSurfaceCapabilities(VkSurfaceCapabilitiesKHR* capabilities);
 
 /// Debugging
 ////////////////////////////////////////////////////////////
@@ -671,7 +671,8 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
     Array<VkPresentModeKHR> present_modes = {};
     LoadVkSurfaceFormats(&formats, &frame.allocator, physical_device->hnd, surface);
     LoadVkSurfacePresentModes(&present_modes, &frame.allocator, physical_device->hnd, surface);
-    VkSurfaceCapabilitiesKHR surface_capabilities = GetSurfaceCapabilities();
+    VkSurfaceCapabilitiesKHR surface_capabilities = {};
+    GetSurfaceCapabilities(&surface_capabilities);
 
     // Default to first surface format, then check for preferred 4-component 8-bit BGRA unnormalized format and sRG
     // color space.
@@ -868,13 +869,11 @@ static Swapchain* GetSwapchain()
     return &global_ctx.swapchain;
 }
 
-static VkSurfaceCapabilitiesKHR GetSurfaceCapabilities()
+static void GetSurfaceCapabilities(VkSurfaceCapabilitiesKHR* capabilities)
 {
-    VkSurfaceCapabilitiesKHR capabilities;
     VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(global_ctx.physical_device->hnd, global_ctx.surface,
-                                                             &capabilities);
+                                                             capabilities);
     Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
-    return capabilities;
 }
 
 static uint32 GetFrameCount()
@@ -938,7 +937,9 @@ static void UpdateSwapchainSurfaceExtent(Stack* temp_stack, FreeList* free_list)
     DeinitArray(&swapchain->image_views, &free_list->allocator);
 
     // Update swapchain surface extent.
-    global_ctx.swapchain.surface_extent = GetSurfaceCapabilities().currentExtent;
+    VkSurfaceCapabilitiesKHR surface_capabilities = {};
+    GetSurfaceCapabilities(&surface_capabilities);
+    global_ctx.swapchain.surface_extent = surface_capabilities.currentExtent;
 
     // Recreate swapchain.
     vkDestroySwapchainKHR(global_ctx.device, swapchain->hnd, NULL);

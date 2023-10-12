@@ -385,6 +385,16 @@ static void Run()
             continue;
         }
 
+        // When window is re-focused after being minimized, surface extent is 0,0 for 1 frame, so skip rendering until
+        // next frame.
+        VkSurfaceCapabilitiesKHR surface_capabilities = {};
+        GetSurfaceCapabilities(&surface_capabilities);
+        VkExtent2D current_surface_extent = surface_capabilities.currentExtent;
+        if (current_surface_extent.width == 0 || current_surface_extent.height == 0)
+        {
+            continue;
+        }
+
         NextFrame();
         VkResult next_swapchain_image_res = NextSwapchainImage();
         if (next_swapchain_image_res == VK_ERROR_OUT_OF_DATE_KHR)
@@ -402,10 +412,6 @@ static void Run()
             // recreated afterwards.
 
             recreate_swapchain = true;
-        }
-        else if (next_swapchain_image_res != VK_SUCCESS)
-        {
-            CTK_FATAL("unhandled NextSwapchainImage() result: %s", VkResultName(next_swapchain_image_res));
         }
 
 EntityBuffer* entity_buffer = GetHostMemory<EntityBuffer>(rs.entity_buffer, GetFrameIndex());
@@ -427,14 +433,8 @@ x += 0.005f;
             DrawMesh(command_buffer, &rs.quad_mesh, 0, ENTITY_COUNT);
         EndRenderCommands(command_buffer);
         VkResult submit_render_commands_res = SubmitRenderCommands(&rs.render_target);
-        if (submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR || submit_render_commands_res == VK_SUBOPTIMAL_KHR)
-        {
-            recreate_swapchain = true;
-        }
-        else if (submit_render_commands_res != VK_SUCCESS)
-        {
-            CTK_FATAL("unhandled NextSwapchainImage() result: %s", VkResultName(submit_render_commands_res));
-        }
+        recreate_swapchain = submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR ||
+                             submit_render_commands_res == VK_SUBOPTIMAL_KHR;
 
         if (recreate_swapchain)
         {

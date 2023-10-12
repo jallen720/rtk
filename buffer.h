@@ -46,26 +46,20 @@ static void LogBuffers()
     for (uint32 buffer_index = 0; buffer_index < g_buffer_state.buffer_count; ++buffer_index)
     {
         Buffer* buffer = g_buffer_state.buffers + buffer_index;
-        PrintLine("   [%2u] mem_properties:", buffer_index);
+        PrintLine("   [%2u] size:             %llu", buffer_index, buffer->size);
+        PrintLine("        offset_alignment: %llu", buffer->offset_alignment);
+        PrintLine("        per_frame:        %s", buffer->per_frame ? "true" : "false");
+        PrintLine("        mem_index:        %u", g_buffer_state.mem_indexes[buffer_index]);
+        PrintLine("        mem_properties:");
         PrintMemoryProperties(buffer->mem_properties, 3);
         PrintLine("        usage:");
         PrintBufferUsage(buffer->usage, 3);
-        PrintLine("        size:             %u", buffer->size);
-        PrintLine("        offset_alignment: %u", buffer->offset_alignment);
-        PrintLine("        per_frame:        %s", buffer->per_frame ? "true" : "false");
-        PrintLine("        mem_index:        %u", g_buffer_state.mem_indexes[buffer_index]);
         PrintLine("        offsets:");
-        if (buffer->per_frame)
+        uint32 frame_count = buffer->per_frame ? GetFrameCount() : 1;
+        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
-            for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
-            {
-                uint32 frame_offset = frame_index * g_buffer_state.max_buffers;
-                PrintLine("            [%u] %u", frame_index, g_buffer_state.offsets[frame_offset + buffer_index]);
-            }
-        }
-        else
-        {
-            PrintLine("            [0] %u", g_buffer_state.offsets[buffer_index]);
+            uint32 frame_offset = frame_index * g_buffer_state.max_buffers;
+            PrintLine("            [%u] %llu", frame_index, g_buffer_state.offsets[frame_offset + buffer_index]);
         }
         PrintLine();
     }
@@ -77,11 +71,14 @@ static void LogBufferMems()
     for (uint32 i = 0; i < g_buffer_state.buffer_mems.count; ++i)
     {
         BufferMemory* buffer_mem = GetPtr(&g_buffer_state.buffer_mems, i);
-        PrintLine("   [%2u] mem_properties:", i);
+        PrintLine("   [%2u] hnd:        0x%p", i, buffer_mem->hnd);
+        PrintLine("        size:       %llu", buffer_mem->size);
+        PrintLine("        device_mem: 0x%p", buffer_mem->device_mem);
+        PrintLine("        host_mem:   0x%p", buffer_mem->host_mem);
+        PrintLine("        mem_properties:");
         PrintMemoryProperties(buffer_mem->mem_properties, 3);
         PrintLine("        usage:");
         PrintBufferUsage(buffer_mem->usage, 3);
-        PrintLine("        size: %u", buffer_mem->size);
         PrintLine();
     }
 }
@@ -181,7 +178,6 @@ static void AllocateBuffers()
     {
         Buffer* buffer = g_buffer_state.buffers + buffer_index;
 
-        CTK_TODO("shouldn't use aligned size");
         uint32 buffer_aligned_size = MultipleOf(buffer->size, buffer->offset_alignment);
         uint32 buffer_aligned_total_size = buffer_aligned_size * (buffer->per_frame ? g_buffer_state.frame_count : 1);
 
@@ -215,23 +211,14 @@ static void AllocateBuffers()
         }
         g_buffer_state.mem_indexes[buffer_index] = mem_index;
 
-        // Calculate offsets (if per-frame).
-        if (buffer->per_frame)
+        // Calculate offsets.
+        uint32 frame_count = buffer->per_frame ? GetFrameCount() : 1;
+        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
-            for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
-            {
-                uint32 frame_offset = frame_index * g_buffer_state.max_buffers;
-                uint32 offset = buffer_aligned_base_offset + (buffer_aligned_size * frame_index);
-                g_buffer_state.offsets[frame_offset + buffer_index] = offset;
-            }
-        }
-        else
-        {
-            uint32 frame_offset = 0;
-            uint32 offset = buffer_aligned_base_offset;
+            uint32 frame_offset = frame_index * g_buffer_state.max_buffers;
+            uint32 offset = buffer_aligned_base_offset + (buffer_aligned_size * frame_index);
             g_buffer_state.offsets[frame_offset + buffer_index] = offset;
         }
-
     }
 
     // Initialize and allocate buffer memory.

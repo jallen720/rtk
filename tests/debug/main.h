@@ -283,6 +283,14 @@ static void UpdateAllRenderTargetAttachments(RenderState* rs, Stack* temp_stack,
     UpdateRenderTargetAttachments(&rs->render_target, temp_stack, free_list);
 }
 
+static void RecreateSwapchain(RenderState* rs, Stack* temp_stack, FreeList* free_list)
+{
+    WaitIdle();
+    UpdateSwapchainSurfaceExtent(temp_stack, free_list);
+    UpdateAllPipelineViewports(rs, free_list);
+    UpdateAllRenderTargetAttachments(rs, temp_stack, free_list);
+}
+
 static void Run()
 {
     Stack* perm_stack = CreateStack(&win32_allocator, Megabyte32<8>());
@@ -356,6 +364,7 @@ static void Run()
         }
     }
 
+    bool recreate_swapchain = false;
     for (;;)
     {
         ProcessWindowEvents();
@@ -376,14 +385,27 @@ static void Run()
             continue;
         }
 
-        VkResult next_frame_result = NextFrame();
-        if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
+        NextFrame();
+        VkResult next_swapchain_image_res = NextSwapchainImage();
+        if (next_swapchain_image_res == VK_ERROR_OUT_OF_DATE_KHR)
         {
-            WaitIdle();
-            UpdateSwapchainSurfaceExtent(temp_stack, free_list);
-            UpdateAllPipelineViewports(&rs, free_list);
-            UpdateAllRenderTargetAttachments(&rs, temp_stack, free_list);
+            // Swapchain image acquisition failed, recreate swapchain, skip rendering and move to next iteration to
+            // retry acquiring swapchain image.
+
+            recreate_swapchain = true;
+            RecreateSwapchain(&rs, temp_stack, free_list);
             continue;
+        }
+        else if (next_swapchain_image_res == VK_SUBOPTIMAL_KHR)
+        {
+            // Swapchain image acquisition succeeded but was suboptimal, continue rendering but flag swapchain to be
+            // recreated afterwards.
+
+            recreate_swapchain = true;
+        }
+        else if (next_swapchain_image_res != VK_SUCCESS)
+        {
+            CTK_FATAL("unhandled NextSwapchainImage() result: %s", VkResultName(next_swapchain_image_res));
         }
 
 EntityBuffer* entity_buffer = GetHostMemory<EntityBuffer>(rs.entity_buffer, GetFrameIndex());
@@ -404,7 +426,21 @@ x += 0.005f;
             BindMeshData(command_buffer, &rs.mesh_data);
             DrawMesh(command_buffer, &rs.quad_mesh, 0, ENTITY_COUNT);
         EndRenderCommands(command_buffer);
-        SubmitRenderCommands(&rs.render_target);
+        VkResult submit_render_commands_res = SubmitRenderCommands(&rs.render_target);
+        if (submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR || submit_render_commands_res == VK_SUBOPTIMAL_KHR)
+        {
+            recreate_swapchain = true;
+        }
+        else if (submit_render_commands_res != VK_SUCCESS)
+        {
+            CTK_FATAL("unhandled NextSwapchainImage() result: %s", VkResultName(submit_render_commands_res));
+        }
+
+        if (recreate_swapchain)
+        {
+            RecreateSwapchain(&rs, temp_stack, free_list);
+            recreate_swapchain = false;
+        }
     }
 }
 

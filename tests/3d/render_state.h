@@ -360,6 +360,14 @@ static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_l
     UpdateRenderTargetAttachments(&g_render_state.render_target, temp_stack, free_list);
 }
 
+static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
+{
+    WaitIdle();
+    UpdateSwapchainSurfaceExtent(temp_stack, free_list);
+    UpdateAllPipelineViewports(free_list);
+    UpdateAllRenderTargetAttachments(temp_stack, free_list);
+}
+
 /// Interface
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)

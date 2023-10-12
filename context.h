@@ -1007,3 +1007,8 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
 
     return mem;
 }
+
+static void NextFrame()
+{
+    Next(&global_ctx.frames);
+}

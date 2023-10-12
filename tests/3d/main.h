@@ -79,6 +79,7 @@ LogPhysicalDevice(GetPhysicalDevice());
     InitGameState(perm_stack, thread_pool->size);
 
     // Run game.
+    bool recreate_swapchain = false;
     for (;;)
     {
         ProcessWindowEvents();
@@ -99,20 +100,46 @@ LogPhysicalDevice(GetPhysicalDevice());
             continue;
         }
 
-        // NextFrame() will only return VK_SUCCESS, VK_SUBOPTIMAL_KHR or VK_ERROR_OUT_OF_DATE_KHR.
-        VkResult next_frame_result = NextFrame();
-        if (next_frame_result == VK_SUBOPTIMAL_KHR || next_frame_result == VK_ERROR_OUT_OF_DATE_KHR)
+        NextFrame();
+        VkResult next_swapchain_image_res = NextSwapchainImage();
+        if (next_swapchain_image_res == VK_ERROR_OUT_OF_DATE_KHR)
         {
-            WaitIdle();
-            UpdateSwapchainSurfaceExtent(temp_stack, free_list);
-            UpdateAllPipelineViewports(free_list);
-            UpdateAllRenderTargetAttachments(temp_stack, free_list);
+            // Swapchain image acquisition failed, recreate swapchain, skip rendering and move to next iteration to
+            // retry acquiring swapchain image.
+
+            recreate_swapchain = true;
+            RecreateSwapchain(temp_stack, free_list);
             continue;
+        }
+        else if (next_swapchain_image_res == VK_SUBOPTIMAL_KHR)
+        {
+            // Swapchain image acquisition succeeded but was suboptimal, continue rendering but flag swapchain to be
+            // recreated afterwards.
+
+            recreate_swapchain = true;
+        }
+        else if (next_swapchain_image_res != VK_SUCCESS)
+        {
+            CTK_FATAL("unhandled NextSwapchainImage() result: %s", VkResultName(next_swapchain_image_res));
         }
 
         UpdateMVPMatrixes(thread_pool);
         RecordRenderCommands(thread_pool, GetEntityCount());
-        SubmitRenderCommands(GetRenderTarget());
+        VkResult submit_render_commands_res = SubmitRenderCommands(GetRenderTarget());
+        if (submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR || submit_render_commands_res == VK_SUBOPTIMAL_KHR)
+        {
+            recreate_swapchain = true;
+        }
+        else if (submit_render_commands_res != VK_SUCCESS)
+        {
+            CTK_FATAL("unhandled NextSwapchainImage() result: %s", VkResultName(submit_render_commands_res));
+        }
+
+        if (recreate_swapchain)
+        {
+            RecreateSwapchain(temp_stack, free_list);
+            recreate_swapchain = false;
+        }
     }
 }
 

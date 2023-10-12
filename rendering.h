@@ -1,54 +1,41 @@
 /// Interface
 ////////////////////////////////////////////////////////////
-static VkResult NextFrame()
+static VkResult NextSwapchainImage()
 {
     VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
+    Frame* frame = GetCurrentPtr(&global_ctx.frames);
 
-    // Get next frame and wait for it to be finished (if still in-progress) before proceeding.
-    Frame* frame = Next(&global_ctx.frames);
-
+    // Wait for frame's command buffers to be done executing.
     res = vkWaitForFences(device, 1, &frame->command_buffers_complete, VK_TRUE, UINT64_MAX);
     Validate(res, "vkWaitForFences() failed");
 
-    // // Only reset fence after image is successfully acquired to avoid deadlock if swapchain is recreated.
-    // No longer need to wait to reset fences until after successful swapchain image acquisition. If image
-    // acquisition fails, a dummy vkQueueSubmit() is called which will re-signal the fence.
-    res = vkResetFences(device, 1, &frame->command_buffers_complete);
-    Validate(res, "vkResetFences() failed");
-
-    // Once frame is ready, aquire next swapchain image's index.
+    // Once frame is ready, acquire next swapchain image's index.
     res = vkAcquireNextImageKHR(device, global_ctx.swapchain.hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
                                 &frame->swapchain_image_index);
-    if (res == VK_SUBOPTIMAL_KHR || res == VK_ERROR_OUT_OF_DATE_KHR)
+    if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        // Submit dummy vkQueueSubmit() call to unsignal frame->image_acquired semaphore so it can be re-used after
-        // swapchain is recreated.
-        VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        VkSubmitInfo submit_info =
-        {
-            .sType                = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-            .pNext                = NULL,
-            .waitSemaphoreCount   = 1,
-            .pWaitSemaphores      = &frame->image_acquired,
-            .pWaitDstStageMask    = &wait_stage,
-            .commandBufferCount   = 0,
-            .pCommandBuffers      = NULL,
-            .signalSemaphoreCount = 0,
-            .pSignalSemaphores    = NULL,
-        };
-        VkResult queue_submit_res = vkQueueSubmit(global_ctx.graphics_queue, 1, &submit_info,
-                                                  frame->command_buffers_complete);
-        Validate(queue_submit_res, "dummy vkQueueSubmit() to unsignal frame->image_acquired semaphore failed");
-
-        // Reset frame so Next() call gives same frame.
-        global_ctx.frames.index = global_ctx.frames.index == 0 ? global_ctx.frames.size - 1 : global_ctx.frames.index - 1;
-
         return res;
     }
 
-    Validate(res, "vkAcquireNextImageKHR() failed");
-    return VK_SUCCESS;
+    // Swapchain image aqcuisition succeeded and frame->image_acquired will be signaled.
+    if (res == VK_SUBOPTIMAL_KHR)
+    {
+        // If swapchain image is suboptimal, continue normally and recreate swapchain when device is idle.
+    }
+    else
+    {
+        Validate(res, "vkAcquireNextImageKHR() failed");
+    }
+
+    // Only reset fence after successful image acquisition (vkAcquireNextImageKHR() did not return
+    // VK_ERROR_OUT_OF_DATE_KHR). vkResetFences() will unsignal frame->command_buffers_complete and cause the next
+    // call to vkWaitForFences() to deadlock as the command buffers were not subbmitted again due to swapchain needing
+    // to be recreated.
+    res = vkResetFences(device, 1, &frame->command_buffers_complete);
+    Validate(res, "vkResetFences() failed");
+
+    return res;
 }
 
 static VkCommandBuffer BeginRenderCommands(RenderTarget* render_target, uint32 render_thread_index)
@@ -135,7 +122,7 @@ static void EndRenderCommands(VkCommandBuffer command_buffer)
     Validate(res, "vkEndCommandBuffer() failed");
 }
 
-static void SubmitRenderCommands(RenderTarget* render_target)
+static VkResult SubmitRenderCommands(RenderTarget* render_target)
 {
     Frame* frame = GetCurrentPtr(&global_ctx.frames);
     VkResult res = VK_SUCCESS;
@@ -212,4 +199,6 @@ static void SubmitRenderCommands(RenderTarget* render_target)
     {
         Validate(res, "vkQueuePresentKHR() failed");
     }
+
+    return res;
 }

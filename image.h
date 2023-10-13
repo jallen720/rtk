@@ -3,22 +3,56 @@
 struct ImageHnd { uint32 index; };
 struct ImageGroupHnd { uint32 index; };
 
-struct ImageMemory
-{
-    VkDeviceMemory hnd;
-    VkDeviceSize   size;
-};
-
 struct Image
 {
-    VkImage              hnd;
-    VkMemoryRequirements mem_requirements;
-    uint32               mem_index;
-    VkImageType          type;
-    VkFormat             format;
-    VkExtent3D           extent;
-    VkImageView          default_view;
+    VkExtent3D        extent;
+    VkImageUsageFlags usage;
+    VkDeviceSize      offset_alignment;
+    bool              per_frame;
+
+    // Properties used to select memory allocation.
+    VkMemoryPropertyFlags mem_properties;
+    VkImageCreateFlags    flags;
+    VkImageType           type;
+    VkFormat              format;
+    uint32                mip_levels;
+    uint32                array_layers;
+    VkSampleCountFlagBits samples;
+    VkImageTiling         tiling;
 };
+
+struct ImageMemory
+{
+    VkImage           hnd;
+    VkDeviceSize      size;
+    VkImageUsageFlags usage;
+    VkDeviceMemory    device_mem;
+    uint8*            host_mem;
+
+    // Unique combination of properties for this memory allocation.
+    VkMemoryPropertyFlags mem_properties;
+    VkImageCreateFlags    flags;
+    VkImageType           type;
+    VkFormat              format;
+    uint32                mip_levels;
+    uint32                array_layers;
+    VkSampleCountFlagBits samples;
+    VkImageTiling         tiling;
+};
+
+static struct ImageState
+{
+    Image*        images;      // size: max_images
+    uint32*       mem_indexes; // size: max_images
+    VkImageView   views;       // size: max_images * frame_count
+    VkDeviceSize* offsets;     // size: max_images * frame_count
+    uint32        max_images;
+    uint32        image_count;
+    uint32        frame_count;
+
+    FArray<ImageMemory, VK_MAX_MEMORY_TYPES> mems;
+}
+g_image_state;
 
 struct ImageData
 {
@@ -29,49 +63,63 @@ struct ImageData
     uint8* data;
 };
 
-struct ImageGroup
-{
-    Image*      images;
-    uint32      count;
-    uint32      size;
-    ImageMemory mem[VK_MAX_MEMORY_TYPES];
-};
-
-static Array<ImageGroup> global_image_groups;
-
 /// Debug
 ////////////////////////////////////////////////////////////
-static void LogImageGroups()
+static void LogImages()
 {
-    for (uint32 image_group_index = 0; image_group_index < global_image_groups.count; ++image_group_index)
+    PrintLine("images:");
+    for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
     {
-        ImageGroup* image_group = GetPtr(&global_image_groups, image_group_index);
+        Image* image = g_image_state.image + image_index;
+        PrintLine("   [%2u] extent:           { w: %u, h: %u }", image_index, image->extent.widht, image->extent.height);
+        PrintLine("        usage:");
+        PrintBufferUsage(image->usage, 3);
+        PrintLine("        offset_alignment: %llu", image->offset_alignment);
+        PrintLine("        per_frame:        %s", image->per_frame ? "true" : "false");
 
-        PrintLine("image group %u:", image_group_index);
-        PrintLine("    images:");
-        for (uint32 i = 0; i < image_group->count; ++i)
-        {
-            Image* image = image_group->images + i;
-            PrintLine("        [%3u] hnd:          %llu", i, image->hnd);
-            PrintLine("              size:         %llu", image->mem_requirements.size);
-            PrintLine("              alignment:    %llu", image->mem_requirements.alignment);
-            PrintLine("              mem_index:    %u", image->mem_index);
-            PrintLine("              default_view: %llu", image->default_view);
-            PrintLine("              extent:       { w: %u, h: %u, d: %u }",
-                      image->extent.width,
-                      image->extent.height,
-                      image->extent.depth);
-            PrintLine();
-        }
+        PrintLine("        mem_properties:");
+        PrintMemoryProperties(image->mem_properties, 3);
+        PrintLine("        flags:            %s", VkImageCreateName(image->flags));
+        PrintLine("        type:             %s", VkImageTypeName(image->type));
+        PrintLine("        format:           %s", VkFormatName(image->format));
+        PrintLine("        mip_levels:       %u", image->mip_levels);
+        PrintLine("        array_layers:     %u", image->array_layers);
+        PrintLine("        samples:          %s", VkSampleCountName(image->samples));
+        PrintLine("        tiling:           %s", VkImageTilingName(image->tiling));
 
-        PrintLine("    memory types:");
-        for (uint32 i = 0; i < image_group->count; ++i)
+        PrintLine("        mem_index:        %u", g_image_state.mem_indexes[image_index]);
+        PrintLine("        offsets:");
+        uint32 frame_count = image->per_frame ? GetFrameCount() : 1;
+        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
-            ImageMemory* mem = image_group->mem + i;
-            PrintLine("        [%3u] hnd:    %llu", i, mem->hnd);
-            PrintLine("              size:   %u", mem->size);
-            PrintLine();
+            uint32 frame_offset = frame_index * g_image_state.max_buffers;
+            PrintLine("            [%u] %llu", frame_index, g_image_state.offsets[frame_offset + image_index]);
         }
+        PrintLine("        views:");
+        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+        {
+            uint32 frame_offset = frame_index * g_image_state.max_buffers;
+            PrintLine("            [%u] %p", frame_index, g_image_state.views[frame_offset + image_index]);
+        }
+        PrintLine();
+    }
+}
+
+static void LogImageMems()
+{
+    PrintLine("image mems:");
+    for (uint32 i = 0; i < g_image_state.mems.count; ++i)
+    {
+        BufferMemory* buffer_mem = GetPtr(&g_image_state.mems, i);
+        PrintLine("   [%2u] hnd:        0x%p", i, buffer_mem->hnd);
+        PrintLine("        size:       %llu", buffer_mem->size);
+        PrintLine("        device_mem: 0x%p", buffer_mem->device_mem);
+        PrintLine("        host_mem:   0x%p", buffer_mem->host_mem);
+        PrintLine("        mem_properties:");
+        PrintMemoryProperties(buffer_mem->mem_properties, 3);
+        PrintLine("        usage:");
+        PrintBufferUsage(buffer_mem->usage, 3);
+        PrintLine();
     }
 }
 
@@ -179,7 +227,7 @@ static Image* GetImage(ImageHnd image_hnd)
     return image_group->images + image_index;
 }
 
-static void AllocateImageGroup(ImageGroupHnd image_group_hnd, VkMemoryPropertyFlags mem_properties)
+static void AllocateImageGroup(ImageGroupHnd image_group_hnd)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = global_ctx.device;

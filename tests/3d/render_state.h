@@ -132,7 +132,7 @@ static void InitDescriptorDatas(Stack* perm_stack)
     // Textures
     g_render_state.textures_group = CreateImageGroup(&perm_stack->allocator, 16);
     InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
-    VkImageCreateInfo texture_create_info =
+    VkImageInfo texture_create_info =
     {
         .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
         .pNext     = NULL,

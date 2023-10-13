@@ -7,9 +7,9 @@ static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
 struct BufferInfo
 {
     VkDeviceSize       size;
+    VkBufferUsageFlags usage;
     VkDeviceSize       offset_alignment;
     bool               per_frame;
-    VkBufferUsageFlags usage;
 
     // Properties used to select memory allocation.
     VkMemoryPropertyFlags mem_properties;

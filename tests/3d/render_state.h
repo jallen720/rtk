@@ -77,10 +77,10 @@ static void InitDeviceMemory()
     BufferInfo staging_buffer_info =
     {
         .size             = Megabyte32<4>(),
+        .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame        = false,
         .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     };
     g_render_state.staging_buffer = CreateBuffer(&staging_buffer_info);
 }

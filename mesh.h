@@ -26,20 +26,20 @@ static void InitMeshData(MeshData* mesh_data, MeshDataInfo* info)
     BufferInfo vertex_buffer_info =
     {
         .size             = info->vertex_buffer_size,
+        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame        = false,
         .mem_properties   = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
     };
     mesh_data->vertex_buffer = CreateBuffer(&vertex_buffer_info);
 
     BufferInfo index_buffer_info =
     {
         .size             = info->index_buffer_size,
+        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame        = false,
         .mem_properties   = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
     };
     mesh_data->index_buffer = CreateBuffer(&index_buffer_info);
 }

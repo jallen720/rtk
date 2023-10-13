@@ -6,11 +6,13 @@ static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
 
 struct BufferInfo
 {
-    VkDeviceSize          size;
-    VkDeviceSize          offset_alignment;
-    bool                  per_frame;
+    VkDeviceSize       size;
+    VkDeviceSize       offset_alignment;
+    bool               per_frame;
+    VkBufferUsageFlags usage;
+
+    // Properties used to select memory allocation.
     VkMemoryPropertyFlags mem_properties;
-    VkBufferUsageFlags    usage;
 };
 using Buffer = BufferInfo; // Stored information for Buffer is same as information used to create it.
 
@@ -18,10 +20,12 @@ struct BufferMemory
 {
     VkBuffer              hnd;
     VkDeviceSize          size;
+    VkBufferUsageFlags    usage;
     VkDeviceMemory        device_mem;
     uint8*                host_mem;
+
+    // Unique combination of properties for this memory allocation.
     VkMemoryPropertyFlags mem_properties;
-    VkBufferUsageFlags    usage;
 };
 
 static struct BufferState
@@ -205,8 +209,8 @@ static void AllocateBuffers()
             Push(&g_buffer_state.buffer_mems,
                  {
                      .size           = buffer_aligned_total_size,
-                     .mem_properties = buffer->mem_properties,
                      .usage          = buffer->usage,
+                     .mem_properties = buffer->mem_properties,
                  });
         }
         g_buffer_state.mem_indexes[buffer_index] = mem_index;

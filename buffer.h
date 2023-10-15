@@ -54,11 +54,11 @@ static void LogBuffers()
         PrintLine("        offset_alignment: %llu", buffer->offset_alignment);
         PrintLine("        per_frame:        %s", buffer->per_frame ? "true" : "false");
         PrintLine("        mem_index:        %u", g_buffer_state.mem_indexes[buffer_index]);
-        PrintLine("        mem_properties:");
-        PrintMemoryProperties(buffer->mem_properties, 3);
-        PrintLine("        usage:");
-        PrintBufferUsage(buffer->usage, 3);
-        PrintLine("        offsets:");
+        Print(    "        mem_properties:   ");
+        PrintMemoryPropertyFlags(buffer->mem_properties, 26);
+        Print(    "        usage:            ");
+        PrintBufferUsageFlags(buffer->usage, 26);
+        Print(    "        offsets:          ");
         uint32 frame_count = buffer->per_frame ? GetFrameCount() : 1;
         for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
@@ -75,14 +75,14 @@ static void LogBufferMems()
     for (uint32 i = 0; i < g_buffer_state.mems.count; ++i)
     {
         BufferMemory* buffer_mem = GetPtr(&g_buffer_state.mems, i);
-        PrintLine("   [%2u] hnd:        0x%p", i, buffer_mem->hnd);
-        PrintLine("        size:       %llu", buffer_mem->size);
-        PrintLine("        device_mem: 0x%p", buffer_mem->device_mem);
-        PrintLine("        host_mem:   0x%p", buffer_mem->host_mem);
-        PrintLine("        mem_properties:");
-        PrintMemoryProperties(buffer_mem->mem_properties, 3);
-        PrintLine("        usage:");
-        PrintBufferUsage(buffer_mem->usage, 3);
+        PrintLine("   [%2u] hnd:            0x%p", i, buffer_mem->hnd);
+        PrintLine("        size:           %llu", buffer_mem->size);
+        PrintLine("        device_mem:     0x%p", buffer_mem->device_mem);
+        PrintLine("        host_mem:       0x%p", buffer_mem->host_mem);
+        Print(    "        mem_properties: ");
+        PrintMemoryPropertyFlags(buffer_mem->mem_properties, 24);
+        Print(    "        usage:          ");
+        PrintBufferUsageFlags(buffer_mem->usage, 24);
         PrintLine();
     }
 }
@@ -132,7 +132,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
 {
     if (g_buffer_state.buffer_count >= g_buffer_state.max_buffers)
     {
-        CTK_FATAL("can't create buffer: already at max buffer count of %u", g_buffer_state.max_buffers);
+        CTK_FATAL("can't create buffer: already at max of %u buffers", g_buffer_state.max_buffers);
     }
 
     BufferHnd hnd = { .index = g_buffer_state.buffer_count };
@@ -141,6 +141,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     *buffer = *info; // Buffer is exact copy of info passed to CreateBuffer().
 
     // Figure out minimum offset alignment if requested.
+    // Spec:
     if (buffer->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
         VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;

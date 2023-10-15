@@ -141,7 +141,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     *buffer = *info; // Buffer is exact copy of info passed to CreateBuffer().
 
     // Figure out minimum offset alignment if requested.
-    // Spec:
+    // Spec: https://registry.khronos.org/vulkan/specs/1.1-extensions/html/vkspec.html#resources-association
     if (buffer->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
         VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;

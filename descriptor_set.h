@@ -232,29 +232,31 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
                 {
-                    write->pImageInfo = End(image_infos);
-                    CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
-                    {
-                        Push(image_infos,
-                        {
-                            .sampler     = VK_NULL_HANDLE,
-                            .imageView   = GetImage(*image_hnd)->default_view,
-                            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        });
-                    }
+                    CTK_TODO("uncomment")
+                    // write->pImageInfo = End(image_infos);
+                    // CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
+                    // {
+                    //     Push(image_infos,
+                    //     {
+                    //         .sampler     = VK_NULL_HANDLE,
+                    //         .imageView   = GetImage(*image_hnd)->default_view,
+                    //         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    //     });
+                    // }
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
                 {
-                    write->pImageInfo = End(image_infos);
-                    CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnds, data_binding->count)
-                    {
-                        Push(image_infos,
-                        {
-                            .sampler     = data_binding->combined_image_samplers.sampler,
-                            .imageView   = GetImage(*image_hnd)->default_view,
-                            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        });
-                    }
+                    CTK_TODO("uncomment")
+                    // write->pImageInfo = End(image_infos);
+                    // CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnds, data_binding->count)
+                    // {
+                    //     Push(image_infos,
+                    //     {
+                    //         .sampler     = data_binding->combined_image_samplers.sampler,
+                    //         .imageView   = GetImage(*image_hnd)->default_view,
+                    //         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    //     });
+                    // }
                 }
                 else
                 {

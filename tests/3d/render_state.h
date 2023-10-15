@@ -33,7 +33,7 @@ struct RenderState
 
     // Descriptor Datas
     BufferHnd       entity_buffer;
-    ImageGroupHnd   textures_group;
+    // ImageGroupHnd   textures_group;
     Array<ImageHnd> textures;
     VkSampler       texture_sampler;
 
@@ -129,37 +129,37 @@ static void InitDescriptorDatas(Stack* perm_stack)
     };
     g_render_state.entity_buffer = CreateBuffer(&entity_buffer_info);
 
-    // Textures
-    g_render_state.textures_group = CreateImageGroup(&perm_stack->allocator, 16);
-    InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
-    VkImageInfo texture_create_info =
-    {
-        .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .pNext     = NULL,
-        .flags     = 0,
-        .imageType = VK_IMAGE_TYPE_2D,
-        .format    = GetSwapchain()->surface_format.format,
-        .extent =
-        {
-            .width  = 64,
-            .height = 32,
-            .depth  = 1
-        },
-        .mipLevels             = 1,
-        .arrayLayers           = 1,
-        .samples               = VK_SAMPLE_COUNT_1_BIT,
-        .tiling                = VK_IMAGE_TILING_OPTIMAL,
-        .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                                 VK_IMAGE_USAGE_SAMPLED_BIT,
-        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 0,
-        .pQueueFamilyIndices   = NULL,
-        .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
-    };
-    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-    {
-        Push(&g_render_state.textures, CreateImage(g_render_state.textures_group, &texture_create_info));
-    }
+CTK_TODO("uncomment");
+    // // Textures
+    // InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
+    // VkImageInfo texture_create_info =
+    // {
+    //     .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+    //     .pNext     = NULL,
+    //     .flags     = 0,
+    //     .imageType = VK_IMAGE_TYPE_2D,
+    //     .format    = GetSwapchain()->surface_format.format,
+    //     .extent =
+    //     {
+    //         .width  = 64,
+    //         .height = 32,
+    //         .depth  = 1
+    //     },
+    //     .mipLevels             = 1,
+    //     .arrayLayers           = 1,
+    //     .samples               = VK_SAMPLE_COUNT_1_BIT,
+    //     .tiling                = VK_IMAGE_TILING_OPTIMAL,
+    //     .usage                 = VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+    //                              VK_IMAGE_USAGE_SAMPLED_BIT,
+    //     .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
+    //     .queueFamilyIndexCount = 0,
+    //     .pQueueFamilyIndices   = NULL,
+    //     .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+    // };
+    // for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    // {
+    //     Push(&g_render_state.textures, CreateImage(g_render_state.textures_group, &texture_create_info));
+    // }
 
     // Texture Sampler
     VkSamplerCreateInfo texture_sampler_info =
@@ -294,17 +294,18 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
 static void AllocateResources(Stack* temp_stack)
 {
     AllocateBuffers();
-    AllocateImageGroup(g_render_state.textures_group, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    AllocateImageGroup();
     AllocateDescriptorSets(temp_stack);
 }
 
 static void WriteResources()
 {
-    // Images
-    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-    {
-        LoadImage(Get(&g_render_state.textures, i), g_render_state.staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
-    }
+    CTK_TODO("uncomment")
+    // // Images
+    // for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
+    // {
+    //     LoadImage(Get(&g_render_state.textures, i), g_render_state.staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
+    // }
 
     // Meshes
     {
@@ -373,23 +374,48 @@ static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
     InitBufferModule(&perm_stack->allocator, 32);
-    InitImageModule(&perm_stack->allocator, 4);
+    InitImageModule(&perm_stack->allocator, 32);
     InitDescriptorSetModule(&perm_stack->allocator, 16);
 
-    InitRenderJob(perm_stack);
-    InitDeviceMemory();
+    ImageInfo info =
+    {
+        .extent =
+        {
+            .width  = 64,
+            .height = 32,
+            .depth  = 1
+        },
+        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .per_frame      = false,
+        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .flags          = 0,
+        .type           = VK_IMAGE_TYPE_2D,
+        .format         = GetSwapchain()->surface_format.format,
+        .mip_levels     = 1,
+        .array_layers   = 1,
+        .samples        = VK_SAMPLE_COUNT_1_BIT,
+        .tiling         = VK_IMAGE_TILING_OPTIMAL,
+    };
+    ImageHnd image = CreateImage(&info);
+    AllocateImages();
+    LogImages();
+    LogImageMems();
+    exit(0);
 
-    InitRenderTargets(temp_stack, free_list);
-    InitShaders(temp_stack);
-    InitMeshes();
+    // InitRenderJob(perm_stack);
+    // InitDeviceMemory();
 
-    InitDescriptorDatas(perm_stack);
-    InitDescriptorSets(perm_stack, temp_stack);
-    InitVertexLayout(perm_stack);
-    InitPipelines(temp_stack, free_list);
+    // InitRenderTargets(temp_stack, free_list);
+    // InitShaders(temp_stack);
+    // InitMeshes();
 
-    AllocateResources(temp_stack);
-    WriteResources();
+    // InitDescriptorDatas(perm_stack);
+    // InitDescriptorSets(perm_stack, temp_stack);
+    // InitVertexLayout(perm_stack);
+    // InitPipelines(temp_stack, free_list);
+
+    // AllocateResources(temp_stack);
+    // WriteResources();
 }
 
 static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)

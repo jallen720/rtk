@@ -294,7 +294,7 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
 static void AllocateResources(Stack* temp_stack)
 {
     AllocateBuffers();
-    AllocateImageGroup();
+    AllocateImages();
     AllocateDescriptorSets(temp_stack);
 }
 

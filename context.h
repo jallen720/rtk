@@ -129,7 +129,7 @@ static void LogMemoryTypes(VkPhysicalDeviceMemoryProperties* mem_properties, uin
         PrintTabs(tabs + 1);
         PrintLine("propertyFlags:");
 
-        PrintMemoryProperties(type->propertyFlags, tabs + 2);
+        PrintMemoryPropertyFlags(type->propertyFlags, tabs + 2);
     }
     PrintLine();
 }

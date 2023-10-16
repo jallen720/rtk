@@ -333,6 +333,20 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
     return VK_FALSE;
 }
 
+/// Misc
+////////////////////////////////////////////////////////////
+static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint32 tabs = 0)
+{
+    PrintTabs(tabs);
+    PrintLine("size:           %u", mem_requirements->size);
+    PrintTabs(tabs);
+    PrintLine("alignment:      %u", mem_requirements->alignment);
+    PrintTabs(tabs);
+    Print(    "memoryTypeBits: ");
+    PrintBits((uint8*)&mem_requirements->memoryTypeBits, sizeof(mem_requirements->memoryTypeBits));
+    PrintLine();
+}
+
 /// Flag Printing
 ////////////////////////////////////////////////////////////
 static void PrintMemoryPropertyFlags(VkMemoryPropertyFlags mem_property_flags, uint32 tabs = 0)

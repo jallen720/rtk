@@ -141,7 +141,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     *buffer = *info; // Buffer is exact copy of info passed to CreateBuffer().
 
     // Figure out minimum offset alignment if requested.
-    // Spec: https://registry.khronos.org/vulkan/specs/1.1-extensions/html/vkspec.html#resources-association
+    // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
     if (buffer->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
         VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
@@ -174,9 +174,9 @@ static BufferHnd CreateBuffer(BufferInfo* info)
 
 static void AllocateBuffers()
 {
-    PhysicalDevice* physical_device = GetPhysicalDevice();
-    VkDevice device = GetDevice();
+    VkDevice device = global_ctx.device;
     VkResult res = VK_SUCCESS;
+    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
 
     // Calculate buffer memory information and buffer offsets.
     for (uint32 buffer_index = 0; buffer_index < g_buffer_state.buffer_count; ++buffer_index)
@@ -227,7 +227,6 @@ static void AllocateBuffers()
     }
 
     // Initialize and allocate buffer memory.
-    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
     CTK_ITER(buffer_mem, &g_buffer_state.mems)
     {
         VkBufferCreateInfo create_info = {};

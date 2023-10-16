@@ -132,7 +132,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
 {
     if (g_buffer_state.buffer_count >= g_buffer_state.max_buffers)
     {
-        CTK_FATAL("can't create buffer: already at max of %u buffers", g_buffer_state.max_buffers);
+        CTK_FATAL("can't create buffer: already at max of %u", g_buffer_state.max_buffers);
     }
 
     BufferHnd hnd = { .index = g_buffer_state.buffer_count };

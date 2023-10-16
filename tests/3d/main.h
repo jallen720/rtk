@@ -71,7 +71,7 @@ static void Run()
     context_info.enabled_features.vulkan_1_2.scalarBlockLayout                         = VK_TRUE;
 
     InitContext(perm_stack, temp_stack, free_list, &context_info);
-LogPhysicalDevice(GetPhysicalDevice());
+// LogPhysicalDevice(GetPhysicalDevice());
 
     // Initialize other test state.
     ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);

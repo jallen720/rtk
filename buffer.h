@@ -4,7 +4,7 @@ struct BufferHnd { uint32 index; };
 
 static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
 
-struct BufferInfo
+struct Buffer
 {
     VkDeviceSize       size;
     VkBufferUsageFlags usage;
@@ -14,7 +14,7 @@ struct BufferInfo
     // Properties used to select memory allocation.
     VkMemoryPropertyFlags mem_properties;
 };
-using Buffer = BufferInfo; // Stored information for Buffer is same as information used to create it.
+using BufferInfo = Buffer; // Stored information for Buffer is same as information used to create it.
 
 struct BufferMemory
 {

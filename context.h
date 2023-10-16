@@ -975,26 +975,15 @@ static uint32 GetCapableMemoryTypeIndex(VkMemoryRequirements* mem_requirements, 
     CTK_FATAL("failed to find memory type that satisfies memory requirements");
 }
 
-static VkDeviceMemory
-AllocateDeviceMemory(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFlags mem_properties,
-                     VkAllocationCallbacks* allocators, uint32 allocation_count = 1)
-{
-    // Allocate memory using selected memory type index.
-    VkMemoryAllocateInfo info =
-    {
-        .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize  = mem_requirements->size * allocation_count,
-        .memoryTypeIndex = GetCapableMemoryTypeIndex(mem_requirements, mem_properties),
-    };
-    VkDeviceMemory mem = VK_NULL_HANDLE;
-    VkResult res = vkAllocateMemory(global_ctx.device, &info, allocators, &mem);
-    Validate(res, "vkAllocateMemory() failed");
-
-    return mem;
-}
-
 static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize size, VkAllocationCallbacks* allocators)
 {
+    // From https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateMemory.html:
+    // Allocations returned by vkAllocateMemory are guaranteed to meet any alignment requirement of the implementation.
+    // For example, if an implementation requires 128 byte alignment for images and 64 byte alignment for buffers, the
+    // device memory returned through this mechanism would be 128-byte aligned. This ensures that applications can
+    // correctly suballocate objects of different types (with potentially different alignment requirements) in the same
+    // memory object.
+
     // Allocate memory using selected memory type index.
     VkMemoryAllocateInfo info =
     {
@@ -1007,6 +996,13 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
     Validate(res, "vkAllocateMemory() failed");
 
     return mem;
+}
+
+static VkDeviceMemory
+AllocateDeviceMemory(VkMemoryRequirements* requirements, VkMemoryPropertyFlags properties,
+                     VkAllocationCallbacks* allocators)
+{
+    return AllocateDeviceMemory(GetCapableMemoryTypeIndex(requirements, properties), requirements->size, allocators);
 }
 
 static void NextFrame()

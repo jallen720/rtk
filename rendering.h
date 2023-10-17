@@ -2,16 +2,16 @@
 ////////////////////////////////////////////////////////////
 static VkResult AcquireSwapchainImage()
 {
-    VkDevice device = g_context.device;
+    VkDevice device = GetDevice();
+    Frame* frame = GetCurrentFrame();
     VkResult res = VK_SUCCESS;
-    Frame* frame = GetCurrentPtr(&g_context.frames);
 
     // Wait for frame's command buffers to be done executing.
     res = vkWaitForFences(device, 1, &frame->command_buffers_complete, VK_TRUE, UINT64_MAX);
     Validate(res, "vkWaitForFences() failed");
 
     // Once frame is ready, acquire next swapchain image's index.
-    res = vkAcquireNextImageKHR(device, g_context.swapchain.hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
+    res = vkAcquireNextImageKHR(device, GetSwapchain()->hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
                                 &frame->swapchain_image_index);
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -40,7 +40,7 @@ static VkResult AcquireSwapchainImage()
 
 static VkCommandBuffer BeginRenderCommands(RenderTarget* render_target, uint32 render_thread_index)
 {
-    Frame* frame = GetCurrentPtr(&g_context.frames);
+    Frame* frame = GetCurrentFrame();
     VkCommandBuffer command_buffer = Get(&frame->render_command_buffers, render_thread_index);
 
     VkCommandBufferInheritanceInfo inheritance_info =
@@ -124,7 +124,7 @@ static void EndRenderCommands(VkCommandBuffer command_buffer)
 
 static VkResult SubmitRenderCommands(RenderTarget* render_target)
 {
-    Frame* frame = GetCurrentPtr(&g_context.frames);
+    Frame* frame = GetCurrentFrame();
     VkResult res = VK_SUCCESS;
 
     // Record current frame's primary command buffer, including render command buffers.
@@ -179,7 +179,7 @@ static VkResult SubmitRenderCommands(RenderTarget* render_target)
         .signalSemaphoreCount = 1,
         .pSignalSemaphores    = &frame->render_finished,
     };
-    res = vkQueueSubmit(g_context.graphics_queue, 1, &submit_info, frame->command_buffers_complete);
+    res = vkQueueSubmit(GetGraphicsQueue(), 1, &submit_info, frame->command_buffers_complete);
     Validate(res, "vkQueueSubmit() failed");
 
     // Queue swapchain image for presentation.
@@ -190,11 +190,11 @@ static VkResult SubmitRenderCommands(RenderTarget* render_target)
         .waitSemaphoreCount = 1,
         .pWaitSemaphores    = &frame->render_finished,
         .swapchainCount     = 1,
-        .pSwapchains        = &g_context.swapchain.hnd,
+        .pSwapchains        = &GetSwapchain()->hnd,
         .pImageIndices      = &frame->swapchain_image_index,
         .pResults           = NULL,
     };
-    res = vkQueuePresentKHR(g_context.present_queue, &present_info);
+    res = vkQueuePresentKHR(GetGraphicsQueue(), &present_info);
     if (res != VK_SUBOPTIMAL_KHR && res != VK_ERROR_OUT_OF_DATE_KHR)
     {
         Validate(res, "vkQueuePresentKHR() failed");

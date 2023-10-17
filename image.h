@@ -253,8 +253,8 @@ static void AllocateImages(Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);
 
-    VkDevice device = g_context.device;
-    QueueFamilies* queue_families = &g_context.physical_device->queue_families;
+    VkDevice device = GetDevice();
+    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
     VkResult res = VK_SUCCESS;
 
     // Create images and get their memory information.
@@ -467,7 +467,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
                 .layerCount     = 1,
             },
         };
-        vkCmdPipelineBarrier(g_context.temp_command_buffer,
+        vkCmdPipelineBarrier(GetTempCommandBuffer(),
                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
                              VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
                              0, // Dependency Flags
@@ -498,7 +498,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
             },
             .imageExtent = GetImageInfo(image_hnd)->extent,
         };
-        vkCmdCopyBufferToImage(g_context.temp_command_buffer, GetBufferMemory(image_data_buffer_hnd)->hnd, image,
+        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBufferMemory(image_data_buffer_hnd)->hnd, image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.
@@ -521,7 +521,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
                 .layerCount     = 1,
             },
         };
-        vkCmdPipelineBarrier(g_context.temp_command_buffer,
+        vkCmdPipelineBarrier(GetTempCommandBuffer(),
                              VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
                              0, // Dependency Flags

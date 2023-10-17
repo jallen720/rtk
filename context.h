@@ -856,24 +856,38 @@ static void InitContext(Stack* perm_stack, Stack* temp_stack, FreeList* free_lis
 
 static VkDevice GetDevice()
 {
+    CTK_ASSERT(g_context.device != VK_NULL_HANDLE);
     return g_context.device;
 }
 
 static PhysicalDevice* GetPhysicalDevice()
 {
+    CTK_ASSERT(g_context.physical_device != NULL);
     return g_context.physical_device;
 }
 
 static Swapchain* GetSwapchain()
 {
+    CTK_ASSERT(g_context.swapchain.hnd != VK_NULL_HANDLE);
     return &g_context.swapchain;
 }
 
-static void GetSurfaceCapabilities(VkSurfaceCapabilitiesKHR* capabilities)
+static VkCommandBuffer GetTempCommandBuffer()
 {
-    VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_context.physical_device->hnd, g_context.surface,
-                                                             capabilities);
-    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
+    CTK_ASSERT(g_context.temp_command_buffer != VK_NULL_HANDLE);
+    return g_context.temp_command_buffer;
+}
+
+static VkQueue GetGraphicsQueue()
+{
+    CTK_ASSERT(g_context.graphics_queue != VK_NULL_HANDLE);
+    return g_context.graphics_queue;
+}
+
+static VkQueue GetPresentQueue()
+{
+    CTK_ASSERT(g_context.present_queue != VK_NULL_HANDLE);
+    return g_context.present_queue;
 }
 
 static uint32 GetFrameCount()
@@ -886,9 +900,21 @@ static uint32 GetFrameIndex()
     return g_context.frames.index;
 }
 
+static Frame* GetCurrentFrame()
+{
+    return GetCurrentPtr(&g_context.frames);
+}
+
 static uint32 GetRenderThreadCount()
 {
     return g_context.render_thread_count;
+}
+
+static void GetSurfaceCapabilities(VkSurfaceCapabilitiesKHR* capabilities)
+{
+    VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_context.physical_device->hnd, g_context.surface,
+                                                             capabilities);
+    Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
 }
 
 static void BeginTempCommandBuffer()

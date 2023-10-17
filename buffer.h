@@ -144,7 +144,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
     if (buffer->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
-        VkPhysicalDeviceLimits* physical_device_limits = &g_context.physical_device->properties.limits;
+        VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
         buffer->offset_alignment = 4;
 
         // Uniform
@@ -174,8 +174,8 @@ static BufferHnd CreateBuffer(BufferInfo* info)
 
 static void AllocateBuffers()
 {
-    VkDevice device = g_context.device;
-    QueueFamilies* queue_families = &g_context.physical_device->queue_families;
+    VkDevice device = GetDevice();
+    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
     VkResult res = VK_SUCCESS;
 
     // Calculate buffer memory information and buffer offsets.
@@ -330,7 +330,7 @@ static void WriteDeviceBufferCmd(BufferHnd buffer_hnd, uint32 frame_index,
         .dstOffset = g_buffer_state.offsets[buffer_frame_index],
         .size      = size,
     };
-    vkCmdCopyBuffer(g_context.temp_command_buffer,
+    vkCmdCopyBuffer(GetTempCommandBuffer(),
                     GetBufferMemoryUtil(src_buffer_hnd)->hnd,
                     GetBufferMemoryUtil(buffer_hnd)->hnd,
                     1, &copy);
@@ -360,7 +360,7 @@ static void AppendDeviceBufferCmd(BufferHnd buffer_hnd, uint32 frame_index,
         .dstOffset = g_buffer_state.offsets[buffer_frame_index] + buffer_index,
         .size      = size,
     };
-    vkCmdCopyBuffer(g_context.temp_command_buffer,
+    vkCmdCopyBuffer(GetTempCommandBuffer(),
                     GetBufferMemoryUtil(src_buffer_hnd)->hnd,
                     GetBufferMemoryUtil(buffer_hnd)->hnd,
                     1, &copy);

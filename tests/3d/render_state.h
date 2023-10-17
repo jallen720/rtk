@@ -294,8 +294,9 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
 static void AllocateResources(Stack* temp_stack)
 {
     AllocateBuffers();
-    AllocateImages();
-    AllocateDescriptorSets(temp_stack);
+    AllocateImages(temp_stack);
+    CTK_TODO("uncomment")
+    // AllocateDescriptorSets(temp_stack);
 }
 
 static void WriteResources()
@@ -377,31 +378,6 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitImageModule(&perm_stack->allocator, 32);
     InitDescriptorSetModule(&perm_stack->allocator, 16);
 
-    ImageInfo info =
-    {
-        .extent =
-        {
-            .width  = 64,
-            .height = 32,
-            .depth  = 1
-        },
-        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        .per_frame      = false,
-        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        .flags          = 0,
-        .type           = VK_IMAGE_TYPE_2D,
-        .format         = GetSwapchain()->surface_format.format,
-        .mip_levels     = 1,
-        .array_layers   = 1,
-        .samples        = VK_SAMPLE_COUNT_1_BIT,
-        .tiling         = VK_IMAGE_TILING_OPTIMAL,
-    };
-    ImageHnd image = CreateImage(&info);
-    AllocateImages();
-    LogImages();
-    LogImageMems();
-    exit(0);
-
     // InitRenderJob(perm_stack);
     // InitDeviceMemory();
 
@@ -414,7 +390,119 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     // InitVertexLayout(perm_stack);
     // InitPipelines(temp_stack, free_list);
 
-    // AllocateResources(temp_stack);
+ImageInfo image_infos[] =
+{
+    {
+        .extent =
+        {
+            .width  = 16,
+            .height = 16,
+            .depth  = 1
+        },
+        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .per_frame      = true,
+        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .flags          = 0,
+        .type           = VK_IMAGE_TYPE_2D,
+        .format         = GetSwapchain()->surface_format.format,
+        .mip_levels     = 1,
+        .array_layers   = 1,
+        .samples        = VK_SAMPLE_COUNT_1_BIT,
+        .tiling         = VK_IMAGE_TILING_OPTIMAL,
+    },
+    {
+        .extent =
+        {
+            .width  = 64,
+            .height = 32,
+            .depth  = 1
+        },
+        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .per_frame      = false,
+        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .flags          = 0,
+        .type           = VK_IMAGE_TYPE_2D,
+        .format         = GetPhysicalDevice()->depth_image_format,
+        .mip_levels     = 1,
+        .array_layers   = 1,
+        .samples        = VK_SAMPLE_COUNT_1_BIT,
+        .tiling         = VK_IMAGE_TILING_OPTIMAL,
+    },
+    {
+        .extent =
+        {
+            .width  = 32,
+            .height = 32,
+            .depth  = 32
+        },
+        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .per_frame      = false,
+        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .flags          = 0,
+        .type           = VK_IMAGE_TYPE_3D,
+        .format         = GetSwapchain()->surface_format.format,
+        .mip_levels     = 1,
+        .array_layers   = 1,
+        .samples        = VK_SAMPLE_COUNT_1_BIT,
+        .tiling         = VK_IMAGE_TILING_OPTIMAL,
+    },
+};
+ImageViewInfo default_view_infos[] =
+{
+    {
+        .flags      = 0,
+        .type       = VK_IMAGE_VIEW_TYPE_2D,
+        .format     = image_infos[0].format,
+        .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
+        .subresource_range =
+        {
+            .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel   = 0,
+            .levelCount     = VK_REMAINING_MIP_LEVELS,
+            .baseArrayLayer = 0,
+            .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+        },
+    },
+    {
+        .flags      = 0,
+        .type       = VK_IMAGE_VIEW_TYPE_2D,
+        .format     = image_infos[1].format,
+        .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
+        .subresource_range =
+        {
+            .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT,
+            .baseMipLevel   = 0,
+            .levelCount     = VK_REMAINING_MIP_LEVELS,
+            .baseArrayLayer = 0,
+            .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+        },
+    },
+    {
+        .flags      = 0,
+        .type       = VK_IMAGE_VIEW_TYPE_3D,
+        .format     = image_infos[2].format,
+        .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
+        .subresource_range =
+        {
+            .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel   = 0,
+            .levelCount     = VK_REMAINING_MIP_LEVELS,
+            .baseArrayLayer = 0,
+            .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+        },
+    },
+};
+ImageHnd images[] =
+{
+    CreateImage(&image_infos[0], &default_view_infos[0]),
+    CreateImage(&image_infos[1], &default_view_infos[1]),
+    CreateImage(&image_infos[2], &default_view_infos[2]),
+};
+    AllocateResources(temp_stack);
+LogImages();
+LogDefaultViews();
+LogImageMemory();
+exit(0);
     // WriteResources();
 }
 

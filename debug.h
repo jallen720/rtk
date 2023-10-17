@@ -445,6 +445,35 @@ static void PrintImageCreateFlags(VkImageCreateFlags image_create_flags, uint32 
     RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_FRAGMENT_DENSITY_MAP_OFFSET_BIT_QCOM)
 }
 
+static void PrintImageAspectFlags(VkImageAspectFlags image_aspect_flags, uint32 tabs = 0)
+{
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_COLOR_BIT)
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_DEPTH_BIT)
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_STENCIL_BIT)
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_METADATA_BIT)
+    // Provided by VK_VERSION_1_1
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_PLANE_0_BIT)
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_PLANE_1_BIT)
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_PLANE_2_BIT)
+    // Provided by VK_VERSION_1_3
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_NONE)
+    // Provided by VK_EXT_image_drm_format_modifier
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT)
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_1_BIT_EXT)
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_2_BIT_EXT)
+    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_3_BIT_EXT)
+}
+
+static void PrintImageViewCreateFlags(VkImageViewCreateFlags image_view_create_flags, uint32 tabs = 0)
+{
+    // Provided by VK_EXT_fragment_density_map
+    RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DYNAMIC_BIT_EXT)
+    // Provided by VK_EXT_descriptor_buffer
+    RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
+    // Provided by VK_EXT_fragment_density_map2
+    RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DEFERRED_BIT_EXT)
+}
+
 /// Enum Strings
 ////////////////////////////////////////////////////////////
 static constexpr const char* VkPresentModeName(VkPresentModeKHR present_mode)
@@ -651,7 +680,6 @@ static constexpr const char* VkFormatName(VkFormat format)
 {
     switch (format)
     {
-
         RTK_ENUM_NAME_CASE(VK_FORMAT_UNDEFINED)
         RTK_ENUM_NAME_CASE(VK_FORMAT_R4G4_UNORM_PACK8)
         RTK_ENUM_NAME_CASE(VK_FORMAT_R4G4B4A4_UNORM_PACK16)
@@ -935,5 +963,35 @@ static constexpr const char* VkImageTilingName(VkImageTiling image_tiling)
         // Provided by VK_EXT_image_drm_format_modifier
         RTK_ENUM_NAME_CASE(VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT)
         default: CTK_FATAL("unknown VkImageTiling value: %u", (uint32)image_tiling);
+    }
+}
+
+static constexpr const char* VkImageViewTypeName(VkImageViewType image_view_type)
+{
+    switch (image_view_type)
+    {
+        RTK_ENUM_NAME_CASE(VK_IMAGE_VIEW_TYPE_1D)
+        RTK_ENUM_NAME_CASE(VK_IMAGE_VIEW_TYPE_2D)
+        RTK_ENUM_NAME_CASE(VK_IMAGE_VIEW_TYPE_3D)
+        RTK_ENUM_NAME_CASE(VK_IMAGE_VIEW_TYPE_CUBE)
+        RTK_ENUM_NAME_CASE(VK_IMAGE_VIEW_TYPE_1D_ARRAY)
+        RTK_ENUM_NAME_CASE(VK_IMAGE_VIEW_TYPE_2D_ARRAY)
+        RTK_ENUM_NAME_CASE(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY)
+        default: CTK_FATAL("unknown VkImageViewType value: %u", (uint32)image_view_type);
+    }
+}
+
+static constexpr const char* VkComponentSwizzleName(VkComponentSwizzle component_swizzle)
+{
+    switch (component_swizzle)
+    {
+        RTK_ENUM_NAME_CASE(VK_COMPONENT_SWIZZLE_IDENTITY)
+        RTK_ENUM_NAME_CASE(VK_COMPONENT_SWIZZLE_ZERO)
+        RTK_ENUM_NAME_CASE(VK_COMPONENT_SWIZZLE_ONE)
+        RTK_ENUM_NAME_CASE(VK_COMPONENT_SWIZZLE_R)
+        RTK_ENUM_NAME_CASE(VK_COMPONENT_SWIZZLE_G)
+        RTK_ENUM_NAME_CASE(VK_COMPONENT_SWIZZLE_B)
+        RTK_ENUM_NAME_CASE(VK_COMPONENT_SWIZZLE_A)
+        default: CTK_FATAL("unknown VkComponentSwizzle value: %u", (uint32)component_swizzle);
     }
 }

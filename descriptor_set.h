@@ -210,11 +210,11 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                     CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnds, data_binding->count)
                     {
                         Push(buffer_infos,
-                        {
-                            .buffer = GetBufferMemory(*buffer_hnd)->hnd,
-                            .offset = GetOffset(*buffer_hnd, frame_index),
-                            .range  = GetBuffer(*buffer_hnd)->size,
-                        });
+                             {
+                                 .buffer = GetBufferMemory(*buffer_hnd)->hnd,
+                                 .offset = GetOffset(*buffer_hnd, frame_index),
+                                 .range  = GetBuffer(*buffer_hnd)->size,
+                             });
                     }
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
@@ -223,11 +223,11 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                     CTK_ITER_PTR(sampler, data_binding->samplers, data_binding->count)
                     {
                         Push(image_infos,
-                        {
-                            .sampler     = *sampler,
-                            .imageView   = VK_NULL_HANDLE,
-                            .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                        });
+                             {
+                                 .sampler     = *sampler,
+                                 .imageView   = VK_NULL_HANDLE,
+                                 .imageLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                             });
                     }
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
@@ -236,11 +236,11 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                     CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
                     {
                         Push(image_infos,
-                        {
-                            .sampler     = VK_NULL_HANDLE,
-                            .imageView   = GetDefaultView(*image_hnd, 0),
-                            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        });
+                             {
+                                 .sampler     = VK_NULL_HANDLE,
+                                 .imageView   = GetDefaultView(*image_hnd, 0),
+                                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                             });
                     }
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
@@ -249,11 +249,11 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                     CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnds, data_binding->count)
                     {
                         Push(image_infos,
-                        {
-                            .sampler     = data_binding->combined_image_samplers.sampler,
-                            .imageView   = GetDefaultView(*image_hnd, 0),
-                            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                        });
+                             {
+                                 .sampler     = data_binding->combined_image_samplers.sampler,
+                                 .imageView   = GetDefaultView(*image_hnd, 0),
+                                 .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                             });
                     }
                 }
                 else

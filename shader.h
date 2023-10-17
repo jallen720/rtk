@@ -21,7 +21,7 @@ static void InitShader(Shader* shader, Stack* temp_stack, const char* path, VkSh
         .codeSize = ByteSize(bytecode),
         .pCode    = bytecode->data,
     };
-    VkResult res = vkCreateShaderModule(GetDevice(), &info, NULL, &shader->module);
+    VkResult res = vkCreateShaderModule(g_context.device, &info, NULL, &shader->module);
     Validate(res, "vkCreateShaderModule() failed");
 
     shader->stage = stage;

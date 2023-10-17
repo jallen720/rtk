@@ -88,7 +88,7 @@ static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* t
         .bindingCount = layout_bindings.count,
         .pBindings    = layout_bindings.data,
     };
-    VkResult res = vkCreateDescriptorSetLayout(GetDevice(), &layout_info, NULL,
+    VkResult res = vkCreateDescriptorSetLayout(g_context.device, &layout_info, NULL,
                                                g_descriptor_state.layouts + hnd.index);
     Validate(res, "vkCreateDescriptorSetLayout() failed");
 
@@ -98,7 +98,7 @@ static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* t
 static void AllocateDescriptorSets(Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);
-    VkDevice device = GetDevice();
+    VkDevice device = g_context.device;
     uint32 frame_count = g_descriptor_state.frame_count;
 
     ///
@@ -265,7 +265,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
     }
 
     // Update all descriptor sets with writes from data bindings.
-    vkUpdateDescriptorSets(GetDevice(), writes->count, writes->data, 0, NULL);
+    vkUpdateDescriptorSets(g_context.device, writes->count, writes->data, 0, NULL);
 }
 
 static VkDescriptorSetLayout GetLayout(DescriptorSetHnd hnd)

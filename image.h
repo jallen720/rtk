@@ -214,6 +214,8 @@ static bool AlignmentDesc(ImageMemoryInfo* a, ImageMemoryInfo* b)
 ////////////////////////////////////////////////////////////
 static void InitImageModule(const Allocator* allocator, uint32 max_images)
 {
+    CTK_ASSERT(max_images > 0);
+
     uint32 frame_count = GetFrameCount();
 
     g_image_state.max_images         = max_images;
@@ -231,10 +233,7 @@ static void InitImageModule(const Allocator* allocator, uint32 max_images)
 
 static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_info)
 {
-    if (g_image_state.image_count >= g_image_state.max_images)
-    {
-        CTK_FATAL("can't create image: already at max of %u", g_image_state.max_images);
-    }
+    CTK_ASSERT(g_image_state.image_count < g_image_state.max_images)
 
     // Copy info.
     ImageHnd hnd = { .index = g_image_state.image_count };
@@ -382,34 +381,22 @@ static void AllocateImages(Stack* temp_stack)
 
 static ImageInfo* GetImageInfo(ImageHnd hnd)
 {
-    if (hnd.index >= g_image_state.image_count)
-    {
-        CTK_FATAL("can't get image info for handle: image index %u exceeds count of %u",
-                  hnd.index, g_image_state.image_count);
-    }
+    CTK_ASSERT(hnd.index < g_image_state.image_count)
     return &g_image_state.image_infos[hnd.index];
 }
 
 static VkImage GetImage(ImageHnd hnd, uint32 frame_index)
 {
-    if (hnd.index >= g_image_state.image_count)
-    {
-        CTK_FATAL("can't get image for handle: image index %u exceeds count of %u",
-                  hnd.index, g_image_state.image_count);
-    }
-
+    CTK_ASSERT(hnd.index < g_image_state.image_count)
+    CTK_ASSERT(frame_index < g_image_state.frame_count)
     uint32 frame_offset = frame_index * g_image_state.image_count;
-    return g_image_state.image_hnds[frame_index + hnd.index];
+    return g_image_state.image_hnds[frame_offset + hnd.index];
 }
 
 static VkImageView GetDefaultView(ImageHnd hnd, uint32 frame_index)
 {
-    if (hnd.index >= g_image_state.image_count)
-    {
-        CTK_FATAL("can't get default view for image handle: image index %u exceeds count of %u",
-                  hnd.index, g_image_state.image_count);
-    }
-
+    CTK_ASSERT(hnd.index < g_image_state.image_count)
+    CTK_ASSERT(frame_index < g_image_state.frame_count)
     uint32 frame_offset = frame_index * g_image_state.image_count;
     return g_image_state.default_view_hnds[frame_offset + hnd.index];
 }

@@ -174,7 +174,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
 
 static void AllocateBuffers()
 {
-    VkDevice device = global_ctx.device;
+    VkDevice device = g_context.device;
     VkResult res = VK_SUCCESS;
     QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
 
@@ -330,7 +330,7 @@ static void WriteDeviceBufferCmd(BufferHnd buffer_hnd, uint32 frame_index,
         .dstOffset = g_buffer_state.offsets[buffer_frame_index],
         .size      = size,
     };
-    vkCmdCopyBuffer(global_ctx.temp_command_buffer,
+    vkCmdCopyBuffer(g_context.temp_command_buffer,
                     GetBufferMemoryUtil(src_buffer_hnd)->hnd,
                     GetBufferMemoryUtil(buffer_hnd)->hnd,
                     1, &copy);
@@ -360,7 +360,7 @@ static void AppendDeviceBufferCmd(BufferHnd buffer_hnd, uint32 frame_index,
         .dstOffset = g_buffer_state.offsets[buffer_frame_index] + buffer_index,
         .size      = size,
     };
-    vkCmdCopyBuffer(global_ctx.temp_command_buffer,
+    vkCmdCopyBuffer(g_context.temp_command_buffer,
                     GetBufferMemoryUtil(src_buffer_hnd)->hnd,
                     GetBufferMemoryUtil(buffer_hnd)->hnd,
                     1, &copy);

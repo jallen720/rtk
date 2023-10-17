@@ -58,18 +58,18 @@ static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, F
 {
     Stack frame = CreateFrame(temp_stack);
 
-    Swapchain* swapchain = &global_ctx.swapchain;
-    VkDevice device = global_ctx.device;
+    Swapchain* swapchain = &g_context.swapchain;
+    VkDevice device = g_context.device;
     VkResult res = VK_SUCCESS;
 
     // Set render target to cover entire swapchain extent.
-    render_target->extent = global_ctx.swapchain.surface_extent;
+    render_target->extent = g_context.swapchain.surface_extent;
 
     // Init depth image/views if depth testing is enabled.
     if (render_target->depth_testing)
     {
         // Create image resource with array layers for each swapchain image.
-        VkFormat depth_image_format = global_ctx.physical_device->depth_image_format;
+        VkFormat depth_image_format = g_context.physical_device->depth_image_format;
         VkImageCreateInfo image_info =
         {
             .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -162,7 +162,7 @@ static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, F
             .height          = render_target->extent.height,
             .layers          = 1,
         };
-        res = vkCreateFramebuffer(global_ctx.device, &info, NULL, Push(&render_target->framebuffers));
+        res = vkCreateFramebuffer(g_context.device, &info, NULL, Push(&render_target->framebuffers));
         Validate(res, "vkCreateFramebuffer() failed");
 
         // Clear attachments for next iteration.
@@ -190,7 +190,7 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fre
     PushColorAttachment(&attachments,
                         {
                             .flags          = 0,
-                            .format         = global_ctx.swapchain.surface_format.format,
+                            .format         = g_context.swapchain.surface_format.format,
                             .samples        = VK_SAMPLE_COUNT_1_BIT,
                             .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
                             .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
@@ -205,7 +205,7 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fre
         SetDepthAttachment(&attachments,
                            {
                                .flags          = 0,
-                               .format         = global_ctx.physical_device->depth_image_format,
+                               .format         = g_context.physical_device->depth_image_format,
                                .samples        = VK_SAMPLE_COUNT_1_BIT,
                                .loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR,
                                .storeOp        = VK_ATTACHMENT_STORE_OP_STORE,
@@ -235,7 +235,7 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fre
         .dependencyCount = 0,
         .pDependencies   = NULL,
     };
-    VkResult res = vkCreateRenderPass(global_ctx.device, &create_info, NULL, &render_target->render_pass);
+    VkResult res = vkCreateRenderPass(g_context.device, &create_info, NULL, &render_target->render_pass);
     Validate(res, "vkCreateRenderPass() failed");
 
     // Copy attachment clear values.
@@ -258,7 +258,7 @@ static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* te
     // Destroy depth images.
     if (render_target->depth_testing)
     {
-        VkDevice device = global_ctx.device;
+        VkDevice device = g_context.device;
 
         // Destroy views.
         for (uint32 i = 0; i < render_target->depth_image_views.count; ++i)
@@ -275,7 +275,7 @@ static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* te
     // Destroy framebuffers.
     for (uint32 i = 0; i < render_target->framebuffers.count; ++i)
     {
-        vkDestroyFramebuffer(global_ctx.device, Get(&render_target->framebuffers, i), NULL);
+        vkDestroyFramebuffer(g_context.device, Get(&render_target->framebuffers, i), NULL);
     }
     DeinitArray(&render_target->framebuffers, &free_list->allocator);
 

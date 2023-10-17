@@ -137,7 +137,7 @@ static void CreatePipeline(Pipeline* pipeline)
         .basePipelineHandle  = VK_NULL_HANDLE,
         .basePipelineIndex   = -1,
     };
-    VkResult res = vkCreateGraphicsPipelines(global_ctx.device, VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline->hnd);
+    VkResult res = vkCreateGraphicsPipelines(g_context.device, VK_NULL_HANDLE, 1, &create_info, NULL, &pipeline->hnd);
     Validate(res, "vkCreateGraphicsPipelines() failed");
 }
 
@@ -209,7 +209,7 @@ static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_l
     layout_create_info.pushConstantRangeCount = layout_info->push_constant_ranges.count;
     layout_create_info.pPushConstantRanges    = layout_info->push_constant_ranges.data;
 
-    VkResult res = vkCreatePipelineLayout(global_ctx.device, &layout_create_info, NULL, &pipeline->layout);
+    VkResult res = vkCreatePipelineLayout(g_context.device, &layout_create_info, NULL, &pipeline->layout);
     Validate(res, "vkCreatePipelineLayout() failed");
 
     // Shader Stages
@@ -255,6 +255,6 @@ static void UpdatePipelineViewports(Pipeline* pipeline, FreeList* free_list, Arr
     InitScissors(pipeline);
 
     // Recreate pipeline.
-    vkDestroyPipeline(global_ctx.device, pipeline->hnd, NULL);
+    vkDestroyPipeline(g_context.device, pipeline->hnd, NULL);
     CreatePipeline(pipeline);
 }

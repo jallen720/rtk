@@ -104,7 +104,7 @@ struct Context
 
 /// Instance
 ////////////////////////////////////////////////////////////
-static Context global_ctx;
+static Context g_context;
 
 /// Forward Declarations
 ////////////////////////////////////////////////////////////
@@ -366,12 +366,12 @@ static void InitInstance(InstanceInfo* info, Stack* temp_stack)
     create_info.enabledLayerCount       = 0;
     create_info.ppEnabledLayerNames     = NULL;
 #endif
-    res = vkCreateInstance(&create_info, NULL, &global_ctx.instance);
+    res = vkCreateInstance(&create_info, NULL, &g_context.instance);
     Validate(res, "vkCreateInstance() failed");
 
 #ifdef RTK_ENABLE_VALIDATION
-    RTK_LOAD_INSTANCE_EXTENSION_FUNCTION(global_ctx.instance, vkCreateDebugUtilsMessengerEXT);
-    res = vkCreateDebugUtilsMessengerEXT(global_ctx.instance, &debug_msgr_info, NULL, &global_ctx.debug_messenger);
+    RTK_LOAD_INSTANCE_EXTENSION_FUNCTION(g_context.instance, vkCreateDebugUtilsMessengerEXT);
+    res = vkCreateDebugUtilsMessengerEXT(g_context.instance, &debug_msgr_info, NULL, &g_context.debug_messenger);
     Validate(res, "vkCreateDebugUtilsMessengerEXT() failed");
 #endif
 }
@@ -385,7 +385,7 @@ static void InitSurface()
         .hinstance = window->instance,
         .hwnd      = window->handle,
     };
-    VkResult res = vkCreateWin32SurfaceKHR(global_ctx.instance, &info, NULL, &global_ctx.surface);
+    VkResult res = vkCreateWin32SurfaceKHR(g_context.instance, &info, NULL, &g_context.surface);
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
 }
 
@@ -402,14 +402,14 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
 
     // Get system physical devices and ensure atleast 1 physical device was found.
     Array<VkPhysicalDevice> vk_physical_devices = {};
-    LoadVkPhysicalDevices(&vk_physical_devices, &frame.allocator, global_ctx.instance);
+    LoadVkPhysicalDevices(&vk_physical_devices, &frame.allocator, g_context.instance);
     if (vk_physical_devices.count == 0)
     {
         CTK_FATAL("failed to find any physical devices");
     }
 
     // Initialize physical devices array to hold all physical devices if necessary.
-    InitArray(&global_ctx.physical_devices, &perm_stack->allocator, vk_physical_devices.count);
+    InitArray(&g_context.physical_devices, &perm_stack->allocator, vk_physical_devices.count);
 
     // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
     for (uint32 physical_device_index = 0; physical_device_index < vk_physical_devices.count; ++physical_device_index)
@@ -420,7 +420,7 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
         PhysicalDevice physical_device =
         {
             .hnd                = vk_physical_device,
-            .queue_families     = FindQueueFamilies(&frame, vk_physical_device, global_ctx.surface),
+            .queue_families     = FindQueueFamilies(&frame, vk_physical_device, g_context.surface),
             .depth_image_format = FindDepthImageFormat(vk_physical_device),
         };
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
@@ -500,11 +500,11 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
         }
 
         // Physical device is capable.
-        Push(&global_ctx.physical_devices, physical_device);
+        Push(&g_context.physical_devices, physical_device);
     }
 
     // Ensure atleast 1 capable physical device was loaded.
-    if (global_ctx.physical_devices.count == 0)
+    if (g_context.physical_devices.count == 0)
     {
         CTK_FATAL("failed to find any capable physical devices");
     }
@@ -512,17 +512,17 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
 
 static void UsePhysicalDevice(uint32 index)
 {
-    if (index >= global_ctx.physical_devices.count)
+    if (index >= g_context.physical_devices.count)
     {
-        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, global_ctx.physical_devices.count - 1);
+        CTK_FATAL("physical device index %u is out of bounds: max is %u", index, g_context.physical_devices.count - 1);
     }
 
-    global_ctx.physical_device = GetPtr(&global_ctx.physical_devices, index);
+    g_context.physical_device = GetPtr(&g_context.physical_devices, index);
 }
 
 static void InitDevice(DeviceFeatures* enabled_features)
 {
-    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
+    QueueFamilies* queue_families = &g_context.physical_device->queue_families;
 
     // Add queue creation info for 1 queue in each queue family.
     FArray<VkDeviceQueueCreateInfo, 2> queue_infos = {};
@@ -549,20 +549,20 @@ static void InitDevice(DeviceFeatures* enabled_features)
         .ppEnabledExtensionNames = enabled_extensions,
         .pEnabledFeatures        = NULL,
     };
-    VkResult res = vkCreateDevice(global_ctx.physical_device->hnd, &create_info, NULL, &global_ctx.device);
+    VkResult res = vkCreateDevice(g_context.physical_device->hnd, &create_info, NULL, &g_context.device);
     Validate(res, "vkCreateDevice() failed");
 }
 
 static void InitQueues()
 {
-    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
-    vkGetDeviceQueue(global_ctx.device, queue_families->graphics, 0, &global_ctx.graphics_queue);
-    vkGetDeviceQueue(global_ctx.device, queue_families->present, 0, &global_ctx.present_queue);
+    QueueFamilies* queue_families = &g_context.physical_device->queue_families;
+    vkGetDeviceQueue(g_context.device, queue_families->graphics, 0, &g_context.graphics_queue);
+    vkGetDeviceQueue(g_context.device, queue_families->present, 0, &g_context.present_queue);
 }
 
 static void InitMainCommandState()
 {
-    VkDevice device = global_ctx.device;
+    VkDevice device = g_context.device;
     VkResult res = VK_SUCCESS;
 
     // Main Command Pool
@@ -570,20 +570,20 @@ static void InitMainCommandState()
     {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = global_ctx.physical_device->queue_families.graphics,
+        .queueFamilyIndex = g_context.physical_device->queue_families.graphics,
     };
-    res = vkCreateCommandPool(device, &pool_info, NULL, &global_ctx.main_command_pool);
+    res = vkCreateCommandPool(device, &pool_info, NULL, &g_context.main_command_pool);
     Validate(res, "vkCreateCommandPool() failed");
 
     // Temp Command Buffer
     VkCommandBufferAllocateInfo allocate_info =
     {
         .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool        = global_ctx.main_command_pool,
+        .commandPool        = g_context.main_command_pool,
         .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
-    res = vkAllocateCommandBuffers(device, &allocate_info, &global_ctx.temp_command_buffer);
+    res = vkAllocateCommandBuffers(device, &allocate_info, &g_context.temp_command_buffer);
     Validate(res, "vkAllocateCommandBuffers() failed");
 }
 
@@ -592,8 +592,8 @@ static void CreateSwapchain(Stack* temp_stack, FreeList* free_list)
 {
     Stack frame = CreateFrame(temp_stack);
 
-    Swapchain* swapchain = &global_ctx.swapchain;
-    VkDevice device = global_ctx.device;
+    Swapchain* swapchain = &g_context.swapchain;
+    VkDevice device = g_context.device;
     VkResult res = VK_SUCCESS;
 
     // Create swapchain.
@@ -601,7 +601,7 @@ static void CreateSwapchain(Stack* temp_stack, FreeList* free_list)
     {
         .sType                 = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .flags                 = 0,
-        .surface               = global_ctx.surface,
+        .surface               = g_context.surface,
         .minImageCount         = swapchain->surface_min_image_count,
         .imageFormat           = swapchain->surface_format.format,
         .imageColorSpace       = swapchain->surface_format.colorSpace,
@@ -659,9 +659,9 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
 {
     Stack frame = CreateFrame(temp_stack);
 
-    Swapchain* swapchain = &global_ctx.swapchain;
-    VkSurfaceKHR surface = global_ctx.surface;
-    PhysicalDevice* physical_device = global_ctx.physical_device;
+    Swapchain* swapchain = &g_context.swapchain;
+    VkSurfaceKHR surface = g_context.surface;
+    PhysicalDevice* physical_device = g_context.physical_device;
 
     /// Configure Swapchain
     ////////////////////////////////////////////////////////////
@@ -712,7 +712,7 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
     }
 
     // Check if image sharing mode needs to be concurrent due to separate graphics & present queue families.
-    QueueFamilies* queue_families = &global_ctx.physical_device->queue_families;
+    QueueFamilies* queue_families = &g_context.physical_device->queue_families;
     if (queue_families->graphics != queue_families->present)
     {
         swapchain->image_sharing_mode       = VK_SHARING_MODE_CONCURRENT;
@@ -733,16 +733,16 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
 
 static void InitRenderCommandPools(Stack* perm_stack)
 {
-    InitArray(&global_ctx.render_command_pools, &perm_stack->allocator, global_ctx.render_thread_count);
+    InitArray(&g_context.render_command_pools, &perm_stack->allocator, g_context.render_thread_count);
     VkCommandPoolCreateInfo info =
     {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .flags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = global_ctx.physical_device->queue_families.graphics,
+        .queueFamilyIndex = g_context.physical_device->queue_families.graphics,
     };
-    for (uint32 i = 0; i < global_ctx.render_thread_count; ++i)
+    for (uint32 i = 0; i < g_context.render_thread_count; ++i)
     {
-        VkResult res = vkCreateCommandPool(global_ctx.device, &info, NULL, Push(&global_ctx.render_command_pools));
+        VkResult res = vkCreateCommandPool(g_context.device, &info, NULL, Push(&g_context.render_command_pools));
         Validate(res, "vkCreateCommandPool() failed");
     }
 }
@@ -787,13 +787,13 @@ static VkSemaphore CreateSemaphore(VkDevice device, VkSemaphoreType type)
 static void InitFrames(Stack* perm_stack)
 {
     VkResult res = VK_SUCCESS;
-    VkDevice device = global_ctx.device;
+    VkDevice device = g_context.device;
 
-    uint32 frame_count = global_ctx.swapchain.image_views.count + 1;
+    uint32 frame_count = g_context.swapchain.image_views.count + 1;
     CTK_ASSERT(frame_count <= MAX_FRAME_COUNT);
 
-    InitRingBuffer(&global_ctx.frames, &perm_stack->allocator, frame_count);
-    CTK_ITER(frame, &global_ctx.frames)
+    InitRingBuffer(&g_context.frames, &perm_stack->allocator, frame_count);
+    CTK_ITER(frame, &g_context.frames)
     {
         // Sync State
         frame->image_acquired           = CreateSemaphore(device, VK_SEMAPHORE_TYPE_BINARY);
@@ -805,7 +805,7 @@ static void InitFrames(Stack* perm_stack)
             VkCommandBufferAllocateInfo allocate_info =
             {
                 .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .commandPool        = global_ctx.main_command_pool,
+                .commandPool        = g_context.main_command_pool,
                 .level              = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                 .commandBufferCount = 1,
             };
@@ -814,13 +814,13 @@ static void InitFrames(Stack* perm_stack)
         }
 
         // render_command_buffers
-        InitArray(&frame->render_command_buffers, &perm_stack->allocator, global_ctx.render_command_pools.count);
-        for (uint32 i = 0; i < global_ctx.render_command_pools.count; ++i)
+        InitArray(&frame->render_command_buffers, &perm_stack->allocator, g_context.render_command_pools.count);
+        for (uint32 i = 0; i < g_context.render_command_pools.count; ++i)
         {
             VkCommandBufferAllocateInfo allocate_info =
             {
                 .sType              = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-                .commandPool        = Get(&global_ctx.render_command_pools, i),
+                .commandPool        = Get(&g_context.render_command_pools, i),
                 .level              = VK_COMMAND_BUFFER_LEVEL_SECONDARY,
                 .commandBufferCount = 1,
             };
@@ -834,7 +834,7 @@ static void InitFrames(Stack* perm_stack)
 ////////////////////////////////////////////////////////////
 static void InitContext(Stack* perm_stack, Stack* temp_stack, FreeList* free_list, ContextInfo* info)
 {
-    global_ctx.render_thread_count = info->render_thread_count;
+    g_context.render_thread_count = info->render_thread_count;
 
     InitInstance(&info->instance_info, temp_stack);
     InitSurface();
@@ -856,39 +856,39 @@ static void InitContext(Stack* perm_stack, Stack* temp_stack, FreeList* free_lis
 
 static VkDevice GetDevice()
 {
-    return global_ctx.device;
+    return g_context.device;
 }
 
 static PhysicalDevice* GetPhysicalDevice()
 {
-    return global_ctx.physical_device;
+    return g_context.physical_device;
 }
 
 static Swapchain* GetSwapchain()
 {
-    return &global_ctx.swapchain;
+    return &g_context.swapchain;
 }
 
 static void GetSurfaceCapabilities(VkSurfaceCapabilitiesKHR* capabilities)
 {
-    VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(global_ctx.physical_device->hnd, global_ctx.surface,
+    VkResult res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_context.physical_device->hnd, g_context.surface,
                                                              capabilities);
     Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
 }
 
 static uint32 GetFrameCount()
 {
-    return global_ctx.frames.size;
+    return g_context.frames.size;
 }
 
 static uint32 GetFrameIndex()
 {
-    return global_ctx.frames.index;
+    return g_context.frames.index;
 }
 
 static uint32 GetRenderThreadCount()
 {
-    return global_ctx.render_thread_count;
+    return g_context.render_thread_count;
 }
 
 static void BeginTempCommandBuffer()
@@ -900,12 +900,12 @@ static void BeginTempCommandBuffer()
         .flags            = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
         .pInheritanceInfo = NULL,
     };
-    vkBeginCommandBuffer(global_ctx.temp_command_buffer, &info);
+    vkBeginCommandBuffer(g_context.temp_command_buffer, &info);
 }
 
 static void SubmitTempCommandBuffer()
 {
-    vkEndCommandBuffer(global_ctx.temp_command_buffer);
+    vkEndCommandBuffer(g_context.temp_command_buffer);
 
     VkSubmitInfo submit_info =
     {
@@ -915,46 +915,46 @@ static void SubmitTempCommandBuffer()
         .pWaitSemaphores      = NULL,
         .pWaitDstStageMask    = NULL,
         .commandBufferCount   = 1,
-        .pCommandBuffers      = &global_ctx.temp_command_buffer,
+        .pCommandBuffers      = &g_context.temp_command_buffer,
         .signalSemaphoreCount = 0,
         .pSignalSemaphores    = NULL,
     };
-    VkResult res = vkQueueSubmit(global_ctx.graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+    VkResult res = vkQueueSubmit(g_context.graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
     Validate(res, "vkQueueSubmit() failed");
 
-    vkQueueWaitIdle(global_ctx.graphics_queue);
+    vkQueueWaitIdle(g_context.graphics_queue);
 }
 
 static void UpdateSwapchainSurfaceExtent(Stack* temp_stack, FreeList* free_list)
 {
-    Swapchain* swapchain = &global_ctx.swapchain;
+    Swapchain* swapchain = &g_context.swapchain;
 
     // Destroy image views.
     for (uint32 i = 0; i < swapchain->image_views.count; ++i)
     {
-        vkDestroyImageView(global_ctx.device, Get(&swapchain->image_views, i), NULL);
+        vkDestroyImageView(g_context.device, Get(&swapchain->image_views, i), NULL);
     }
     DeinitArray(&swapchain->image_views, &free_list->allocator);
 
     // Update swapchain surface extent.
     VkSurfaceCapabilitiesKHR surface_capabilities = {};
     GetSurfaceCapabilities(&surface_capabilities);
-    global_ctx.swapchain.surface_extent = surface_capabilities.currentExtent;
+    g_context.swapchain.surface_extent = surface_capabilities.currentExtent;
 
     // Recreate swapchain.
-    vkDestroySwapchainKHR(global_ctx.device, swapchain->hnd, NULL);
+    vkDestroySwapchainKHR(g_context.device, swapchain->hnd, NULL);
     CreateSwapchain(temp_stack, free_list);
 }
 
 static void WaitIdle()
 {
-    vkDeviceWaitIdle(global_ctx.device);
+    vkDeviceWaitIdle(g_context.device);
 }
 
 static uint32 GetCapableMemoryTypeIndex(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFlags mem_properties)
 {
     // Reference: https://registry.khronos.org/vulkan/specs/1.3/html/vkspec.html#memory-device
-    VkPhysicalDeviceMemoryProperties* device_mem_properties = &global_ctx.physical_device->mem_properties;
+    VkPhysicalDeviceMemoryProperties* device_mem_properties = &g_context.physical_device->mem_properties;
     for (uint32 i = 0; i < device_mem_properties->memoryTypeCount; ++i)
     {
         // Memory type at index must be supported for resource.
@@ -992,7 +992,7 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
         .memoryTypeIndex = mem_type_index,
     };
     VkDeviceMemory mem = VK_NULL_HANDLE;
-    VkResult res = vkAllocateMemory(global_ctx.device, &info, allocators, &mem);
+    VkResult res = vkAllocateMemory(g_context.device, &info, allocators, &mem);
     Validate(res, "vkAllocateMemory() failed");
 
     return mem;
@@ -1007,5 +1007,5 @@ AllocateDeviceMemory(VkMemoryRequirements* requirements, VkMemoryPropertyFlags p
 
 static void NextFrame()
 {
-    Next(&global_ctx.frames);
+    Next(&g_context.frames);
 }

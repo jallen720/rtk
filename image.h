@@ -253,7 +253,7 @@ static void AllocateImages(Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);
 
-    VkDevice device = global_ctx.device;
+    VkDevice device = g_context.device;
     VkResult res = VK_SUCCESS;
     QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
 
@@ -298,6 +298,24 @@ static void AllocateImages(Stack* temp_stack)
             res = vkCreateImage(device, &info, NULL, &g_image_state.image_hnds[GetFrameOffset(frame_index) + image_index]);
             Validate(res, "vkCreateImage() failed");
         }
+        // if (image_info->per_frame)
+        // {
+        //     for (uint32 frame_index = 0; frame_index < g_image_state.frame_count; ++frame_index)
+        //     {
+        //         res = vkCreateImage(device, &info, NULL, &g_image_state.image_hnds[GetFrameOffset(frame_index) + image_index]);
+        //         Validate(res, "vkCreateImage() failed");
+        //     }
+        // }
+        // else
+        // {
+        //     VkImage image_hnd = VK_NULL_HANDLE;
+        //     res = vkCreateImage(device, &info, NULL, &image_hnd);
+        //     Validate(res, "vkCreateImage() failed");
+        //     for (uint32 frame_index = 0; frame_index < g_image_state.frame_count; ++frame_index)
+        //     {
+        //         g_image_state.image_hnds[GetFrameOffset(frame_index) + image_index] = image_hnd;
+        //     }
+        // }
 
         // Get image memory info.
         VkMemoryRequirements mem_requirements = {};
@@ -449,7 +467,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
                 .layerCount     = 1,
             },
         };
-        vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
+        vkCmdPipelineBarrier(g_context.temp_command_buffer,
                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
                              VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
                              0, // Dependency Flags
@@ -480,7 +498,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
             },
             .imageExtent = GetImageInfo(image_hnd)->extent,
         };
-        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, GetBufferMemory(image_data_buffer_hnd)->hnd, image,
+        vkCmdCopyBufferToImage(g_context.temp_command_buffer, GetBufferMemory(image_data_buffer_hnd)->hnd, image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.
@@ -503,7 +521,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
                 .layerCount     = 1,
             },
         };
-        vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
+        vkCmdPipelineBarrier(g_context.temp_command_buffer,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
                              0, // Dependency Flags

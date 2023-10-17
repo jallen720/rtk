@@ -236,67 +236,10 @@ static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_i
         CTK_FATAL("can't create image: already at max of %u", g_image_state.max_images);
     }
 
-    // Validate image info against physical device limits.
-    VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
-    if (image_info->type == VK_IMAGE_TYPE_3D)
-    {
-        if (image_info->extent.depth > physical_device_limits->maxImageDimension3D)
-        {
-            CTK_FATAL("can't create image: image depth of %u exceeds max 3D image dimension of %u",
-                      image_info->extent.depth,
-                      physical_device_limits->maxImageDimension3D);
-        }
-        if (image_info->extent.height > physical_device_limits->maxImageDimension3D)
-        {
-            CTK_FATAL("can't create image: image height of %u exceeds max 3D image dimension of %u",
-                      image_info->extent.height,
-                      physical_device_limits->maxImageDimension3D);
-        }
-        if (image_info->extent.width > physical_device_limits->maxImageDimension3D)
-        {
-            CTK_FATAL("can't create image: image width of %u exceeds max 3D image dimension of %u",
-                      image_info->extent.width,
-                      physical_device_limits->maxImageDimension3D);
-        }
-    }
-    else if (image_info->type == VK_IMAGE_TYPE_2D)
-    {
-        if (image_info->extent.height > physical_device_limits->maxImageDimension2D)
-        {
-            CTK_FATAL("can't create image: image height of %u exceeds max 2D image dimension of %u",
-                      image_info->extent.height,
-                      physical_device_limits->maxImageDimension2D);
-        }
-        if (image_info->extent.width > physical_device_limits->maxImageDimension2D)
-        {
-            CTK_FATAL("can't create image: image width of %u exceeds max 2D image dimension of %u",
-                      image_info->extent.width,
-                      physical_device_limits->maxImageDimension2D);
-        }
-    }
-    else
-    {
-        if (image_info->extent.width > physical_device_limits->maxImageDimension1D)
-        {
-            CTK_FATAL("can't create image: image width of %u exceeds max 1D image dimension of %u",
-                      image_info->extent.width,
-                      physical_device_limits->maxImageDimension1D);
-        }
-    }
-
-    if (image_info->array_layers > physical_device_limits->maxImageArrayLayers)
-    {
-        CTK_FATAL("can't create image: array layer count of %u exceeds max of %u",
-                  image_info->array_layers,
-                  physical_device_limits->maxImageArrayLayers);
-    }
-
     // Copy info.
     ImageHnd hnd = { .index = g_image_state.image_count };
     ++g_image_state.image_count;
     g_image_state.image_infos[hnd.index] = *image_info;
-
-    // Validate default view info.
     g_image_state.default_view_infos[hnd.index] = *default_view_info;
 
     return hnd;

@@ -302,16 +302,6 @@ static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_i
     return hnd;
 }
 
-static ImageInfo* GetImageInfo(ImageHnd hnd)
-{
-    if (hnd.index >= g_image_state.image_count)
-    {
-        CTK_FATAL("can't get image for handle: image index %u exceeds count of %u",
-                  hnd.index, g_image_state.image_count);
-    }
-    return g_image_state.image_infos + hnd.index;
-}
-
 static void AllocateImages(Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);
@@ -447,118 +437,151 @@ static void AllocateImages(Stack* temp_stack)
     }
 }
 
-// static void LoadImageData(ImageData* image_data, const char* path)
-// {
-//     image_data->data = stbi_load(path, &image_data->width, &image_data->height, &image_data->channel_count, 0);
-//     if (image_data->data == NULL)
-//     {
-//         CTK_FATAL("failed to load image data from path '%s'", path);
-//     }
+static ImageInfo* GetImageInfo(ImageHnd hnd)
+{
+    if (hnd.index >= g_image_state.image_count)
+    {
+        CTK_FATAL("can't get image info for handle: image index %u exceeds count of %u",
+                  hnd.index, g_image_state.image_count);
+    }
+    return &g_image_state.image_infos[hnd.index];
+}
 
-//     image_data->size = image_data->width * image_data->height * image_data->channel_count;
-// }
+static VkImage GetImage(ImageHnd hnd, uint32 frame_index)
+{
+    if (hnd.index >= g_image_state.image_count)
+    {
+        CTK_FATAL("can't get image for handle: image index %u exceeds count of %u",
+                  hnd.index, g_image_state.image_count);
+    }
 
-// static void DestroyImageData(ImageData* image_data)
-// {
-//     stbi_image_free(image_data->data);
-//     *image_data = {};
-// }
+    uint32 frame_offset = frame_index * g_image_state.image_count;
+    return g_image_state.image_hnds[frame_index + hnd.index];
+}
 
-// static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint32 frame_index, const char* path)
-// {
-//     ImageInfo* image_info = GetImage(image_hnd);
+static VkImageView GetDefaultView(ImageHnd hnd, uint32 frame_index)
+{
+    if (hnd.index >= g_image_state.image_count)
+    {
+        CTK_FATAL("can't get default view for image handle: image index %u exceeds count of %u",
+                  hnd.index, g_image_state.image_count);
+    }
 
-//     // Load image data and write to staging buffer.
-//     ImageData image_data = {};
-//     LoadImageData(&image_data, path);
-//     WriteHostBuffer(image_data_buffer_hnd, frame_index, image_data.data, (VkDeviceSize)image_data.size);
-//     DestroyImageData(&image_data);
+    uint32 frame_offset = frame_index * g_image_state.image_count;
+    return g_image_state.default_view_hnds[frame_offset + hnd.index];
+}
 
-//     // Copy image data from buffer memory to image memory.
-//     BeginTempCommandBuffer();
-//         // Transition image layout for use in shader.
-//         VkImageMemoryBarrier pre_copy_mem_barrier =
-//         {
-//             .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-//             .srcAccessMask       = 0,
-//             .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-//             .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
-//             .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-//             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-//             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-//             .image               = image_info->hnd,
-//             .subresourceRange =
-//             {
-//                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-//                 .baseMipLevel   = 0,
-//                 .levelCount     = 1,
-//                 .baseArrayLayer = 0,
-//                 .layerCount     = 1,
-//             },
-//         };
-//         vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
-//                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
-//                              VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
-//                              0, // Dependency Flags
-//                              0, // Memory Barrier Count
-//                              NULL, // Memory Barriers
-//                              0, // Buffer Memory Barrier Count
-//                              NULL, // Buffer Memory Barriers
-//                              1, // Image Memory Barrier Count
-//                              &pre_copy_mem_barrier); // Image Memory Barriers
+static void LoadImageData(ImageData* image_data, const char* path)
+{
+    image_data->data = stbi_load(path, &image_data->width, &image_data->height, &image_data->channel_count, 0);
+    if (image_data->data == NULL)
+    {
+        CTK_FATAL("failed to load image data from path '%s'", path);
+    }
 
-//         VkBufferImageCopy copy =
-//         {
-//             .bufferOffset      = GetOffset(image_data_buffer_hnd, frame_index),
-//             .bufferRowLength   = 0,
-//             .bufferImageHeight = 0,
-//             .imageSubresource =
-//             {
-//                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-//                 .mipLevel       = 0,
-//                 .baseArrayLayer = 0,
-//                 .layerCount     = 1,
-//             },
-//             .imageOffset =
-//             {
-//                 .x = 0,
-//                 .y = 0,
-//                 .z = 0,
-//             },
-//             .imageExtent = image_info->extent,
-//         };
-//         vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, GetBufferMemory(image_data_buffer_hnd)->hnd, image_info->hnd,
-//                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+    image_data->size = image_data->width * image_data->height * image_data->channel_count;
+}
 
-//         // Transition image layout for use in shader.
-//         VkImageMemoryBarrier post_copy_mem_barrier =
-//         {
-//             .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-//             .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-//             .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
-//             .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-//             .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-//             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-//             .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-//             .image               = image_info->hnd,
-//             .subresourceRange =
-//             {
-//                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-//                 .baseMipLevel   = 0,
-//                 .levelCount     = 1,
-//                 .baseArrayLayer = 0,
-//                 .layerCount     = 1,
-//             },
-//         };
-//         vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
-//                              VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
-//                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
-//                              0, // Dependency Flags
-//                              0, // Memory Barrier Count
-//                              NULL, // Memory Barriers
-//                              0, // Buffer Memory Barrier Count
-//                              NULL, // Buffer Memory Barriers
-//                              1, // Image Memory Barrier Count
-//                              &post_copy_mem_barrier); // Image Memory Barriers
-//     SubmitTempCommandBuffer();
-// }
+static void DestroyImageData(ImageData* image_data)
+{
+    stbi_image_free(image_data->data);
+    *image_data = {};
+}
+
+static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint32 frame_index, const char* path)
+{
+    // Load image data and write to staging buffer.
+    ImageData image_data = {};
+    LoadImageData(&image_data, path);
+    WriteHostBuffer(image_data_buffer_hnd, frame_index, image_data.data, (VkDeviceSize)image_data.size);
+    DestroyImageData(&image_data);
+
+    // Copy image data from buffer memory to image memory.
+    VkImage image = GetImage(image_hnd, frame_index);
+    BeginTempCommandBuffer();
+        // Transition image layout for use in shader.
+        VkImageMemoryBarrier pre_copy_mem_barrier =
+        {
+            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask       = 0,
+            .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image               = image,
+            .subresourceRange =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = 1,
+                .baseArrayLayer = 0,
+                .layerCount     = 1,
+            },
+        };
+        vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
+                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
+                             0, // Dependency Flags
+                             0, // Memory Barrier Count
+                             NULL, // Memory Barriers
+                             0, // Buffer Memory Barrier Count
+                             NULL, // Buffer Memory Barriers
+                             1, // Image Memory Barrier Count
+                             &pre_copy_mem_barrier); // Image Memory Barriers
+
+        VkBufferImageCopy copy =
+        {
+            .bufferOffset      = GetOffset(image_data_buffer_hnd, frame_index),
+            .bufferRowLength   = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel       = 0,
+                .baseArrayLayer = 0,
+                .layerCount     = 1,
+            },
+            .imageOffset =
+            {
+                .x = 0,
+                .y = 0,
+                .z = 0,
+            },
+            .imageExtent = GetImageInfo(image_hnd)->extent,
+        };
+        vkCmdCopyBufferToImage(global_ctx.temp_command_buffer, GetBufferMemory(image_data_buffer_hnd)->hnd, image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+        // Transition image layout for use in shader.
+        VkImageMemoryBarrier post_copy_mem_barrier =
+        {
+            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image               = image,
+            .subresourceRange =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = 1,
+                .baseArrayLayer = 0,
+                .layerCount     = 1,
+            },
+        };
+        vkCmdPipelineBarrier(global_ctx.temp_command_buffer,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
+                             0, // Dependency Flags
+                             0, // Memory Barrier Count
+                             NULL, // Memory Barriers
+                             0, // Buffer Memory Barrier Count
+                             NULL, // Buffer Memory Barriers
+                             1, // Image Memory Barrier Count
+                             &post_copy_mem_barrier); // Image Memory Barriers
+    SubmitTempCommandBuffer();
+}

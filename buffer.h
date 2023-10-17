@@ -144,7 +144,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
     if (buffer->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
-        VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
+        VkPhysicalDeviceLimits* physical_device_limits = &g_context.physical_device->properties.limits;
         buffer->offset_alignment = 4;
 
         // Uniform
@@ -175,8 +175,8 @@ static BufferHnd CreateBuffer(BufferInfo* info)
 static void AllocateBuffers()
 {
     VkDevice device = g_context.device;
+    QueueFamilies* queue_families = &g_context.physical_device->queue_families;
     VkResult res = VK_SUCCESS;
-    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
 
     // Calculate buffer memory information and buffer offsets.
     for (uint32 buffer_index = 0; buffer_index < g_buffer_state.buffer_count; ++buffer_index)

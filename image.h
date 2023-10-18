@@ -38,8 +38,8 @@ struct ImageMemoryInfo
 {
     VkDeviceSize size;
     VkDeviceSize alignment;
+    VkImage      image;
     VkDeviceSize offset;
-    VkImage      hnd;
 };
 
 struct ImageMemory
@@ -55,11 +55,12 @@ struct ImageState
     uint32         frame_count;
 
     ImageInfo*     image_infos;        // size: max_images
+    uint32*        frame_counts;       // size: max_images
     uint32*        mem_indexes;        // size: max_images
-    VkImage*       image_hnds;         // size: max_images * frame_count
+    VkImage*       images;             // size: max_images * frame_count
 
     ImageViewInfo* default_view_infos; // size: max_images
-    VkImageView*   default_view_hnds;  // size: max_images * frame_count
+    VkImageView*   default_views;      // size: max_images * frame_count
 
     ImageMemory    mems[VK_MAX_MEMORY_TYPES];
 };
@@ -95,7 +96,7 @@ static void LogImages()
     for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
     {
         ImageInfo* image_info = &g_image_state.image_infos[image_index];
-        uint32 frame_count = image_info->per_frame ? GetFrameCount() : 1;
+        uint32 frame_count = g_image_state.frame_counts[image_index];
 
         PrintLine("   [%2u] extent:       { w: %u, h: %u, d: %u }",
                   image_index,
@@ -111,6 +112,7 @@ static void LogImages()
         PrintLine("        samples:      %s", VkSampleCountName(image_info->samples));
         PrintLine("        tiling:       %s", VkImageTilingName(image_info->tiling));
         PrintLine("        mem_index:    %u", g_image_state.mem_indexes[image_index]);
+        PrintLine("        frame_count:  %u", frame_count);
 
         PrintLine("        mem_properties:");
         PrintMemoryPropertyFlags(image_info->mem_properties, 3);
@@ -118,11 +120,11 @@ static void LogImages()
         PrintImageCreateFlags(image_info->flags, 3);
         PrintLine("        usage:");
         PrintImageUsageFlags(image_info->usage, 3);
-        PrintLine("        image_hnds:");
+        PrintLine("        images:");
         for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
             PrintLine("            [%u] %p", frame_index,
-                      g_image_state.image_hnds[GetFrameOffset(frame_index) + image_index]);
+                      g_image_state.images[GetFrameOffset(frame_index) + image_index]);
         }
         PrintLine();
     }
@@ -168,12 +170,11 @@ static void LogDefaultViews()
         PrintLine("        flags:");
         PrintImageViewCreateFlags(default_view_info->flags, 3);
 
-        PrintLine("        default_view_hnds:");
-        uint32 frame_count = g_image_state.image_infos[image_index].per_frame ? g_image_state.frame_count : 1;
-        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+        PrintLine("        default_views:");
+        for (uint32 frame_index = 0; frame_index < g_image_state.frame_counts[image_index]; ++frame_index)
         {
             PrintLine("            [%u] %p", frame_index,
-                      g_image_state.default_view_hnds[GetFrameOffset(frame_index) + image_index]);
+                      g_image_state.default_views[GetFrameOffset(frame_index) + image_index]);
         }
         PrintLine();
     }
@@ -185,7 +186,10 @@ static void LogImageMemory()
     for (uint32 i = 0; i < VK_MAX_MEMORY_TYPES; ++i)
     {
         ImageMemory* image_mem = g_image_state.mems + i;
-        if (image_mem->size == 0) { continue; }
+        if (image_mem->size == 0)
+        {
+            continue;
+        }
 
         PrintLine("   [%2u] size:       %llu", i, image_mem->size);
         PrintLine("        device_mem: 0x%p", image_mem->device_mem);
@@ -208,8 +212,8 @@ static void LogImageMemoryInfoArrays(Array<ImageMemoryInfo> mem_info_arrays[VK_M
             ImageMemoryInfo* mem_info = GetPtr(mem_infos, mem_info_index);
             PrintLine("    [%2u] size:      %llu", mem_info_index, mem_info->size);
             PrintLine("         alignment: %llu", mem_info->alignment);
+            PrintLine("         image:     %p", mem_info->image);
             PrintLine("         offset:    %llu", mem_info->offset);
-            PrintLine("         hnd:       %p", mem_info->hnd);
             PrintLine();
         }
     }
@@ -229,10 +233,11 @@ static void InitImageModule(const Allocator* allocator, uint32 max_images)
 
     g_image_state.image_infos        = Allocate<ImageInfo>    (allocator, max_images);
     g_image_state.mem_indexes        = Allocate<uint32>       (allocator, max_images);
-    g_image_state.image_hnds         = Allocate<VkImage>      (allocator, max_images * frame_count);
+    g_image_state.frame_counts       = Allocate<uint32>       (allocator, max_images);
+    g_image_state.images             = Allocate<VkImage>      (allocator, max_images * frame_count);
 
     g_image_state.default_view_infos = Allocate<ImageViewInfo>(allocator, max_images);
-    g_image_state.default_view_hnds  = Allocate<VkImageView>  (allocator, max_images * frame_count);
+    g_image_state.default_views      = Allocate<VkImageView>  (allocator, max_images * frame_count);
 
 }
 
@@ -245,6 +250,7 @@ static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_i
     ++g_image_state.image_count;
     g_image_state.image_infos[hnd.index] = *image_info;
     g_image_state.default_view_infos[hnd.index] = *default_view_info;
+    g_image_state.frame_counts[hnd.index] = image_info->per_frame ? g_image_state.frame_count : 1;
 
     return hnd;
 }
@@ -258,10 +264,12 @@ static void AllocateImages(Stack* temp_stack)
     VkResult res = VK_SUCCESS;
 
     // Create images and get their memory information.
+    auto image_mem_requirements = CreateArrayFull<VkMemoryRequirements>(&frame.allocator, g_image_state.image_count);
+    uint32 mem_info_counts[VK_MAX_MEMORY_TYPES] = {};
     Array<ImageMemoryInfo> mem_info_arrays[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
     {
-        ImageInfo* image_info = g_image_state.image_infos + image_index;
+        ImageInfo* image_info = &g_image_state.image_infos[image_index];
 
         // Create image.
         VkImageCreateInfo info = {};
@@ -292,51 +300,60 @@ static void AllocateImages(Stack* temp_stack)
             info.pQueueFamilyIndices   = NULL;
         }
 
-        uint32 frame_count = image_info->per_frame ? g_image_state.frame_count : 1;
-        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+        uint32 frame_count = g_image_state.frame_counts[image_index];
+        if (frame_count == 1)
         {
-            res = vkCreateImage(device, &info, NULL, &g_image_state.image_hnds[GetFrameOffset(frame_index) + image_index]);
+            // Create 1 image and copy to each frame offset for image.
+            VkImage image_hnd = VK_NULL_HANDLE;
+            res = vkCreateImage(device, &info, NULL, &image_hnd);
             Validate(res, "vkCreateImage() failed");
+            for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+            {
+                g_image_state.images[GetFrameOffset(frame_index) + image_index] = image_hnd;
+            }
         }
-        // if (image_info->per_frame)
-        // {
-        //     for (uint32 frame_index = 0; frame_index < g_image_state.frame_count; ++frame_index)
-        //     {
-        //         res = vkCreateImage(device, &info, NULL, &g_image_state.image_hnds[GetFrameOffset(frame_index) + image_index]);
-        //         Validate(res, "vkCreateImage() failed");
-        //     }
-        // }
-        // else
-        // {
-        //     VkImage image_hnd = VK_NULL_HANDLE;
-        //     res = vkCreateImage(device, &info, NULL, &image_hnd);
-        //     Validate(res, "vkCreateImage() failed");
-        //     for (uint32 frame_index = 0; frame_index < g_image_state.frame_count; ++frame_index)
-        //     {
-        //         g_image_state.image_hnds[GetFrameOffset(frame_index) + image_index] = image_hnd;
-        //     }
-        // }
+        else
+        {
+            // Create 1 image per frame.
+            for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+            {
+                res = vkCreateImage(device, &info, NULL,
+                                    &g_image_state.images[GetFrameOffset(frame_index) + image_index]);
+                Validate(res, "vkCreateImage() failed");
+            }
+        }
 
         // Get image memory info.
-        VkMemoryRequirements mem_requirements = {};
-        vkGetImageMemoryRequirements(device, g_image_state.image_hnds[0 + image_index], &mem_requirements);
-        uint32 mem_index = GetCapableMemoryTypeIndex(&mem_requirements, image_info->mem_properties);
+        VkMemoryRequirements* mem_requirements = GetPtr(image_mem_requirements, image_index);
+        vkGetImageMemoryRequirements(device, g_image_state.images[0 + image_index], mem_requirements);
+        uint32 mem_index = GetCapableMemoryTypeIndex(mem_requirements, image_info->mem_properties);
         g_image_state.mem_indexes[image_index] = mem_index;
+        mem_info_counts[mem_index] += frame_count;
+    }
 
-        // Push memory info to memory type array, initializing if necessary.
-        Array<ImageMemoryInfo>* mem_info_array = &mem_info_arrays[mem_index];
-        if (mem_info_array->data == NULL)
+    // Initialize mem_info_arrays if they will have any mem_infos.
+    for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
+    {
+        uint32 mem_info_count = mem_info_counts[mem_index];
+        if (mem_info_count > 0)
         {
-            InitArray(mem_info_array, &frame.allocator, g_image_state.image_count * g_image_state.frame_count);
+            InitArray(&mem_info_arrays[mem_index], &frame.allocator, mem_info_count);
         }
-        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+    }
+
+    // Push memory info for each instance of each image to its memory type's mem_info_array.
+    for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
+    {
+        Array<ImageMemoryInfo>* mem_info_array = &mem_info_arrays[g_image_state.mem_indexes[image_index]];
+        VkMemoryRequirements* mem_requirements = GetPtr(image_mem_requirements, image_index);
+        for (uint32 frame_index = 0; frame_index < g_image_state.frame_counts[image_index]; ++frame_index)
         {
             Push(mem_info_array,
                  {
-                    .size      = mem_requirements.size,
-                    .alignment = mem_requirements.alignment,
+                    .size      = mem_requirements->size,
+                    .alignment = mem_requirements->alignment,
+                    .image     = g_image_state.images[GetFrameOffset(frame_index) + image_index],
                     .offset    = 0, // Calculated during memory sizing below.
-                    .hnd       = g_image_state.image_hnds[GetFrameOffset(frame_index) + image_index]
                  });
         }
     }
@@ -369,7 +386,7 @@ static void AllocateImages(Stack* temp_stack)
         // Bind images to memory.
         CTK_ITER(mem_info, mem_infos)
         {
-            res = vkBindImageMemory(device, mem_info->hnd, image_mem->device_mem, mem_info->offset);
+            res = vkBindImageMemory(device, mem_info->image, image_mem->device_mem, mem_info->offset);
             Validate(res, "vkBindImageMemory() failed");
         }
     }
@@ -378,23 +395,46 @@ static void AllocateImages(Stack* temp_stack)
     for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
     {
         ImageViewInfo* default_view_info = &g_image_state.default_view_infos[image_index];
-        uint32 frame_count = g_image_state.image_infos[image_index].per_frame ? g_image_state.frame_count : 1;
-        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+        if (g_image_state.frame_counts[image_index] == 1)
         {
-            uint32 image_frame_index = GetFrameOffset(frame_index) + image_index;
             VkImageViewCreateInfo view_info =
             {
                 .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext            = NULL,
                 .flags            = default_view_info->flags,
-                .image            = g_image_state.image_hnds[image_frame_index],
+                .image            = g_image_state.images[0 + image_index],
                 .viewType         = default_view_info->type,
                 .format           = default_view_info->format,
                 .components       = default_view_info->components,
                 .subresourceRange = default_view_info->subresource_range,
             };
-            res = vkCreateImageView(device, &view_info, NULL, &g_image_state.default_view_hnds[image_frame_index]);
+            VkImageView default_view = VK_NULL_HANDLE;
+            res = vkCreateImageView(device, &view_info, NULL, &default_view);
             Validate(res, "vkCreateImageView() failed");
+            for (uint32 frame_index = 0; frame_index < g_image_state.frame_count; ++frame_index)
+            {
+                g_image_state.default_views[GetFrameOffset(frame_index) + image_index] = default_view;
+            }
+        }
+        else
+        {
+            for (uint32 frame_index = 0; frame_index < g_image_state.frame_count; ++frame_index)
+            {
+                uint32 image_frame_index = GetFrameOffset(frame_index) + image_index;
+                VkImageViewCreateInfo view_info =
+                {
+                    .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                    .pNext            = NULL,
+                    .flags            = default_view_info->flags,
+                    .image            = g_image_state.images[image_frame_index],
+                    .viewType         = default_view_info->type,
+                    .format           = default_view_info->format,
+                    .components       = default_view_info->components,
+                    .subresourceRange = default_view_info->subresource_range,
+                };
+                res = vkCreateImageView(device, &view_info, NULL, &g_image_state.default_views[image_frame_index]);
+                Validate(res, "vkCreateImageView() failed");
+            }
         }
     }
 }
@@ -409,14 +449,14 @@ static VkImage GetImage(ImageHnd hnd, uint32 frame_index)
 {
     CTK_ASSERT(hnd.index < g_image_state.image_count)
     CTK_ASSERT(frame_index < g_image_state.frame_count)
-    return g_image_state.image_hnds[GetFrameOffset(frame_index) + hnd.index];
+    return g_image_state.images[GetFrameOffset(frame_index) + hnd.index];
 }
 
 static VkImageView GetDefaultView(ImageHnd hnd, uint32 frame_index)
 {
     CTK_ASSERT(hnd.index < g_image_state.image_count)
     CTK_ASSERT(frame_index < g_image_state.frame_count)
-    return g_image_state.default_view_hnds[GetFrameOffset(frame_index) + hnd.index];
+    return g_image_state.default_views[GetFrameOffset(frame_index) + hnd.index];
 }
 
 static void LoadImageData(ImageData* image_data, const char* path)

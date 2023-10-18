@@ -324,7 +324,7 @@ static void AllocateImages(Stack* temp_stack)
         g_image_state.mem_indexes[image_index] = mem_index;
 
         // Push memory info to memory type array, initializing if necessary.
-        Array<ImageMemoryInfo>* mem_info_array = mem_info_arrays + mem_index;
+        Array<ImageMemoryInfo>* mem_info_array = &mem_info_arrays[mem_index];
         if (mem_info_array->data == NULL)
         {
             InitArray(mem_info_array, &frame.allocator, g_image_state.image_count * g_image_state.frame_count);

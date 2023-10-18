@@ -232,8 +232,8 @@ static void InitImageModule(const Allocator* allocator, uint32 max_images)
     g_image_state.frame_count        = frame_count;
 
     g_image_state.image_infos        = Allocate<ImageInfo>    (allocator, max_images);
-    g_image_state.mem_indexes        = Allocate<uint32>       (allocator, max_images);
     g_image_state.frame_counts       = Allocate<uint32>       (allocator, max_images);
+    g_image_state.mem_indexes        = Allocate<uint32>       (allocator, max_images);
     g_image_state.images             = Allocate<VkImage>      (allocator, max_images * frame_count);
 
     g_image_state.default_view_infos = Allocate<ImageViewInfo>(allocator, max_images);

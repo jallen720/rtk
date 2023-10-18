@@ -92,7 +92,7 @@ static void InitDeviceMesh(Mesh* mesh, MeshData* mesh_data, Array<VertexType> ve
 
 template<typename VertexType>
 static Mesh* CreateDeviceMesh(const Allocator* allocator, MeshData* mesh_data, Array<VertexType> vertexes,
-                              Array<uint32> indexes, Buffer* staging_buffer)
+                              Array<uint32> indexes, BufferHnd staging_buffer)
 {
     auto mesh = Allocate<Mesh>(allocator, 1);
     InitDeviceMesh(mesh, mesh_data, vertexes, indexes, staging_buffer);

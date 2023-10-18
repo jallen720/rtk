@@ -212,7 +212,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                              {
                                  .buffer = GetBufferMemory(*buffer_hnd)->hnd,
                                  .offset = GetOffset(*buffer_hnd, frame_index),
-                                 .range  = GetBuffer(*buffer_hnd)->size,
+                                 .range  = GetBufferInfo(*buffer_hnd)->size,
                              });
                     }
                 }

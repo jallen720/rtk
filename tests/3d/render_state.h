@@ -76,10 +76,10 @@ static void InitDeviceMemory()
     BufferInfo staging_buffer_info =
     {
         .size             = Megabyte32<4>(),
-        .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame        = false,
         .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     };
     g_render_state.staging_buffer = CreateBuffer(&staging_buffer_info);
 }
@@ -121,10 +121,10 @@ static void InitDescriptorDatas(Stack* perm_stack)
     BufferInfo entity_buffer_info =
     {
         .size             = sizeof(EntityBuffer),
-        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame        = true,
         .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     };
     g_render_state.entity_buffer = CreateBuffer(&entity_buffer_info);
 
@@ -397,6 +397,8 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitPipelines(temp_stack, free_list);
 
     AllocateResources(temp_stack);
+LogBuffers();
+LogBufferMemory();
     WriteResources();
 }
 

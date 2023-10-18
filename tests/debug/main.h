@@ -62,10 +62,10 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     BufferInfo staging_buffer_info =
     {
         .size             = Megabyte32<4>(),
-        .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame        = false,
         .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     };
     rs->staging_buffer = CreateBuffer(&staging_buffer_info);
 
@@ -98,10 +98,10 @@ static void InitRenderState(RenderState* rs, Stack* perm_stack, Stack* temp_stac
     BufferInfo entity_buffer_info =
     {
         .size             = sizeof(EntityBuffer),
-        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame        = true,
         .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     };
     rs->entity_buffer = CreateBuffer(&entity_buffer_info);
 

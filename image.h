@@ -331,7 +331,7 @@ static void AllocateImages(Stack* temp_stack)
         mem_info_counts[mem_index] += frame_count;
     }
 
-    // Initialize mem_info_arrays if they will have any mem_infos.
+    // Initialize mem_info arrays that will contain mem_infos.
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
         uint32 mem_info_count = mem_info_counts[mem_index];

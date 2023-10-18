@@ -13,9 +13,7 @@ static constexpr VkComponentMapping RGBA_COMPONENT_SWIZZLE_IDENTITY =
 struct ImageInfo
 {
     VkExtent3D            extent;
-    VkImageUsageFlags     usage;
     bool                  per_frame;
-    VkMemoryPropertyFlags mem_properties;
     VkImageCreateFlags    flags;
     VkImageType           type;
     VkFormat              format;
@@ -23,6 +21,8 @@ struct ImageInfo
     uint32                array_layers;
     VkSampleCountFlagBits samples;
     VkImageTiling         tiling;
+    VkMemoryPropertyFlags mem_properties;
+    VkImageUsageFlags     usage;
 };
 
 struct ImageViewInfo
@@ -105,21 +105,21 @@ static void LogImages()
                   image_info->extent.depth);
         PrintLine("        per_frame:    %s", image_info->per_frame ? "true" : "false");
 
+        PrintLine("        flags:");
+        PrintImageCreateFlags(image_info->flags, 3);
         PrintLine("        type:         %s", VkImageTypeName(image_info->type));
         PrintLine("        format:       %s", VkFormatName(image_info->format));
         PrintLine("        mip_levels:   %u", image_info->mip_levels);
         PrintLine("        array_layers: %u", image_info->array_layers);
         PrintLine("        samples:      %s", VkSampleCountName(image_info->samples));
         PrintLine("        tiling:       %s", VkImageTilingName(image_info->tiling));
-        PrintLine("        mem_index:    %u", g_image_state.mem_indexes[image_index]);
-        PrintLine("        frame_count:  %u", frame_count);
-
         PrintLine("        mem_properties:");
         PrintMemoryPropertyFlags(image_info->mem_properties, 3);
-        PrintLine("        flags:");
-        PrintImageCreateFlags(image_info->flags, 3);
         PrintLine("        usage:");
         PrintImageUsageFlags(image_info->usage, 3);
+
+        PrintLine("        mem_index:    %u", g_image_state.mem_indexes[image_index]);
+        PrintLine("        frame_count:  %u", frame_count);
         PrintLine("        images:");
         for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {

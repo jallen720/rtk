@@ -54,11 +54,12 @@ static void LogBuffers()
         PrintLine("        offset_alignment: %llu", buffer_info->offset_alignment);
         PrintLine("        per_frame:        %s", buffer_info->per_frame ? "true" : "false");
         PrintLine("        frame_count:      %u", frame_count);
-        PrintLine("        mem_index:        %u", g_buffer_state.mem_indexes[buffer_index]);
         PrintLine("        mem_properties:   ");
         PrintMemoryPropertyFlags(buffer_info->mem_properties, 3);
         PrintLine("        usage:            ");
         PrintBufferUsageFlags(buffer_info->usage, 3);
+
+        PrintLine("        mem_index:        %u", g_buffer_state.mem_indexes[buffer_index]);
         PrintLine("        offsets:          ");
         for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {

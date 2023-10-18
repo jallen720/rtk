@@ -138,9 +138,7 @@ static void InitDescriptorDatas(Stack* perm_stack)
             .height = 32,
             .depth  = 1
         },
-        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         .per_frame      = false,
-        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         .flags          = 0,
         .type           = VK_IMAGE_TYPE_2D,
         .format         = GetSwapchain()->surface_format.format,
@@ -148,6 +146,8 @@ static void InitDescriptorDatas(Stack* perm_stack)
         .array_layers   = 1,
         .samples        = VK_SAMPLE_COUNT_1_BIT,
         .tiling         = VK_IMAGE_TILING_OPTIMAL,
+        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
     };
     ImageViewInfo default_view_info =
     {
@@ -399,6 +399,8 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     AllocateResources(temp_stack);
 LogBuffers();
 LogBufferMemory();
+LogImages();
+LogImageMemory();
     WriteResources();
 }
 

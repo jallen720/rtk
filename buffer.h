@@ -11,7 +11,6 @@ struct BufferInfo
     bool                  per_frame;
     VkMemoryPropertyFlags mem_properties;
     VkBufferUsageFlags    usage;
-
 };
 
 struct BufferMemory

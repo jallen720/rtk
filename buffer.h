@@ -130,7 +130,8 @@ static void LogBuffers()
         PrintLine("        frame_stride:     %u", g_buffer_state.frame_strides[buffer_index]);
         PrintLine("        mem_index:        %u", g_buffer_state.mem_indexes[buffer_index]);
         PrintLine("        offsets:          ");
-        for (uint32 frame_index = 0; frame_index < g_buffer_state.frame_count; ++frame_index)
+        uint32 frame_count = buffer_info->per_frame ? g_buffer_state.frame_count : 1;
+        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
             PrintLine("            [%u] %llu", frame_index,
                       g_buffer_state.offsets[GetBufferFrameIndex(buffer_index, frame_index)]);

@@ -79,9 +79,6 @@ static uint32 PushEntity(EntityData* entity_data)
 
 static void InitEntities()
 {
-    static constexpr uint32 CUBE_SIZE = 66;
-    static constexpr uint32 CUBE_ENTITY_COUNT = CUBE_SIZE * CUBE_SIZE * CUBE_SIZE;
-    static_assert(CUBE_ENTITY_COUNT <= MAX_ENTITIES);
     EntityData* entity_data = &game_state.entity_data;
     for (uint32 x = 0; x < CUBE_SIZE; ++x)
     for (uint32 y = 0; y < CUBE_SIZE; ++y)
@@ -98,8 +95,8 @@ static void InitEntities()
             .rotate_axis      = (uint8)RandomRange(0u, 3u),
             .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
         };
-        entity_data->texture_indexes[entity] = entity < CUBE_ENTITY_COUNT / 3 ? 0 :
-                                               entity < 2 * (CUBE_ENTITY_COUNT / 3) ? 1 :
+        entity_data->texture_indexes[entity] = entity < MAX_ENTITIES / 3 ? 0 :
+                                               entity < 2 * (MAX_ENTITIES / 3) ? 1 :
                                                2;
     }
 }

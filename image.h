@@ -288,7 +288,7 @@ static void AllocateImages(Stack* temp_stack)
         ImageInfo* image_info = &g_image_state.image_infos[image_index];
         uint32 frame_count = g_image_state.frame_count;
 
-        // Create image.
+        // Create 1 image per frame.
         VkImageCreateInfo info = {};
         info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         info.pNext         = NULL;
@@ -302,8 +302,6 @@ static void AllocateImages(Stack* temp_stack)
         info.tiling        = image_info->tiling;
         info.usage         = image_info->usage;
         info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-        // Check if sharing mode needs to be concurrent due to separate graphics & present queue families.
         if (queue_families->graphics != queue_families->present)
         {
             info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
@@ -316,18 +314,17 @@ static void AllocateImages(Stack* temp_stack)
             info.queueFamilyIndexCount = 0;
             info.pQueueFamilyIndices   = NULL;
         }
-
-        // Create 1 image per frame.
         for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
-            res = vkCreateImage(device, &info, NULL,
-                                &g_image_state.images[GetImageFrameIndex(image_index, frame_index)]);
+            uint32 image_frame_index = GetImageFrameIndex(image_index, frame_index);
+            res = vkCreateImage(device, &info, NULL, &g_image_state.images[image_frame_index]);
             Validate(res, "vkCreateImage() failed");
         }
 
         // Get image memory info.
         VkMemoryRequirements* mem_requirements = GetPtr(image_mem_requirements, image_index);
-        vkGetImageMemoryRequirements(device, g_image_state.images[0 + image_index], mem_requirements);
+        uint32 image_frame_index = GetImageFrameIndex(image_index, 0);
+        vkGetImageMemoryRequirements(device, g_image_state.images[image_frame_index], mem_requirements);
         uint32 mem_index = GetCapableMemoryTypeIndex(mem_requirements, image_info->mem_properties);
         g_image_state.mem_indexes[image_index] = mem_index;
         mem_info_counts[mem_index] += frame_count;
@@ -337,10 +334,8 @@ static void AllocateImages(Stack* temp_stack)
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
         uint32 mem_info_count = mem_info_counts[mem_index];
-        if (mem_info_count > 0)
-        {
-            InitArray(&mem_info_arrays[mem_index], &frame.allocator, mem_info_count);
-        }
+        if (mem_info_count == 0) { continue; }
+        InitArray(&mem_info_arrays[mem_index], &frame.allocator, mem_info_count);
     }
 
     // Push memory info for each instance of each image to its memory type's mem_info_array.
@@ -366,10 +361,7 @@ static void AllocateImages(Stack* temp_stack)
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
         Array<ImageMemoryInfo>* mem_infos = &mem_info_arrays[mem_index];
-        if (mem_infos->count == 0)
-        {
-            continue;
-        }
+        if (mem_infos->count == 0) { continue; }
 
         // Sort memory information in descending order of alignment.
         InsertionSort(mem_infos, AlignmentDesc);

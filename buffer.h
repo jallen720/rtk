@@ -311,14 +311,13 @@ static void AllocateBuffers(Stack* temp_stack)
             continue;
         }
 
+        // Create buffer.
         VkBufferCreateInfo create_info = {};
         create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
         create_info.pNext = NULL;
         create_info.flags = 0;
         create_info.size  = buffer_mem->size;
         create_info.usage = buffer_mem->usage;
-
-        // Check if sharing mode needs to be concurrent due to separate graphics & present queue families.
         if (queue_families->graphics != queue_families->present)
         {
             create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
@@ -331,7 +330,6 @@ static void AllocateBuffers(Stack* temp_stack)
             create_info.queueFamilyIndexCount = 0;
             create_info.pQueueFamilyIndices   = NULL;
         }
-
         res = vkCreateBuffer(device, &create_info, NULL, &buffer_mem->buffer);
         Validate(res, "vkCreateBuffer() failed");
 

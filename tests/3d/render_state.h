@@ -301,7 +301,7 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
 
 static void AllocateResources(Stack* temp_stack)
 {
-    AllocateBuffers();
+    AllocateBuffers(temp_stack);
     AllocateImages(temp_stack);
     AllocateDescriptorSets(temp_stack);
 }
@@ -397,10 +397,6 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitPipelines(temp_stack, free_list);
 
     AllocateResources(temp_stack);
-LogBuffers();
-LogBufferMemory();
-LogImages();
-LogImageMemory();
     WriteResources();
 }
 

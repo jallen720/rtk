@@ -185,7 +185,7 @@ static void LogImageMemory()
     PrintLine("image memory:");
     for (uint32 i = 0; i < VK_MAX_MEMORY_TYPES; ++i)
     {
-        ImageMemory* image_mem = g_image_state.mems + i;
+        ImageMemory* image_mem = &g_image_state.mems[i];
         if (image_mem->size == 0)
         {
             continue;
@@ -303,7 +303,7 @@ static void AllocateImages(Stack* temp_stack)
         uint32 frame_count = g_image_state.frame_counts[image_index];
         if (frame_count == 1)
         {
-            // Create 1 image and copy to each frame offset for image.
+            // Create 1 image and copy to each frame for image.
             VkImage image_hnd = VK_NULL_HANDLE;
             res = vkCreateImage(device, &info, NULL, &image_hnd);
             Validate(res, "vkCreateImage() failed");
@@ -538,7 +538,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
             },
             .imageExtent = GetImageInfo(image_hnd)->extent,
         };
-        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBufferMemory(image_data_buffer_hnd)->hnd, image,
+        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBufferMemory(image_data_buffer_hnd)->buffer, image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.

@@ -98,10 +98,10 @@ static void BindMeshData(VkCommandBuffer command_buffer, MeshData* mesh_data)
     vkCmdBindVertexBuffers(command_buffer,
                            0, // First Binding
                            1, // Binding Count
-                           &GetBufferMemory(mesh_data->vertex_buffer)->hnd,
+                           &GetBufferMemory(mesh_data->vertex_buffer)->buffer,
                            &vertex_buffer_offset);
     vkCmdBindIndexBuffer(command_buffer,
-                         GetBufferMemory(mesh_data->index_buffer)->hnd,
+                         GetBufferMemory(mesh_data->index_buffer)->buffer,
                          GetOffset(mesh_data->index_buffer, 0),
                          VK_INDEX_TYPE_UINT32);
 }

@@ -238,8 +238,6 @@ static void AllocateBuffers(Stack* temp_stack)
 
     VkDevice device = GetDevice();
     PhysicalDevice* physical_device = GetPhysicalDevice();
-    QueueFamilies* queue_families = &physical_device->queue_families;
-    VkMemoryType* memory_types = physical_device->mem_properties.memoryTypes;
     VkResult res = VK_SUCCESS;
 
     // Associate buffers with memory types they'll be using.
@@ -299,6 +297,8 @@ static void AllocateBuffers(Stack* temp_stack)
     }
 
     // Initialize and allocate buffer memory.
+    QueueFamilies* queue_families = &physical_device->queue_families;
+    VkMemoryType* memory_types = physical_device->mem_properties.memoryTypes;
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
         BufferMemory* buffer_mem = &g_buffer_state.mems[mem_index];

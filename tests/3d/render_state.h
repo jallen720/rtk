@@ -342,7 +342,14 @@ static void RecordRenderCommandsThread(void* data)
         };
         BindDescriptorSets(command_buffer, pipeline, state->temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
         BindMeshData(command_buffer, &g_render_state.mesh_data);
+#if 1
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
+#else
+        for (uint32 i = state->batch_range.start; i < state->batch_range.start + state->batch_range.size; ++i)
+        {
+            DrawMesh(command_buffer, state->mesh, i, 1);
+        }
+#endif
     EndRenderCommands(command_buffer);
 }
 

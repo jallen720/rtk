@@ -225,13 +225,6 @@ static BufferHnd CreateBuffer(BufferInfo* buffer_info)
     return hnd;
 }
 
-struct BufferMemoryInfo
-{
-    VkDeviceSize size;
-    VkDeviceSize offset_alignment;
-    uint32       buffer_index;
-};
-
 static void AllocateBuffers(Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);

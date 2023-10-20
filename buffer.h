@@ -260,8 +260,8 @@ static void AllocateBuffers(Stack* temp_stack)
     // Size buffer memory and calculate buffer offsets.
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        uint32 buffer_count = mem_buffer_counts[mem_index];
-        if (buffer_count == 0)
+        uint32 mem_buffer_count = mem_buffer_counts[mem_index];
+        if (mem_buffer_count == 0)
         {
             continue;
         }
@@ -270,17 +270,17 @@ static void AllocateBuffers(Stack* temp_stack)
         InsertionSort(mem_buffer_index_array, OffsetAlignmentDesc);
 
         BufferMemory* buffer_mem = &g_buffer_state.mems[mem_index];
-        for (uint32 i = 0; i < buffer_count; ++i)
+        for (uint32 i = 0; i < mem_buffer_count; ++i)
         {
-            uint32 buffer_index = Get(mem_buffer_index_array, i);
-            BufferInfo* buffer_info = &g_buffer_state.buffer_infos[buffer_index];
+            uint32 mem_buffer_index = Get(mem_buffer_index_array, i);
+            BufferInfo* buffer_info = &g_buffer_state.buffer_infos[mem_buffer_index];
 
             // Size buffer memory and generate offsets based on buffer size and alignment memory requirements.
             uint32 frame_count = buffer_info->per_frame ? g_buffer_state.frame_count : 1;
             for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
             {
                 buffer_mem->size = MultipleOf(buffer_mem->size, buffer_info->offset_alignment);
-                g_buffer_state.offsets[GetBufferFrameIndex(buffer_index, frame_index)] = buffer_mem->size;
+                g_buffer_state.offsets[GetBufferFrameIndex(mem_buffer_index, frame_index)] = buffer_mem->size;
                 buffer_mem->size += buffer_info->size;
             }
 

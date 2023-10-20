@@ -55,6 +55,7 @@ struct ImageState
     uint32         frame_count;
 
     ImageInfo*     image_infos;        // size: max_images
+    uint32*        frame_strides;      // size: max_images
     uint32*        frame_counts;       // size: max_images
     uint32*        mem_indexes;        // size: max_images
     VkImage*       images;             // size: max_images * frame_count
@@ -78,9 +79,14 @@ static ImageState g_image_state;
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static uint32 GetFrameOffset(uint32 frame_index)
+static uint32 GetImageFrameIndex(uint32 image_index, uint32 frame_index)
 {
-    return frame_index * g_image_state.max_images;
+    return (g_image_state.frame_strides[image_index] * frame_index) + image_index;
+}
+
+static uint32 GetImageFrameIndex(ImageHnd hnd, uint32 frame_index)
+{
+    return GetBufferFrameIndex(hnd.index, frame_index);
 }
 
 static bool AlignmentDesc(ImageMemoryInfo* a, ImageMemoryInfo* b)
@@ -97,7 +103,6 @@ static void LogImages()
     {
         ImageInfo* image_info = &g_image_state.image_infos[image_index];
         uint32 frame_count = g_image_state.frame_counts[image_index];
-
         PrintLine("   [%2u] extent:       { w: %u, h: %u, d: %u }",
                   image_index,
                   image_info->extent.width,
@@ -118,13 +123,14 @@ static void LogImages()
         PrintLine("        usage:");
         PrintImageUsageFlags(image_info->usage, 3);
 
-        PrintLine("        mem_index:    %u", g_image_state.mem_indexes[image_index]);
+        PrintLine("        frame_stride: %u", g_image_state.frame_strides[image_index]);
         PrintLine("        frame_count:  %u", frame_count);
+        PrintLine("        mem_index:    %u", g_image_state.mem_indexes[image_index]);
         PrintLine("        images:");
         for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
             PrintLine("            [%u] %p", frame_index,
-                      g_image_state.images[GetFrameOffset(frame_index) + image_index]);
+                      g_image_state.images[GetImageFrameIndex(image_index, frame_index)]);
         }
         PrintLine();
     }
@@ -174,7 +180,7 @@ static void LogDefaultViews()
         for (uint32 frame_index = 0; frame_index < g_image_state.frame_counts[image_index]; ++frame_index)
         {
             PrintLine("            [%u] %p", frame_index,
-                      g_image_state.default_views[GetFrameOffset(frame_index) + image_index]);
+                      g_image_state.default_views[GetImageFrameIndex(image_index, frame_index)]);
         }
         PrintLine();
     }
@@ -232,6 +238,7 @@ static void InitImageModule(const Allocator* allocator, uint32 max_images)
     g_image_state.frame_count        = frame_count;
 
     g_image_state.image_infos        = Allocate<ImageInfo>    (allocator, max_images);
+    g_image_state.frame_strides      = Allocate<uint32>       (allocator, max_images);
     g_image_state.frame_counts       = Allocate<uint32>       (allocator, max_images);
     g_image_state.mem_indexes        = Allocate<uint32>       (allocator, max_images);
     g_image_state.images             = Allocate<VkImage>      (allocator, max_images * frame_count);
@@ -250,7 +257,16 @@ static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_i
     ++g_image_state.image_count;
     g_image_state.image_infos[hnd.index] = *image_info;
     g_image_state.default_view_infos[hnd.index] = *default_view_info;
-    g_image_state.frame_counts[hnd.index] = image_info->per_frame ? g_image_state.frame_count : 1;
+    if (image_info->per_frame)
+    {
+        g_image_state.frame_strides[hnd.index] = g_image_state.max_images;
+        g_image_state.frame_counts[hnd.index]  = g_image_state.frame_count;
+    }
+    else
+    {
+        g_image_state.frame_strides[hnd.index] = 0;
+        g_image_state.frame_counts[hnd.index]  = 1;
+    }
 
     return hnd;
 }
@@ -265,11 +281,12 @@ static void AllocateImages(Stack* temp_stack)
 
     // Create images and get their memory information.
     auto image_mem_requirements = CreateArrayFull<VkMemoryRequirements>(&frame.allocator, g_image_state.image_count);
-    uint32 mem_info_counts[VK_MAX_MEMORY_TYPES] = {};
     Array<ImageMemoryInfo> mem_info_arrays[VK_MAX_MEMORY_TYPES] = {};
+    uint32 mem_info_counts[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
     {
         ImageInfo* image_info = &g_image_state.image_infos[image_index];
+        uint32 frame_count = g_image_state.frame_count;
 
         // Create image.
         VkImageCreateInfo info = {};
@@ -300,27 +317,12 @@ static void AllocateImages(Stack* temp_stack)
             info.pQueueFamilyIndices   = NULL;
         }
 
-        uint32 frame_count = g_image_state.frame_counts[image_index];
-        if (frame_count == 1)
+        // Create 1 image per frame.
+        for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
-            // Create 1 image and copy to each frame for image.
-            VkImage image_hnd = VK_NULL_HANDLE;
-            res = vkCreateImage(device, &info, NULL, &image_hnd);
+            res = vkCreateImage(device, &info, NULL,
+                                &g_image_state.images[GetImageFrameIndex(image_index, frame_index)]);
             Validate(res, "vkCreateImage() failed");
-            for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
-            {
-                g_image_state.images[GetFrameOffset(frame_index) + image_index] = image_hnd;
-            }
-        }
-        else
-        {
-            // Create 1 image per frame.
-            for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
-            {
-                res = vkCreateImage(device, &info, NULL,
-                                    &g_image_state.images[GetFrameOffset(frame_index) + image_index]);
-                Validate(res, "vkCreateImage() failed");
-            }
         }
 
         // Get image memory info.
@@ -352,7 +354,7 @@ static void AllocateImages(Stack* temp_stack)
                  {
                     .size      = mem_requirements->size,
                     .alignment = mem_requirements->alignment,
-                    .image     = g_image_state.images[GetFrameOffset(frame_index) + image_index],
+                    .image     = g_image_state.images[GetImageFrameIndex(image_index, frame_index)],
                     .offset    = 0, // Calculated during memory sizing below.
                  });
         }
@@ -395,46 +397,22 @@ static void AllocateImages(Stack* temp_stack)
     for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
     {
         ImageViewInfo* default_view_info = &g_image_state.default_view_infos[image_index];
-        if (g_image_state.frame_counts[image_index] == 1)
+        for (uint32 frame_index = 0; frame_index < g_image_state.frame_counts[image_index]; ++frame_index)
         {
+            uint32 image_frame_index = GetImageFrameIndex(image_index, frame_index);
             VkImageViewCreateInfo view_info =
             {
                 .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext            = NULL,
                 .flags            = default_view_info->flags,
-                .image            = g_image_state.images[0 + image_index],
+                .image            = g_image_state.images[image_frame_index],
                 .viewType         = default_view_info->type,
                 .format           = default_view_info->format,
                 .components       = default_view_info->components,
                 .subresourceRange = default_view_info->subresource_range,
             };
-            VkImageView default_view = VK_NULL_HANDLE;
-            res = vkCreateImageView(device, &view_info, NULL, &default_view);
+            res = vkCreateImageView(device, &view_info, NULL, &g_image_state.default_views[image_frame_index]);
             Validate(res, "vkCreateImageView() failed");
-            for (uint32 frame_index = 0; frame_index < g_image_state.frame_count; ++frame_index)
-            {
-                g_image_state.default_views[GetFrameOffset(frame_index) + image_index] = default_view;
-            }
-        }
-        else
-        {
-            for (uint32 frame_index = 0; frame_index < g_image_state.frame_count; ++frame_index)
-            {
-                uint32 image_frame_index = GetFrameOffset(frame_index) + image_index;
-                VkImageViewCreateInfo view_info =
-                {
-                    .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                    .pNext            = NULL,
-                    .flags            = default_view_info->flags,
-                    .image            = g_image_state.images[image_frame_index],
-                    .viewType         = default_view_info->type,
-                    .format           = default_view_info->format,
-                    .components       = default_view_info->components,
-                    .subresourceRange = default_view_info->subresource_range,
-                };
-                res = vkCreateImageView(device, &view_info, NULL, &g_image_state.default_views[image_frame_index]);
-                Validate(res, "vkCreateImageView() failed");
-            }
         }
     }
 }
@@ -449,14 +427,14 @@ static VkImage GetImage(ImageHnd hnd, uint32 frame_index)
 {
     CTK_ASSERT(hnd.index < g_image_state.image_count)
     CTK_ASSERT(frame_index < g_image_state.frame_count)
-    return g_image_state.images[GetFrameOffset(frame_index) + hnd.index];
+    return g_image_state.images[GetImageFrameIndex(hnd, frame_index)];
 }
 
 static VkImageView GetDefaultView(ImageHnd hnd, uint32 frame_index)
 {
     CTK_ASSERT(hnd.index < g_image_state.image_count)
     CTK_ASSERT(frame_index < g_image_state.frame_count)
-    return g_image_state.default_views[GetFrameOffset(frame_index) + hnd.index];
+    return g_image_state.default_views[GetImageFrameIndex(hnd, frame_index)];
 }
 
 static void LoadImageData(ImageData* image_data, const char* path)

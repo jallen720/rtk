@@ -31,6 +31,7 @@ struct BufferState
 
     BufferInfo*   buffer_infos;  // size: max_buffers
     uint32*       frame_strides; // size: max_buffers
+    uint32*       frame_counts;  // size: max_buffers
     uint32*       mem_indexes;   // size: max_buffers
     VkDeviceSize* offsets;       // size: max_buffers * frame_count
     VkDeviceSize* indexes;       // size: max_buffers * frame_count
@@ -118,6 +119,7 @@ static void LogBuffers()
     for (uint32 buffer_index = 0; buffer_index < g_buffer_state.buffer_count; ++buffer_index)
     {
         BufferInfo* buffer_info = g_buffer_state.buffer_infos + buffer_index;
+        uint32 frame_count = g_buffer_state.frame_counts[buffer_index];
         PrintLine("   [%2u] size:             %llu", buffer_index, buffer_info->size);
         PrintLine("        offset_alignment: %llu", buffer_info->offset_alignment);
         PrintLine("        per_frame:        %s", buffer_info->per_frame ? "true" : "false");
@@ -127,9 +129,9 @@ static void LogBuffers()
         PrintBufferUsageFlags(buffer_info->usage, 3);
 
         PrintLine("        frame_stride:     %u", g_buffer_state.frame_strides[buffer_index]);
+        PrintLine("        frame_count:      %u", frame_count);
         PrintLine("        mem_index:        %u", g_buffer_state.mem_indexes[buffer_index]);
         PrintLine("        offsets:          ");
-        uint32 frame_count = buffer_info->per_frame ? g_buffer_state.frame_count : 1;
         for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
         {
             PrintLine("            [%u] %llu", frame_index,
@@ -176,6 +178,7 @@ static void InitBufferModule(const Allocator* allocator, uint32 max_buffers)
 
     g_buffer_state.buffer_infos  = Allocate<BufferInfo>  (allocator, max_buffers);
     g_buffer_state.frame_strides = Allocate<uint32>      (allocator, max_buffers);
+    g_buffer_state.frame_counts  = Allocate<uint32>      (allocator, max_buffers);
     g_buffer_state.mem_indexes   = Allocate<uint32>      (allocator, max_buffers);
     g_buffer_state.offsets       = Allocate<VkDeviceSize>(allocator, max_buffers * frame_count);
     g_buffer_state.indexes       = Allocate<VkDeviceSize>(allocator, max_buffers * frame_count);
@@ -220,7 +223,16 @@ static BufferHnd CreateBuffer(BufferInfo* buffer_info)
     BufferHnd hnd = { .index = g_buffer_state.buffer_count };
     ++g_buffer_state.buffer_count;
     g_buffer_state.buffer_infos[hnd.index] = *buffer_info;
-    g_buffer_state.frame_strides[hnd.index] = buffer_info->per_frame ? g_buffer_state.max_buffers : 0;
+    if (buffer_info->per_frame)
+    {
+        g_buffer_state.frame_strides[hnd.index] = g_buffer_state.max_buffers;
+        g_buffer_state.frame_counts[hnd.index]  = g_buffer_state.frame_count;
+    }
+    else
+    {
+        g_buffer_state.frame_strides[hnd.index] = 0;
+        g_buffer_state.frame_counts[hnd.index]  = 1;
+    }
 
     return hnd;
 }
@@ -276,8 +288,7 @@ static void AllocateBuffers(Stack* temp_stack)
             BufferInfo* buffer_info = &g_buffer_state.buffer_infos[mem_buffer_index];
 
             // Size buffer memory and generate offsets based on buffer size and alignment memory requirements.
-            uint32 frame_count = buffer_info->per_frame ? g_buffer_state.frame_count : 1;
-            for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
+            for (uint32 frame_index = 0; frame_index < g_buffer_state.frame_counts[mem_buffer_index]; ++frame_index)
             {
                 buffer_mem->size = MultipleOf(buffer_mem->size, buffer_info->offset_alignment);
                 g_buffer_state.offsets[GetBufferFrameIndex(mem_buffer_index, frame_index)] = buffer_mem->size;

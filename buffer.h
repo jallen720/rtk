@@ -255,15 +255,13 @@ static void AllocateBuffers(Stack* temp_stack)
         ++mem_buffer_counts[mem_index];
     }
 
+    // Associate buffers with memory types.
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
         uint32 buffer_count = mem_buffer_counts[mem_index];
-        if (buffer_count > 0)
-        {
-            InitArray(&mem_buffer_index_arrays[mem_index], &frame.allocator, buffer_count);
-        }
+        if (buffer_count == 0) { continue; }
+        InitArray(&mem_buffer_index_arrays[mem_index], &frame.allocator, buffer_count);
     }
-
     for (uint32 buffer_index = 0; buffer_index < g_buffer_state.buffer_count; ++buffer_index)
     {
         Push(&mem_buffer_index_arrays[g_buffer_state.mem_indexes[buffer_index]], buffer_index);
@@ -287,7 +285,7 @@ static void AllocateBuffers(Stack* temp_stack)
             uint32 mem_buffer_index = Get(mem_buffer_index_array, i);
             BufferInfo* buffer_info = &g_buffer_state.buffer_infos[mem_buffer_index];
 
-            // Size buffer memory and generate offsets based on buffer size and alignment memory requirements.
+            // Size buffer memory and get offsets based on buffer size and alignment memory requirements.
             for (uint32 frame_index = 0; frame_index < g_buffer_state.frame_counts[mem_buffer_index]; ++frame_index)
             {
                 buffer_mem->size = MultipleOf(buffer_mem->size, buffer_info->offset_alignment);

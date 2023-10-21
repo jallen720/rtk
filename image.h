@@ -38,8 +38,8 @@ struct ImageMemoryInfo
 {
     VkDeviceSize size;
     VkDeviceSize alignment;
-    VkImage      image;
-    VkDeviceSize offset;
+    VkDeviceSize stride;
+    uint32       image_index;
 };
 
 struct ImageMemory
@@ -92,6 +92,11 @@ static uint32 GetImageFrameIndex(ImageHnd hnd, uint32 frame_index)
 static bool AlignmentDesc(ImageMemoryInfo* a, ImageMemoryInfo* b)
 {
     return a->alignment >= b->alignment;
+}
+
+static VkDeviceSize TotalSize(ImageMemoryInfo* mem_info)
+{
+    return (mem_info->stride * (g_image_state.frame_counts[mem_info->image_index] - 1)) + mem_info->size;
 }
 
 /// Debug
@@ -203,23 +208,24 @@ static void LogImageMemory()
     }
 }
 
-static void LogImageMemoryInfoArrays(Array<ImageMemoryInfo> mem_info_arrays[VK_MAX_MEMORY_TYPES])
+static void LogImageMemoryInfos(Array<uint32> mem_info_index_arrays[VK_MAX_MEMORY_TYPES],
+                                Array<ImageMemoryInfo>* mem_infos)
 {
     for (uint32 mem_type_index = 0; mem_type_index < VK_MAX_MEMORY_TYPES; ++mem_type_index)
     {
-        Array<ImageMemoryInfo>* mem_infos = &mem_info_arrays[mem_type_index];
-        if (mem_infos->count == 0)
+        Array<uint32>* mem_info_indexes = &mem_info_index_arrays[mem_type_index];
+        if (mem_info_indexes->count == 0)
         {
             continue;
         }
         PrintLine("mem-type %u:", mem_type_index);
-        for (uint32 mem_info_index = 0; mem_info_index < mem_infos->count; ++mem_info_index)
+        for (uint32 i = 0; i < mem_info_indexes->count; ++i)
         {
-            ImageMemoryInfo* mem_info = GetPtr(mem_infos, mem_info_index);
-            PrintLine("    [%2u] size:      %llu", mem_info_index, mem_info->size);
-            PrintLine("         alignment: %llu", mem_info->alignment);
-            PrintLine("         image:     %p", mem_info->image);
-            PrintLine("         offset:    %llu", mem_info->offset);
+            ImageMemoryInfo* mem_info = GetPtr(mem_infos, Get(mem_info_indexes, i));
+            PrintLine("    [%2u] size:        %llu", i, mem_info->size);
+            PrintLine("         alignment:   %llu", mem_info->alignment);
+            PrintLine("         stride:      %u", mem_info->stride);
+            PrintLine("         image_index: %u", mem_info->image_index);
             PrintLine();
         }
     }
@@ -280,8 +286,7 @@ static void AllocateImages(Stack* temp_stack)
     VkResult res = VK_SUCCESS;
 
     // Create images and get their memory information.
-    auto image_mem_requirements = CreateArrayFull<VkMemoryRequirements>(&frame.allocator, g_image_state.image_count);
-    Array<ImageMemoryInfo> mem_info_arrays[VK_MAX_MEMORY_TYPES] = {};
+    auto mem_infos = CreateArray<ImageMemoryInfo>(&frame.allocator, g_image_state.image_count);
     uint32 mem_info_counts[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
     {
@@ -322,66 +327,71 @@ static void AllocateImages(Stack* temp_stack)
         }
 
         // Get image memory info.
-        VkMemoryRequirements* mem_requirements = GetPtr(image_mem_requirements, image_index);
+        VkMemoryRequirements mem_requirements = {};
         uint32 image_frame_index = GetImageFrameIndex(image_index, 0);
-        vkGetImageMemoryRequirements(device, g_image_state.images[image_frame_index], mem_requirements);
-        uint32 mem_index = GetCapableMemoryTypeIndex(mem_requirements, image_info->mem_properties);
+        vkGetImageMemoryRequirements(device, g_image_state.images[image_frame_index], &mem_requirements);
+
+        uint32 mem_index = GetCapableMemoryTypeIndex(&mem_requirements, image_info->mem_properties);
         g_image_state.mem_indexes[image_index] = mem_index;
-        mem_info_counts[mem_index] += frame_count;
+        ++mem_info_counts[mem_index];
+
+        ImageMemoryInfo* mem_info = Push(mem_infos);
+        mem_info->size        = mem_requirements.size;
+        mem_info->alignment   = mem_requirements.alignment;
+        mem_info->stride      = MultipleOf(mem_requirements.size, mem_requirements.alignment);
+        mem_info->image_index = image_index;
     }
 
-    // Initialize mem_info arrays that will contain mem_infos.
+    // Associate mem_infos with their memory types in descending order of alignment.
+    InsertionSort(mem_infos, AlignmentDesc);
+    Array<uint32> mem_info_index_arrays[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
         uint32 mem_info_count = mem_info_counts[mem_index];
         if (mem_info_count == 0) { continue; }
-        InitArray(&mem_info_arrays[mem_index], &frame.allocator, mem_info_count);
+        InitArray(&mem_info_index_arrays[mem_index], &frame.allocator, mem_info_count);
     }
-
-    // Push memory info for each instance of each image to its memory type's mem_info_array.
-    for (uint32 image_index = 0; image_index < g_image_state.image_count; ++image_index)
+    for (uint32 mem_info_index = 0; mem_info_index < mem_infos->count; ++mem_info_index)
     {
-        Array<ImageMemoryInfo>* mem_info_array = &mem_info_arrays[g_image_state.mem_indexes[image_index]];
-        VkMemoryRequirements* mem_requirements = GetPtr(image_mem_requirements, image_index);
-        for (uint32 frame_index = 0; frame_index < g_image_state.frame_counts[image_index]; ++frame_index)
-        {
-            Push(mem_info_array,
-                 {
-                    .size      = mem_requirements->size,
-                    .alignment = mem_requirements->alignment,
-                    .image     = g_image_state.images[GetImageFrameIndex(image_index, frame_index)],
-                    .offset    = 0, // Calculated during memory sizing below.
-                 });
-        }
+        uint32 mem_index = g_image_state.mem_indexes[GetPtr(mem_infos, mem_info_index)->image_index];
+        Push(&mem_info_index_arrays[mem_index], mem_info_index);
     }
 
     // Calculate size of each image memory based on the required sizes and alignments of all images they will store;
     // image memory offsets are also calculated at this time. Then allocate device memory and bind images to their
     // respective offsets.
+    auto base_offsets = CreateArray<VkDeviceSize>(&frame.allocator, g_image_state.image_count);
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        Array<ImageMemoryInfo>* mem_infos = &mem_info_arrays[mem_index];
-        if (mem_infos->count == 0) { continue; }
+        Array<uint32>* mem_info_indexes = &mem_info_index_arrays[mem_index];
+        if (mem_info_indexes->count == 0) { continue; }
 
-        // Sort memory information in descending order of alignment.
-        InsertionSort(mem_infos, AlignmentDesc);
         ImageMemory* image_mem = &g_image_state.mems[mem_index];
 
         // Calculate image memory size and image offsets based on image size and alignment requirements.
-        CTK_ITER(mem_info, mem_infos)
+        Clear(base_offsets);
+        CTK_ITER(mem_info_index, mem_info_indexes)
         {
+            ImageMemoryInfo* mem_info = GetPtr(mem_infos, *mem_info_index);
             image_mem->size = MultipleOf(image_mem->size, mem_info->alignment);
-            mem_info->offset = image_mem->size;
-            image_mem->size += mem_info->size;
+            Push(base_offsets, image_mem->size);
+            image_mem->size += TotalSize(mem_info);
         }
 
         image_mem->device_mem = AllocateDeviceMemory(mem_index, image_mem->size, NULL);
 
         // Bind images to memory.
-        CTK_ITER(mem_info, mem_infos)
+        for (uint32 i = 0; i < mem_info_indexes->count; ++i)
         {
-            res = vkBindImageMemory(device, mem_info->image, image_mem->device_mem, mem_info->offset);
-            Validate(res, "vkBindImageMemory() failed");
+            ImageMemoryInfo* mem_info = GetPtr(mem_infos, Get(mem_info_indexes, i));
+            VkDeviceSize base_offset = Get(base_offsets, i);
+            for (uint32 frame_index = 0; frame_index < g_image_state.frame_counts[mem_info->image_index]; ++frame_index)
+            {
+                VkImage image = g_image_state.images[GetImageFrameIndex(mem_info->image_index, frame_index)];
+                VkDeviceSize offset = base_offset + (mem_info->stride * frame_index);
+                res = vkBindImageMemory(device, image, image_mem->device_mem, offset);
+                Validate(res, "vkBindImageMemory() failed");
+            }
         }
     }
 

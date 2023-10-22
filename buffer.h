@@ -365,7 +365,8 @@ static void WriteHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDev
     CTK_ASSERT(buffer_mem->mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     uint32 buffer_frame_index = GetBufferFrameIndex(hnd, frame_index);
-    memcpy(buffer_mem->host_mem + g_buffer_state.offsets[buffer_frame_index], data, data_size);
+    uint32 host_offset = g_buffer_state.offsets[buffer_frame_index];
+    memcpy(&buffer_mem->host_mem[host_offset], data, data_size);
     g_buffer_state.indexes[buffer_frame_index] = data_size;
 }
 
@@ -386,7 +387,8 @@ static void AppendHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDe
     CTK_ASSERT(buffer_mem->mem_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     uint32 buffer_frame_index = GetBufferFrameIndex(hnd, frame_index);
-    memcpy(buffer_mem->host_mem + g_buffer_state.offsets[buffer_frame_index] + buffer_index, data, data_size);
+    uint32 host_offset = g_buffer_state.offsets[buffer_frame_index] + buffer_index;
+    memcpy(&buffer_mem->host_mem[host_offset], data, data_size);
     g_buffer_state.indexes[buffer_frame_index] += data_size;
 }
 

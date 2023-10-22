@@ -518,7 +518,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
             },
             .imageExtent = GetImageInfo(image_hnd)->extent,
         };
-        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBufferMemory(image_data_buffer_hnd)->buffer, image,
+        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBufferMemoryHndUtil(image_data_buffer_hnd), image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.

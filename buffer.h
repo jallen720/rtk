@@ -16,11 +16,9 @@ struct BufferInfo
 struct BufferMemory
 {
     VkDeviceSize          size;
-    VkBuffer              buffer;
     VkDeviceMemory        device_mem;
     uint8*                host_mem;
     VkMemoryPropertyFlags mem_properties;
-    VkBufferUsageFlags    usage;
 };
 
 struct BufferState
@@ -36,6 +34,7 @@ struct BufferState
     VkDeviceSize* offsets;       // size: max_buffers * frame_count
     VkDeviceSize* indexes;       // size: max_buffers * frame_count
 
+    VkBuffer      mem_hnds[VK_MAX_MEMORY_TYPES];
     BufferMemory  mems[VK_MAX_MEMORY_TYPES];
 };
 
@@ -102,6 +101,11 @@ static BufferMemory* GetBufferMemoryUtil(BufferHnd hnd)
     return &g_buffer_state.mems[g_buffer_state.mem_indexes[hnd.index]];
 }
 
+static VkBuffer GetBufferMemoryHndUtil(BufferHnd hnd)
+{
+    return g_buffer_state.mem_hnds[g_buffer_state.mem_indexes[hnd.index]];
+}
+
 static void ValidateBufferHnd(BufferHnd hnd, const char* action)
 {
     if (hnd.index >= g_buffer_state.buffer_count)
@@ -141,29 +145,27 @@ static void LogBuffers()
     }
 }
 
-static void LogBufferMemory(BufferMemory* buffer_mem)
+static void LogBufferMemory(uint32 mem_index)
 {
-    PrintLine("   [%2u] size:           %llu", buffer_mem - g_buffer_state.mems, buffer_mem->size);
-    PrintLine("        buffer:         0x%p", buffer_mem->buffer);
+    BufferMemory* buffer_mem = &g_buffer_state.mems[mem_index];
+    if (buffer_mem->size == 0)
+    {
+        return;
+    }
+    PrintLine("   [%2u] size:           %llu", mem_index, buffer_mem->size);
     PrintLine("        device_mem:     0x%p", buffer_mem->device_mem);
     PrintLine("        host_mem:       0x%p", buffer_mem->host_mem);
     PrintLine("        mem_properties:   ");
     PrintMemoryPropertyFlags(buffer_mem->mem_properties, 3);
-    PrintLine("        usage:            ");
-    PrintBufferUsageFlags(buffer_mem->usage, 3);
+    PrintLine("        hnd   :         0x%p", g_buffer_state.mem_hnds[mem_index]);
 }
 
 static void LogBufferMemory()
 {
     PrintLine("buffer memory:");
-    for (uint32 i = 0; i < VK_MAX_MEMORY_TYPES; ++i)
+    for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        BufferMemory* buffer_mem = &g_buffer_state.mems[i];
-        if (buffer_mem->size == 0)
-        {
-            continue;
-        }
-        LogBufferMemory(buffer_mem);
+        LogBufferMemory(mem_index);
     }
 }
 
@@ -268,6 +270,7 @@ static void AllocateBuffers(Stack* temp_stack)
     }
 
     // Size buffer memory and calculate buffer offsets.
+    VkBufferUsageFlags usage[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
         uint32 mem_buffer_count = mem_buffer_counts[mem_index];
@@ -294,7 +297,7 @@ static void AllocateBuffers(Stack* temp_stack)
             }
 
             // Append buffer usage for creating associated buffer memory.
-            buffer_mem->usage |= buffer_info->usage;
+            usage[mem_index] |= buffer_info->usage;
         }
     }
 
@@ -315,7 +318,7 @@ static void AllocateBuffers(Stack* temp_stack)
         create_info.pNext = NULL;
         create_info.flags = 0;
         create_info.size  = buffer_mem->size;
-        create_info.usage = buffer_mem->usage;
+        create_info.usage = usage[mem_index];
         if (queue_families->graphics != queue_families->present)
         {
             create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
@@ -328,18 +331,18 @@ static void AllocateBuffers(Stack* temp_stack)
             create_info.queueFamilyIndexCount = 0;
             create_info.pQueueFamilyIndices   = NULL;
         }
-        res = vkCreateBuffer(device, &create_info, NULL, &buffer_mem->buffer);
+        res = vkCreateBuffer(device, &create_info, NULL, &g_buffer_state.mem_hnds[mem_index]);
         Validate(res, "vkCreateBuffer() failed");
 
         // Allocate buffer memory.
         VkMemoryRequirements mem_requirements = {};
-        vkGetBufferMemoryRequirements(device, buffer_mem->buffer, &mem_requirements);
+        vkGetBufferMemoryRequirements(device, g_buffer_state.mem_hnds[mem_index], &mem_requirements);
         buffer_mem->size = mem_requirements.size;
         buffer_mem->device_mem = AllocateDeviceMemory(mem_index, buffer_mem->size, NULL);
         buffer_mem->mem_properties = memory_types[mem_index].propertyFlags;
 
         // Bind buffer memory.
-        res = vkBindBufferMemory(device, buffer_mem->buffer, buffer_mem->device_mem, 0);
+        res = vkBindBufferMemory(device, g_buffer_state.mem_hnds[mem_index], buffer_mem->device_mem, 0);
         Validate(res, "vkBindBufferMemory() failed");
 
         // Map host visible buffer memory.
@@ -413,8 +416,8 @@ static void WriteDeviceBufferCmd(BufferHnd buffer_hnd, uint32 frame_index,
         .size      = size,
     };
     vkCmdCopyBuffer(GetTempCommandBuffer(),
-                    GetBufferMemoryUtil(src_buffer_hnd)->buffer,
-                    GetBufferMemoryUtil(buffer_hnd)->buffer,
+                    GetBufferMemoryHndUtil(src_buffer_hnd),
+                    GetBufferMemoryHndUtil(buffer_hnd),
                     1, &copy);
     g_buffer_state.indexes[buffer_frame_index] = size;
 }
@@ -443,8 +446,8 @@ static void AppendDeviceBufferCmd(BufferHnd buffer_hnd, uint32 frame_index,
         .size      = size,
     };
     vkCmdCopyBuffer(GetTempCommandBuffer(),
-                    GetBufferMemoryUtil(src_buffer_hnd)->buffer,
-                    GetBufferMemoryUtil(buffer_hnd)->buffer,
+                    GetBufferMemoryHndUtil(src_buffer_hnd),
+                    GetBufferMemoryHndUtil(buffer_hnd),
                     1, &copy);
     g_buffer_state.indexes[buffer_frame_index] += size;
 }
@@ -453,12 +456,6 @@ static BufferInfo* GetBufferInfo(BufferHnd hnd)
 {
     ValidateBufferHnd(hnd, "can't get buffer");
     return GetBufferInfoUtil(hnd);
-}
-
-static BufferMemory* GetBufferMemory(BufferHnd hnd)
-{
-    ValidateBufferHnd(hnd, "can't get buffer memory");
-    return GetBufferMemoryUtil(hnd);
 }
 
 static VkDeviceSize GetOffset(BufferHnd hnd, uint32 frame_index)
@@ -504,4 +501,16 @@ static void Clear(BufferHnd hnd)
     {
         SetIndex(hnd, frame_index, 0);
     }
+}
+
+static BufferMemory* GetBufferMemory(BufferHnd hnd)
+{
+    ValidateBufferHnd(hnd, "can't get buffer memory");
+    return GetBufferMemoryUtil(hnd);
+}
+
+static VkBuffer GetBufferMemoryHnd(BufferHnd hnd)
+{
+    ValidateBufferHnd(hnd, "can't get buffer memory handle");
+    return GetBufferMemoryHndUtil(hnd);
 }

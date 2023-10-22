@@ -57,7 +57,7 @@ struct ImageState
     ImageViewInfo* default_view_infos; // size: max_images
     VkImageView*   default_views;      // size: max_images * frame_count
 
-    ResourceMemory    mems[VK_MAX_MEMORY_TYPES];
+    ResourceMemory mems[VK_MAX_MEMORY_TYPES];
 };
 
 struct ImageData

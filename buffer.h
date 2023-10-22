@@ -288,7 +288,7 @@ static void AllocateBuffers(Stack* temp_stack)
             // Size buffer memory and get offsets based on buffer size and alignment memory requirements.
             for (uint32 frame_index = 0; frame_index < g_buffer_state.frame_counts[mem_buffer_index]; ++frame_index)
             {
-                buffer_mem->size = MultipleOf(buffer_mem->size, buffer_info->offset_alignment);
+                buffer_mem->size = Align(buffer_mem->size, buffer_info->offset_alignment);
                 g_buffer_state.offsets[GetBufferFrameIndex(mem_buffer_index, frame_index)] = buffer_mem->size;
                 buffer_mem->size += buffer_info->size;
             }

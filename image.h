@@ -338,7 +338,7 @@ static void AllocateImages(Stack* temp_stack)
         ImageMemoryInfo* mem_info = Push(mem_infos);
         mem_info->size        = mem_requirements.size;
         mem_info->alignment   = mem_requirements.alignment;
-        mem_info->stride      = MultipleOf(mem_requirements.size, mem_requirements.alignment);
+        mem_info->stride      = Align(mem_requirements.size, mem_requirements.alignment);
         mem_info->image_index = image_index;
     }
 
@@ -373,7 +373,7 @@ static void AllocateImages(Stack* temp_stack)
         CTK_ITER(mem_info_index, mem_info_indexes)
         {
             ImageMemoryInfo* mem_info = GetPtr(mem_infos, *mem_info_index);
-            image_mem->size = MultipleOf(image_mem->size, mem_info->alignment);
+            image_mem->size = Align(image_mem->size, mem_info->alignment);
             Push(base_offsets, image_mem->size);
             image_mem->size += TotalSize(mem_info);
         }

@@ -476,7 +476,6 @@ static VkDeviceSize GetOffset(BufferHnd hnd, uint32 frame_index)
 {
     ValidateBufferHnd(hnd, "can't get buffer offset");
     CTK_ASSERT(frame_index < g_buffer_state.frame_count);
-
     return g_buffer_state.offsets[GetBufferFrameIndex(hnd, frame_index)];
 }
 
@@ -484,7 +483,6 @@ static VkDeviceSize GetIndex(BufferHnd hnd, uint32 frame_index)
 {
     ValidateBufferHnd(hnd, "can't get buffer index");
     CTK_ASSERT(frame_index < g_buffer_state.frame_count);
-
     return g_buffer_state.indexes[GetBufferFrameIndex(hnd, frame_index)];
 }
 
@@ -492,7 +490,6 @@ static void SetIndex(BufferHnd hnd, uint32 frame_index, VkDeviceSize index)
 {
     ValidateBufferHnd(hnd, "can't set buffer index");
     CTK_ASSERT(frame_index < g_buffer_state.frame_count);
-
     SetIndexUtil(hnd, frame_index, index);
 }
 

@@ -103,6 +103,15 @@ static VkImage GetImageUtil(ImageHnd hnd, uint32 frame_index)
     return g_image_state.images[GetImageFrameIndex(hnd, frame_index)];
 }
 
+static void ValidateImageHnd(ImageHnd hnd, const char* action)
+{
+    if (hnd.index >= g_image_state.image_count)
+    {
+        CTK_FATAL("%s: image handle index %u exceeds max image count of %u",
+                  action, hnd.index, g_image_state.image_count);
+    }
+}
+
 /// Debug
 ////////////////////////////////////////////////////////////
 static void LogImages()
@@ -473,14 +482,14 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
         };
         vkCmdPipelineBarrier(GetTempCommandBuffer(),
                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
-                             0, // Dependency Flags
-                             0, // Memory Barrier Count
-                             NULL, // Memory Barriers
-                             0, // Buffer Memory Barrier Count
-                             NULL, // Buffer Memory Barriers
-                             1, // Image Memory Barrier Count
-                             &pre_copy_mem_barrier); // Image Memory Barriers
+                             VK_PIPELINE_STAGE_TRANSFER_BIT,    // Destination Stage Mask
+                             0,                                 // Dependency Flags
+                             0,                                 // Memory Barrier Count
+                             NULL,                              // Memory Barriers
+                             0,                                 // Buffer Memory Barrier Count
+                             NULL,                              // Buffer Memory Barriers
+                             1,                                 // Image Memory Barrier Count
+                             &pre_copy_mem_barrier);            // Image Memory Barriers
 
         VkBufferImageCopy copy =
         {
@@ -526,34 +535,34 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
             },
         };
         vkCmdPipelineBarrier(GetTempCommandBuffer(),
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
+                             VK_PIPELINE_STAGE_TRANSFER_BIT,        // Source Stage Mask
                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
-                             0, // Dependency Flags
-                             0, // Memory Barrier Count
-                             NULL, // Memory Barriers
-                             0, // Buffer Memory Barrier Count
-                             NULL, // Buffer Memory Barriers
-                             1, // Image Memory Barrier Count
-                             &post_copy_mem_barrier); // Image Memory Barriers
+                             0,                                     // Dependency Flags
+                             0,                                     // Memory Barrier Count
+                             NULL,                                  // Memory Barriers
+                             0,                                     // Buffer Memory Barrier Count
+                             NULL,                                  // Buffer Memory Barriers
+                             1,                                     // Image Memory Barrier Count
+                             &post_copy_mem_barrier);               // Image Memory Barriers
     SubmitTempCommandBuffer();
 }
 
 static ImageInfo* GetInfo(ImageHnd hnd)
 {
-    CTK_ASSERT(hnd.index < g_image_state.image_count)
+    ValidateImageHnd(hnd, "can't get image info");
     return GetInfoUtil(hnd);
 }
 
 static VkImage GetImage(ImageHnd hnd, uint32 frame_index)
 {
-    CTK_ASSERT(hnd.index < g_image_state.image_count)
+    ValidateImageHnd(hnd, "can't get image");
     CTK_ASSERT(frame_index < g_image_state.frame_count)
     return GetImageUtil(hnd, frame_index);
 }
 
 static VkImageView GetDefaultView(ImageHnd hnd, uint32 frame_index)
 {
-    CTK_ASSERT(hnd.index < g_image_state.image_count)
+    ValidateImageHnd(hnd, "can't get image default view");
     CTK_ASSERT(frame_index < g_image_state.frame_count)
     return g_image_state.default_views[GetImageFrameIndex(hnd, frame_index)];
 }

@@ -42,12 +42,6 @@ struct ImageMemoryInfo
     uint32       image_index;
 };
 
-struct ImageMemory
-{
-    VkDeviceSize   size;
-    VkDeviceMemory device_mem;
-};
-
 struct ImageState
 {
     uint32         max_images;
@@ -63,7 +57,7 @@ struct ImageState
     ImageViewInfo* default_view_infos; // size: max_images
     VkImageView*   default_views;      // size: max_images * frame_count
 
-    ImageMemory    mems[VK_MAX_MEMORY_TYPES];
+    ResourceMemory    mems[VK_MAX_MEMORY_TYPES];
 };
 
 struct ImageData
@@ -97,6 +91,16 @@ static bool AlignmentDesc(ImageMemoryInfo* a, ImageMemoryInfo* b)
 static VkDeviceSize TotalSize(ImageMemoryInfo* mem_info)
 {
     return (mem_info->stride * (g_image_state.frame_counts[mem_info->image_index] - 1)) + mem_info->size;
+}
+
+static ImageInfo* GetInfoUtil(ImageHnd hnd)
+{
+    return &g_image_state.image_infos[hnd.index];
+}
+
+static VkImage GetImageUtil(ImageHnd hnd, uint32 frame_index)
+{
+    return g_image_state.images[GetImageFrameIndex(hnd, frame_index)];
 }
 
 /// Debug
@@ -196,7 +200,7 @@ static void LogImageMemory()
     PrintLine("image memory:");
     for (uint32 i = 0; i < VK_MAX_MEMORY_TYPES; ++i)
     {
-        ImageMemory* image_mem = &g_image_state.mems[i];
+        ResourceMemory* image_mem = &g_image_state.mems[i];
         if (image_mem->size == 0)
         {
             continue;
@@ -366,7 +370,7 @@ static void AllocateImages(Stack* temp_stack)
         Array<uint32>* mem_info_indexes = &mem_info_index_arrays[mem_index];
         if (mem_info_indexes->count == 0) { continue; }
 
-        ImageMemory* image_mem = &g_image_state.mems[mem_index];
+        ResourceMemory* image_mem = &g_image_state.mems[mem_index];
 
         // Calculate image memory size and image offsets based on image size and alignment requirements.
         Clear(base_offsets);
@@ -419,26 +423,6 @@ static void AllocateImages(Stack* temp_stack)
     }
 }
 
-static ImageInfo* GetImageInfo(ImageHnd hnd)
-{
-    CTK_ASSERT(hnd.index < g_image_state.image_count)
-    return &g_image_state.image_infos[hnd.index];
-}
-
-static VkImage GetImage(ImageHnd hnd, uint32 frame_index)
-{
-    CTK_ASSERT(hnd.index < g_image_state.image_count)
-    CTK_ASSERT(frame_index < g_image_state.frame_count)
-    return g_image_state.images[GetImageFrameIndex(hnd, frame_index)];
-}
-
-static VkImageView GetDefaultView(ImageHnd hnd, uint32 frame_index)
-{
-    CTK_ASSERT(hnd.index < g_image_state.image_count)
-    CTK_ASSERT(frame_index < g_image_state.frame_count)
-    return g_image_state.default_views[GetImageFrameIndex(hnd, frame_index)];
-}
-
 static void LoadImageData(ImageData* image_data, const char* path)
 {
     image_data->data = stbi_load(path, &image_data->width, &image_data->height, &image_data->channel_count, 0);
@@ -465,7 +449,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
     DestroyImageData(&image_data);
 
     // Copy image data from buffer memory to image memory.
-    VkImage image = GetImage(image_hnd, frame_index);
+    VkImage image = GetImageUtil(image_hnd, frame_index);
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.
         VkImageMemoryBarrier pre_copy_mem_barrier =
@@ -516,9 +500,9 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
                 .y = 0,
                 .z = 0,
             },
-            .imageExtent = GetImageInfo(image_hnd)->extent,
+            .imageExtent = GetInfoUtil(image_hnd)->extent,
         };
-        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBufferMemoryHndUtil(image_data_buffer_hnd), image,
+        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBufferUtil(image_data_buffer_hnd), image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.
@@ -552,4 +536,24 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
                              1, // Image Memory Barrier Count
                              &post_copy_mem_barrier); // Image Memory Barriers
     SubmitTempCommandBuffer();
+}
+
+static ImageInfo* GetInfo(ImageHnd hnd)
+{
+    CTK_ASSERT(hnd.index < g_image_state.image_count)
+    return GetInfoUtil(hnd);
+}
+
+static VkImage GetImage(ImageHnd hnd, uint32 frame_index)
+{
+    CTK_ASSERT(hnd.index < g_image_state.image_count)
+    CTK_ASSERT(frame_index < g_image_state.frame_count)
+    return GetImageUtil(hnd, frame_index);
+}
+
+static VkImageView GetDefaultView(ImageHnd hnd, uint32 frame_index)
+{
+    CTK_ASSERT(hnd.index < g_image_state.image_count)
+    CTK_ASSERT(frame_index < g_image_state.frame_count)
+    return g_image_state.default_views[GetImageFrameIndex(hnd, frame_index)];
 }

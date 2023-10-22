@@ -95,14 +95,14 @@ static void BindDescriptorSets(VkCommandBuffer command_buffer, Pipeline* pipelin
 static void BindMeshData(VkCommandBuffer command_buffer, MeshData* mesh_data)
 {
     VkDeviceSize vertex_buffer_offset = GetOffset(mesh_data->vertex_buffer, 0);
-    VkBuffer vertex_buffer_hnd = GetBufferMemoryHnd(mesh_data->vertex_buffer);
+    VkBuffer vertex_buffer = GetBuffer(mesh_data->vertex_buffer);
     vkCmdBindVertexBuffers(command_buffer,
                            0, // First Binding
                            1, // Binding Count
-                           &vertex_buffer_hnd,
+                           &vertex_buffer,
                            &vertex_buffer_offset);
     vkCmdBindIndexBuffer(command_buffer,
-                         GetBufferMemoryHnd(mesh_data->index_buffer),
+                         GetBuffer(mesh_data->index_buffer),
                          GetOffset(mesh_data->index_buffer, 0),
                          VK_INDEX_TYPE_UINT32);
 }

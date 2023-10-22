@@ -472,12 +472,6 @@ static VkBuffer GetBuffer(BufferHnd hnd)
     return GetBufferUtil(hnd);
 }
 
-static ResourceMemory* GetMemory(BufferHnd hnd)
-{
-    ValidateBufferHnd(hnd, "can't get buffer memory");
-    return GetMemoryUtil(hnd);
-}
-
 static VkDeviceSize GetOffset(BufferHnd hnd, uint32 frame_index)
 {
     ValidateBufferHnd(hnd, "can't get buffer offset");

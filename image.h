@@ -80,7 +80,7 @@ static uint32 GetImageFrameIndex(uint32 image_index, uint32 frame_index)
 
 static uint32 GetImageFrameIndex(ImageHnd hnd, uint32 frame_index)
 {
-    return GetBufferFrameIndex(hnd.index, frame_index);
+    return GetImageFrameIndex(hnd.index, frame_index);
 }
 
 static bool AlignmentDesc(ImageMemoryInfo* a, ImageMemoryInfo* b)

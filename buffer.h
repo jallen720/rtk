@@ -103,19 +103,9 @@ static BufferState* GetStateUtil(BufferHnd hnd)
     return GetStateUtil(hnd.index);
 }
 
-static uint32 GetBufferFrameIndex(uint32 buffer_index, uint32 frame_index)
-{
-    return (GetStateUtil(buffer_index)->frame_stride * frame_index) + buffer_index;
-}
-
-static uint32 GetBufferFrameIndex(BufferHnd hnd, uint32 frame_index)
-{
-    return GetBufferFrameIndex(hnd.index, frame_index);
-}
-
 static BufferFrameState* GetFrameStateUtil(uint32 buffer_index, uint32 frame_index)
 {
-    return &g_buf_group.frame_states[GetBufferFrameIndex(buffer_index, frame_index)];
+    return &g_buf_group.frame_states[(GetStateUtil(buffer_index)->frame_stride * frame_index) + buffer_index];
 }
 
 static BufferFrameState* GetFrameStateUtil(BufferHnd hnd, uint32 frame_index)

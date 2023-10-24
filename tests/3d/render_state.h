@@ -299,13 +299,6 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
     InitPipeline(&g_render_state.pipeline, temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
 }
 
-static void AllocateResources(Stack* temp_stack)
-{
-    AllocateBuffers(temp_stack);
-    AllocateImages(temp_stack);
-    AllocateDescriptorSets(temp_stack);
-}
-
 static void WriteResources()
 {
     // Images
@@ -403,7 +396,9 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitVertexLayout(perm_stack);
     InitPipelines(temp_stack, free_list);
 
-    AllocateResources(temp_stack);
+    AllocateBuffers(temp_stack);
+    AllocateImages(temp_stack);
+    AllocateDescriptorSets(temp_stack);
     WriteResources();
 }
 

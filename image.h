@@ -288,7 +288,10 @@ static void InitImageModule(const Allocator* allocator, uint32 max_images)
 
 static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_info)
 {
-    CTK_ASSERT(g_img_group.image_count < g_img_group.max_images)
+    if (g_img_group.image_count >= g_img_group.max_images)
+    {
+        CTK_FATAL("can't create image: already at max of %u", g_img_group.max_images);
+    }
 
     // Copy info.
     ImageHnd hnd = { .index = g_img_group.image_count };

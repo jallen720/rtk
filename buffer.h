@@ -112,8 +112,8 @@ static void AppendHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDe
 static void WriteDeviceBufferCmd(BufferHnd dst_buffer_hnd, BufferHnd src_buffer_hnd, uint32 frame_index,
                                  VkDeviceSize offset, VkDeviceSize size)
 {
-    ValidateBufferHnd(dst_buffer_hnd, "can't write to device buffer");
-    ValidateBufferHnd(src_buffer_hnd, "can't write to device buffer");
+    ValidateBufferHnd(dst_buffer_hnd, "can't write to destination device buffer");
+    ValidateBufferHnd(src_buffer_hnd, "can't write from source buffer to destination device buffer");
     CTK_ASSERT(frame_index < GetResourceGroup()->frame_count);
 
     BufferInfo* dst_buffer_info = GetBufferInfoUtil(dst_buffer_hnd);
@@ -140,8 +140,8 @@ static void WriteDeviceBufferCmd(BufferHnd dst_buffer_hnd, BufferHnd src_buffer_
 static void AppendDeviceBufferCmd(BufferHnd dst_buffer_hnd, BufferHnd src_buffer_hnd, uint32 frame_index,
                                   VkDeviceSize offset, VkDeviceSize size)
 {
-    ValidateBufferHnd(dst_buffer_hnd, "can't append to device buffer");
-    ValidateBufferHnd(src_buffer_hnd, "can't append to device buffer");
+    ValidateBufferHnd(dst_buffer_hnd, "can't append to destination device buffer");
+    ValidateBufferHnd(src_buffer_hnd, "can't append from source buffer to destination device buffer");
     CTK_ASSERT(frame_index < GetResourceGroup()->frame_count);
 
     BufferInfo* dst_buffer_info = GetBufferInfoUtil(dst_buffer_hnd);

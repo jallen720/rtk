@@ -85,8 +85,8 @@ static void InitDeviceMesh(Mesh* mesh, MeshData* mesh_data, Array<VertexType> ve
     AppendHostBuffer(staging_buffer, 0, vertexes.data, vertexes_size);
     AppendHostBuffer(staging_buffer, 0, indexes.data,  indexes_size);
     BeginTempCommandBuffer();
-        AppendDeviceBufferCmd(mesh_data->vertex_buffer, 0, staging_buffer, 0, 0,             vertexes_size);
-        AppendDeviceBufferCmd(mesh_data->index_buffer,  0, staging_buffer, 0, vertexes_size, indexes_size);
+        AppendDeviceBufferCmd(mesh_data->vertex_buffer, staging_buffer, 0, 0,             vertexes_size);
+        AppendDeviceBufferCmd(mesh_data->index_buffer,  staging_buffer, 0, vertexes_size, indexes_size);
     SubmitTempCommandBuffer();
 }
 

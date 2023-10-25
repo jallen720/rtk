@@ -216,7 +216,7 @@ static void LogImageMemory()
         }
 
         PrintLine("   [%2u] size:       %llu", i, image_mem->size);
-        PrintLine("        device_mem: 0x%p", image_mem->device_mem);
+        PrintLine("        device_mem: 0x%p", image_mem->device);
         PrintLine();
     }
 }
@@ -391,7 +391,7 @@ static void AllocateImages(Stack* temp_stack)
             image_mem->size += TotalSize(mem_info);
         }
 
-        image_mem->device_mem = AllocateDeviceMemory(mem_index, image_mem->size, NULL);
+        image_mem->device = AllocateDeviceMemory(mem_index, image_mem->size, NULL);
 
         // Bind images to memory.
         for (uint32 i = 0; i < mem_info_indexes->count; ++i)
@@ -402,7 +402,7 @@ static void AllocateImages(Stack* temp_stack)
             {
                 VkImage image = g_image_state.images[GetImageFrameIndex(mem_info->image_index, frame_index)];
                 VkDeviceSize offset = base_offset + (mem_info->stride * frame_index);
-                res = vkBindImageMemory(device, image, image_mem->device_mem, offset);
+                res = vkBindImageMemory(device, image, image_mem->device, offset);
                 Validate(res, "vkBindImageMemory() failed");
             }
         }

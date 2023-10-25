@@ -78,7 +78,7 @@ static void Run()
     InitRenderState(perm_stack, temp_stack, free_list);
     InitGameState(perm_stack, thread_pool->size);
 LogBuffers();
-LogBufferMemory();
+LogMemory();
 LogImages();
 LogImageMemory();
 

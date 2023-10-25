@@ -11,7 +11,7 @@ struct BufferInfo
     VkBufferUsageFlags    usage;
 };
 
-struct BufferState
+struct ResourceState
 {
     uint32 frame_stride;
     uint32 frame_count;
@@ -44,7 +44,7 @@ struct ResourceGroup
     uint32            frame_count;
 
     BufferInfo*       buffer_infos;        // size: max_buffers
-    BufferState*      buffer_states;       // size: max_buffers
+    ResourceState*    buffer_states;       // size: max_buffers
     BufferFrameState* buffer_frame_states; // size: max_buffers * frame_count
     VkBuffer          buffers[VK_MAX_MEMORY_TYPES];
 
@@ -109,12 +109,12 @@ static BufferInfo* GetBufferInfoUtil(BufferHnd hnd)
     return GetBufferInfoUtil(hnd.index);
 }
 
-static BufferState* GetBufferStateUtil(uint32 index)
+static ResourceState* GetBufferStateUtil(uint32 index)
 {
     return &g_res_group.buffer_states[index];
 }
 
-static BufferState* GetBufferStateUtil(BufferHnd hnd)
+static ResourceState* GetBufferStateUtil(BufferHnd hnd)
 {
     return GetBufferStateUtil(hnd.index);
 }
@@ -153,7 +153,7 @@ static void LogBuffers()
     for (uint32 buffer_index = 0; buffer_index < g_res_group.buffer_count; ++buffer_index)
     {
         BufferInfo* info = GetBufferInfoUtil(buffer_index);
-        BufferState* state = GetBufferStateUtil(buffer_index);
+        ResourceState* state = GetBufferStateUtil(buffer_index);
         PrintLine("   [%2u] size:             %llu", buffer_index, info->size);
         PrintLine("        offset_alignment: %llu", info->offset_alignment);
         PrintLine("        per_frame:        %s", info->per_frame ? "true" : "false");
@@ -206,7 +206,7 @@ static void InitResourceGroup(const Allocator* allocator, ResourceGroupInfo* inf
     g_res_group.buffer_count        = 0;
     g_res_group.frame_count         = frame_count;
     g_res_group.buffer_infos        = Allocate<BufferInfo>      (allocator, info->max_buffers);
-    g_res_group.buffer_states       = Allocate<BufferState>     (allocator, info->max_buffers);
+    g_res_group.buffer_states       = Allocate<ResourceState>   (allocator, info->max_buffers);
     g_res_group.buffer_frame_states = Allocate<BufferFrameState>(allocator, info->max_buffers * frame_count);
 }
 

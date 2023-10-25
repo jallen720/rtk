@@ -55,7 +55,7 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     BufferHnd hnd = { .index = res_group->buffer_count };
     ++res_group->buffer_count;
     *GetBufferInfoUtil(hnd) = *info;
-    BufferState* state = GetBufferStateUtil(hnd);
+    ResourceState* state = GetBufferStateUtil(hnd);
     if (info->per_frame)
     {
         state->frame_stride = res_group->max_buffers;

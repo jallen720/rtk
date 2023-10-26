@@ -60,6 +60,44 @@ static ResourceGroup* GetResourceGroup()
     return &g_res_group;
 }
 
+static ResourceMemory* GetMemory(uint32 mem_index)
+{
+    return &g_res_group.mems[mem_index];
+}
+
+/// Buffer Utils
+////////////////////////////////////////////////////////////
+static VkBuffer* GetBufferPtr(uint32 mem_index)
+{
+    return &g_res_group.buffers[mem_index];
+}
+
+static BufferInfo* GetBufferInfoUtil(uint32 buffer_index)
+{
+    return &g_res_group.buffer_infos[buffer_index];
+}
+
+static ResourceState* GetBufferStateUtil(uint32 buffer_index)
+{
+    return &g_res_group.buffer_states[buffer_index];
+}
+
+static BufferFrameState* GetBufferFrameStateUtil(uint32 buffer_index, uint32 frame_index)
+{
+    uint32 frame_offset = GetBufferStateUtil(buffer_index)->frame_stride * frame_index;
+    return &g_res_group.buffer_frame_states[frame_offset + buffer_index];
+}
+
+static VkBuffer GetBufferUtil(uint32 buffer_index)
+{
+    return g_res_group.buffers[GetBufferStateUtil(buffer_index)->mem_index];
+}
+
+static ResourceMemory* GetBufferMemoryUtil(uint32 buffer_index)
+{
+    return GetMemory(GetBufferStateUtil(buffer_index)->mem_index);
+}
+
 static uint32 GetMemoryIndex(BufferInfo* buffer_info)
 {
     VkDevice device = GetDevice();
@@ -95,54 +133,8 @@ static uint32 GetMemoryIndex(BufferInfo* buffer_info)
 
 static bool OffsetAlignmentDesc(uint32* buffer_index_a, uint32* buffer_index_b)
 {
-    return g_res_group.buffer_infos[*buffer_index_a].offset_alignment >=
-           g_res_group.buffer_infos[*buffer_index_b].offset_alignment;
-}
-
-static BufferInfo* GetBufferInfoUtil(uint32 index)
-{
-    return &g_res_group.buffer_infos[index];
-}
-
-static BufferInfo* GetBufferInfoUtil(BufferHnd hnd)
-{
-    return GetBufferInfoUtil(hnd.index);
-}
-
-static ResourceState* GetBufferStateUtil(uint32 index)
-{
-    return &g_res_group.buffer_states[index];
-}
-
-static ResourceState* GetBufferStateUtil(BufferHnd hnd)
-{
-    return GetBufferStateUtil(hnd.index);
-}
-
-static BufferFrameState* GetBufferFrameStateUtil(uint32 buffer_index, uint32 frame_index)
-{
-    uint32 frame_offset = GetBufferStateUtil(buffer_index)->frame_stride * frame_index;
-    return &g_res_group.buffer_frame_states[frame_offset + buffer_index];
-}
-
-static BufferFrameState* GetBufferFrameStateUtil(BufferHnd hnd, uint32 frame_index)
-{
-    return GetBufferFrameStateUtil(hnd.index, frame_index);
-}
-
-static VkBuffer GetBufferUtil(BufferHnd hnd)
-{
-    return g_res_group.buffers[GetBufferStateUtil(hnd)->mem_index];
-}
-
-static ResourceMemory* GetMemoryUtil(BufferHnd hnd)
-{
-    return &g_res_group.mems[GetBufferStateUtil(hnd)->mem_index];
-}
-
-static ResourceMemory* GetMemoryUtil(uint32 mem_index)
-{
-    return &g_res_group.mems[mem_index];
+    return GetBufferInfoUtil(*buffer_index_a)->offset_alignment >=
+           GetBufferInfoUtil(*buffer_index_b)->offset_alignment;
 }
 
 /// Debug
@@ -253,7 +245,7 @@ static void AllocateResourceGroup(Stack* temp_stack)
         Array<uint32>* mem_buffer_index_array = &mem_buffer_index_arrays[mem_index];
         InsertionSort(mem_buffer_index_array, OffsetAlignmentDesc);
 
-        ResourceMemory* buffer_mem = &g_res_group.mems[mem_index];
+        ResourceMemory* buffer_mem = GetMemory(mem_index);
         for (uint32 i = 0; i < mem_buffer_count; ++i)
         {
             uint32 mem_buffer_index = Get(mem_buffer_index_array, i);
@@ -277,7 +269,7 @@ static void AllocateResourceGroup(Stack* temp_stack)
     VkMemoryType* memory_types = physical_device->mem_properties.memoryTypes;
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        ResourceMemory* buffer_mem = GetMemoryUtil(mem_index);
+        ResourceMemory* buffer_mem = GetMemory(mem_index);
         if (buffer_mem->size == 0)
         {
             continue;
@@ -302,18 +294,19 @@ static void AllocateResourceGroup(Stack* temp_stack)
             create_info.queueFamilyIndexCount = 0;
             create_info.pQueueFamilyIndices   = NULL;
         }
-        res = vkCreateBuffer(device, &create_info, NULL, &g_res_group.buffers[mem_index]);
+        VkBuffer* buffer_ptr = GetBufferPtr(mem_index);
+        res = vkCreateBuffer(device, &create_info, NULL, buffer_ptr);
         Validate(res, "vkCreateBuffer() failed");
 
         // Allocate buffer memory.
         VkMemoryRequirements mem_requirements = {};
-        vkGetBufferMemoryRequirements(device, g_res_group.buffers[mem_index], &mem_requirements);
+        vkGetBufferMemoryRequirements(device, *buffer_ptr, &mem_requirements);
         buffer_mem->size = mem_requirements.size;
         buffer_mem->device = AllocateDeviceMemory(mem_index, buffer_mem->size, NULL);
         buffer_mem->properties = memory_types[mem_index].propertyFlags;
 
         // Bind buffer memory.
-        res = vkBindBufferMemory(device, g_res_group.buffers[mem_index], buffer_mem->device, 0);
+        res = vkBindBufferMemory(device, *buffer_ptr, buffer_mem->device, 0);
         Validate(res, "vkBindBufferMemory() failed");
 
         // Map host visible buffer memory.

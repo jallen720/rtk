@@ -77,10 +77,6 @@ static void Run()
     ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
     InitRenderState(perm_stack, temp_stack, free_list);
     InitGameState(perm_stack, thread_pool->size);
-LogBuffers();
-LogMemory();
-LogImages();
-LogImageMemory();
 
     // Run game.
     bool recreate_swapchain = false;

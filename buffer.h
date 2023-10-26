@@ -1,5 +1,7 @@
 /// Data
 ////////////////////////////////////////////////////////////
+struct BufferHnd { uint32 index; };
+
 static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
 
 /// Utils
@@ -68,6 +70,120 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     }
 
     return hnd;
+}
+
+static void AllocateBuffers(Stack* temp_stack)
+{
+    Stack frame = CreateFrame(temp_stack);
+
+    VkDevice device = GetDevice();
+    PhysicalDevice* physical_device = GetPhysicalDevice();
+    ResourceGroup* res_group = GetResourceGroup();
+    VkResult res = VK_SUCCESS;
+
+    // Associate buffers with memory types.
+    Array<uint32> mem_buffer_index_arrays[VK_MAX_MEMORY_TYPES] = {};
+    uint32 mem_buffer_counts[VK_MAX_MEMORY_TYPES] = {};
+    for (uint32 buffer_index = 0; buffer_index < res_group->buffer_count; ++buffer_index)
+    {
+        uint32 mem_index = GetMemoryIndex(GetBufferInfo(buffer_index));
+        GetBufferState(buffer_index)->mem_index = mem_index;
+        ++mem_buffer_counts[mem_index];
+    }
+    for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
+    {
+        uint32 buffer_count = mem_buffer_counts[mem_index];
+        if (buffer_count == 0) { continue; }
+        InitArray(&mem_buffer_index_arrays[mem_index], &frame.allocator, buffer_count);
+    }
+    for (uint32 buffer_index = 0; buffer_index < res_group->buffer_count; ++buffer_index)
+    {
+        Push(&mem_buffer_index_arrays[GetBufferState(buffer_index)->mem_index], buffer_index);
+    }
+
+    // Size buffer memory and calculate buffer offsets.
+    VkBufferUsageFlags buffer_usage[VK_MAX_MEMORY_TYPES] = {};
+    for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
+    {
+        uint32 mem_buffer_count = mem_buffer_counts[mem_index];
+        if (mem_buffer_count == 0)
+        {
+            continue;
+        }
+
+        Array<uint32>* mem_buffer_index_array = &mem_buffer_index_arrays[mem_index];
+        InsertionSort(mem_buffer_index_array, OffsetAlignmentDesc);
+
+        ResourceMemory* buffer_mem = GetMemory(mem_index);
+        for (uint32 i = 0; i < mem_buffer_count; ++i)
+        {
+            uint32 mem_buffer_index = Get(mem_buffer_index_array, i);
+            BufferInfo* info = GetBufferInfo(mem_buffer_index);
+
+            // Size buffer memory and get offsets based on buffer size and alignment memory requirements.
+            for (uint32 frame_index = 0; frame_index < GetBufferState(mem_buffer_index)->frame_count; ++frame_index)
+            {
+                buffer_mem->size = Align(buffer_mem->size, info->offset_alignment);
+                GetBufferFrameState(mem_buffer_index, frame_index)->offset = buffer_mem->size;
+                buffer_mem->size += info->size;
+            }
+
+            // Append buffer usage for creating associated buffer memory.
+            buffer_usage[mem_index] |= info->usage;
+        }
+    }
+
+    // Initialize and allocate buffer memory.
+    QueueFamilies* queue_families = &physical_device->queue_families;
+    VkMemoryType* memory_types = physical_device->mem_properties.memoryTypes;
+    for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
+    {
+        ResourceMemory* buffer_mem = GetMemory(mem_index);
+        if (buffer_mem->size == 0)
+        {
+            continue;
+        }
+
+        // Create buffer.
+        VkBufferCreateInfo create_info = {};
+        create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        create_info.pNext = NULL;
+        create_info.flags = 0;
+        create_info.size  = buffer_mem->size;
+        create_info.usage = buffer_usage[mem_index];
+        if (queue_families->graphics != queue_families->present)
+        {
+            create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+            create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
+            create_info.pQueueFamilyIndices   = (uint32*)queue_families;
+        }
+        else
+        {
+            create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
+            create_info.queueFamilyIndexCount = 0;
+            create_info.pQueueFamilyIndices   = NULL;
+        }
+        VkBuffer* buffer_ptr = GetBufferPtr(mem_index);
+        res = vkCreateBuffer(device, &create_info, NULL, buffer_ptr);
+        Validate(res, "vkCreateBuffer() failed");
+
+        // Allocate buffer memory.
+        VkMemoryRequirements mem_requirements = {};
+        vkGetBufferMemoryRequirements(device, *buffer_ptr, &mem_requirements);
+        buffer_mem->size = mem_requirements.size;
+        buffer_mem->device = AllocateDeviceMemory(mem_index, buffer_mem->size, NULL);
+        buffer_mem->properties = memory_types[mem_index].propertyFlags;
+
+        // Bind buffer memory.
+        res = vkBindBufferMemory(device, *buffer_ptr, buffer_mem->device, 0);
+        Validate(res, "vkBindBufferMemory() failed");
+
+        // Map host visible buffer memory.
+        if (buffer_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+        {
+            vkMapMemory(device, buffer_mem->device, 0, buffer_mem->size, 0, (void**)&buffer_mem->host);
+        }
+    }
 }
 
 static void WriteHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDeviceSize data_size)

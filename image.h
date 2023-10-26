@@ -10,54 +10,6 @@ static constexpr VkComponentMapping RGBA_COMPONENT_SWIZZLE_IDENTITY =
     .a = VK_COMPONENT_SWIZZLE_IDENTITY,
 };
 
-struct ImageInfo
-{
-    VkExtent3D            extent;
-    bool                  per_frame;
-    VkImageCreateFlags    flags;
-    VkImageType           type;
-    VkFormat              format;
-    uint32                mip_levels;
-    uint32                array_layers;
-    VkSampleCountFlagBits samples;
-    VkImageTiling         tiling;
-    VkMemoryPropertyFlags mem_properties;
-    VkImageUsageFlags     usage;
-};
-
-struct ImageViewInfo
-{
-    VkImageViewCreateFlags  flags;
-    VkImageViewType         type;
-    VkFormat                format;
-    VkComponentMapping      components;
-    VkImageSubresourceRange subresource_range;
-};
-
-struct ImageMemoryInfo
-{
-    VkDeviceSize size;
-    VkDeviceSize alignment;
-    VkDeviceSize stride;
-    uint32       image_index;
-};
-
-struct ImageGroup
-{
-    uint32         max_images;
-    uint32         image_count;
-    uint32         frame_count;
-
-    ImageInfo*     image_infos;        // size: max_images
-    ResourceState* image_states;       // size: max_images
-    VkImage*       images;             // size: max_images * frame_count
-
-    ImageViewInfo* default_view_infos; // size: max_images
-    VkImageView*   default_views;      // size: max_images * frame_count
-
-    ResourceMemory mems[VK_MAX_MEMORY_TYPES];
-};
-
 struct ImageData
 {
     sint32 width;
@@ -67,71 +19,15 @@ struct ImageData
     uint8* data;
 };
 
-static ImageGroup g_img_group;
-
 /// Utils
 ////////////////////////////////////////////////////////////
-static ImageInfo* GetImageInfoUtil(uint32 image_index)
-{
-    return &g_img_group.image_infos[image_index];
-}
-
-static ResourceState* GetImageStateUtil(uint32 image_index)
-{
-    return &g_img_group.image_states[image_index];
-}
-
-static uint32 GetImageFrameIndex(uint32 image_index, uint32 frame_index)
-{
-    return (GetImageStateUtil(image_index)->frame_stride * frame_index) + image_index;
-}
-
-static VkImage GetImageUtil(uint32 image_index, uint32 frame_index)
-{
-    return g_img_group.images[GetImageFrameIndex(image_index, frame_index)];
-}
-
-static VkImage* GetImagePtr(uint32 image_index, uint32 frame_index)
-{
-    return &g_img_group.images[GetImageFrameIndex(image_index, frame_index)];
-}
-
-static ImageViewInfo* GetDefaultViewInfoUtil(uint32 image_index)
-{
-    return &g_img_group.default_view_infos[image_index];
-}
-
-static VkImageView GetDefaultViewUtil(uint32 image_index, uint32 frame_index)
-{
-    return g_img_group.default_views[GetImageFrameIndex(image_index, frame_index)];
-}
-
-static VkImageView* GetDefaultViewPtr(uint32 image_index, uint32 frame_index)
-{
-    return &g_img_group.default_views[GetImageFrameIndex(image_index, frame_index)];
-}
-
-static ResourceMemory* GetImageMemory(uint32 mem_index)
-{
-    return &g_img_group.mems[mem_index];
-}
-
-static bool AlignmentDesc(ImageMemoryInfo* a, ImageMemoryInfo* b)
-{
-    return a->alignment >= b->alignment;
-}
-
-static VkDeviceSize TotalSize(ImageMemoryInfo* mem_info)
-{
-    return (mem_info->stride * (GetImageStateUtil(mem_info->image_index)->frame_count - 1)) + mem_info->size;
-}
-
 static void ValidateImageHnd(ImageHnd hnd, const char* action)
 {
-    if (hnd.index >= g_img_group.image_count)
+    ResourceGroup* res_group = GetResourceGroup();
+    if (hnd.index >= res_group->image_count)
     {
         CTK_FATAL("%s: image handle index %u exceeds max image count of %u",
-                  action, hnd.index, g_img_group.image_count);
+                  action, hnd.index, res_group->image_count);
     }
 }
 
@@ -140,10 +36,10 @@ static void ValidateImageHnd(ImageHnd hnd, const char* action)
 static void LogImages()
 {
     PrintLine("images:");
-    for (uint32 image_index = 0; image_index < g_img_group.image_count; ++image_index)
+    for (uint32 image_index = 0; image_index < GetResourceGroup()->image_count; ++image_index)
     {
-        ImageInfo* image_info = GetImageInfoUtil(image_index);
-        ResourceState* image_state = GetImageStateUtil(image_index);
+        ImageInfo* image_info = GetImageInfo(image_index);
+        ResourceState* image_state = GetImageState(image_index);
         PrintLine("   [%2u] extent:       { w: %u, h: %u, d: %u }",
                   image_index,
                   image_info->extent.width,
@@ -170,7 +66,7 @@ static void LogImages()
         PrintLine("        images:");
         for (uint32 frame_index = 0; frame_index < image_state->frame_count; ++frame_index)
         {
-            PrintLine("            [%u] %p", frame_index, GetImageUtil(image_index, frame_index));
+            PrintLine("            [%u] %p", frame_index, GetImage(image_index, frame_index));
         }
         PrintLine();
     }
@@ -179,9 +75,9 @@ static void LogImages()
 static void LogDefaultViews()
 {
     PrintLine("default views:");
-    for (uint32 image_index = 0; image_index < g_img_group.image_count; ++image_index)
+    for (uint32 image_index = 0; image_index < GetResourceGroup()->image_count; ++image_index)
     {
-        ImageViewInfo* default_view_info = GetDefaultViewInfoUtil(image_index);
+        ImageViewInfo* default_view_info = GetDefaultViewInfo(image_index);
         uint32 layer_count = default_view_info->subresource_range.layerCount;
         uint32 level_count = default_view_info->subresource_range.levelCount;
         PrintLine("   [%2u] type:   %s", image_index, VkImageViewTypeName(default_view_info->type));
@@ -217,92 +113,34 @@ static void LogDefaultViews()
         PrintImageViewCreateFlags(default_view_info->flags, 3);
 
         PrintLine("        default_views:");
-        for (uint32 frame_index = 0; frame_index < GetImageStateUtil(image_index)->frame_count; ++frame_index)
+        for (uint32 frame_index = 0; frame_index < GetImageState(image_index)->frame_count; ++frame_index)
         {
-            PrintLine("            [%u] %p", frame_index, GetDefaultViewUtil(image_index, frame_index));
+            PrintLine("            [%u] %p", frame_index, GetDefaultView(image_index, frame_index));
         }
         PrintLine();
-    }
-}
-
-static void LogImageMemory()
-{
-    PrintLine("image memory:");
-    for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
-    {
-        ResourceMemory* image_mem = GetImageMemory(mem_index);
-        if (image_mem->size == 0)
-        {
-            continue;
-        }
-
-        PrintLine("   [%2u] size:       %llu", mem_index, image_mem->size);
-        PrintLine("        device_mem: 0x%p", image_mem->device);
-        PrintLine();
-    }
-}
-
-static void LogImageMemoryInfos(Array<uint32> mem_info_index_arrays[VK_MAX_MEMORY_TYPES],
-                                Array<ImageMemoryInfo>* mem_infos)
-{
-    for (uint32 mem_type_index = 0; mem_type_index < VK_MAX_MEMORY_TYPES; ++mem_type_index)
-    {
-        Array<uint32>* mem_info_indexes = &mem_info_index_arrays[mem_type_index];
-        if (mem_info_indexes->count == 0)
-        {
-            continue;
-        }
-        PrintLine("mem-type %u:", mem_type_index);
-        for (uint32 i = 0; i < mem_info_indexes->count; ++i)
-        {
-            ImageMemoryInfo* mem_info = GetPtr(mem_infos, Get(mem_info_indexes, i));
-            PrintLine("    [%2u] size:        %llu", i, mem_info->size);
-            PrintLine("         alignment:   %llu", mem_info->alignment);
-            PrintLine("         stride:      %u", mem_info->stride);
-            PrintLine("         image_index: %u", mem_info->image_index);
-            PrintLine();
-        }
     }
 }
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitImageModule(const Allocator* allocator, uint32 max_images)
-{
-    CTK_ASSERT(max_images > 0);
-
-    uint32 frame_count = GetFrameCount();
-
-    g_img_group.max_images         = max_images;
-    g_img_group.image_count        = 0;
-    g_img_group.frame_count        = frame_count;
-
-    g_img_group.image_infos        = Allocate<ImageInfo>    (allocator, max_images);
-    g_img_group.image_states       = Allocate<ResourceState>(allocator, max_images);
-    g_img_group.images             = Allocate<VkImage>      (allocator, max_images * frame_count);
-
-    g_img_group.default_view_infos = Allocate<ImageViewInfo>(allocator, max_images);
-    g_img_group.default_views      = Allocate<VkImageView>  (allocator, max_images * frame_count);
-
-}
-
 static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_info)
 {
-    if (g_img_group.image_count >= g_img_group.max_images)
+    ResourceGroup* res_group = GetResourceGroup();
+    if (res_group->image_count >= res_group->max_images)
     {
-        CTK_FATAL("can't create image: already at max of %u", g_img_group.max_images);
+        CTK_FATAL("can't create image: already at max of %u", res_group->max_images);
     }
 
     // Copy info.
-    ImageHnd hnd = { .index = g_img_group.image_count };
-    ++g_img_group.image_count;
-    *GetImageInfoUtil(hnd.index) = *image_info;
-    g_img_group.default_view_infos[hnd.index] = *default_view_info;
-    ResourceState* image_state = GetImageStateUtil(hnd.index);
+    ImageHnd hnd = { .index = res_group->image_count };
+    ++res_group->image_count;
+    *GetImageInfo(hnd.index) = *image_info;
+    res_group->default_view_infos[hnd.index] = *default_view_info;
+    ResourceState* image_state = GetImageState(hnd.index);
     if (image_info->per_frame)
     {
-        image_state->frame_stride = g_img_group.max_images;
-        image_state->frame_count  = g_img_group.frame_count;
+        image_state->frame_stride = res_group->max_images;
+        image_state->frame_count  = res_group->frame_count;
     }
     else
     {
@@ -318,16 +156,17 @@ static void AllocateImages(Stack* temp_stack)
     Stack frame = CreateFrame(temp_stack);
 
     VkDevice device = GetDevice();
+    ResourceGroup* res_group = GetResourceGroup();
     VkResult res = VK_SUCCESS;
 
     // Create images and get their memory information.
     QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
-    auto mem_infos = CreateArray<ImageMemoryInfo>(&frame.allocator, g_img_group.image_count);
+    auto mem_infos = CreateArray<ImageMemoryInfo>(&frame.allocator, res_group->image_count);
     uint32 mem_info_counts[VK_MAX_MEMORY_TYPES] = {};
-    for (uint32 image_index = 0; image_index < g_img_group.image_count; ++image_index)
+    for (uint32 image_index = 0; image_index < res_group->image_count; ++image_index)
     {
-        ImageInfo* image_info = GetImageInfoUtil(image_index);
-        ResourceState* image_state = GetImageStateUtil(image_index);
+        ImageInfo* image_info = GetImageInfo(image_index);
+        ResourceState* image_state = GetImageState(image_index);
 
         // Create 1 image per frame.
         VkImageCreateInfo info = {};
@@ -363,7 +202,7 @@ static void AllocateImages(Stack* temp_stack)
 
         // Get image memory info.
         VkMemoryRequirements mem_requirements = {};
-        vkGetImageMemoryRequirements(device, GetImageUtil(image_index, 0), &mem_requirements);
+        vkGetImageMemoryRequirements(device, GetImage(image_index, 0), &mem_requirements);
 
         uint32 mem_index = GetCapableMemoryTypeIndex(&mem_requirements, image_info->mem_properties);
         image_state->mem_index = mem_index;
@@ -387,14 +226,14 @@ static void AllocateImages(Stack* temp_stack)
     }
     for (uint32 mem_info_index = 0; mem_info_index < mem_infos->count; ++mem_info_index)
     {
-        uint32 mem_index = GetImageStateUtil(GetPtr(mem_infos, mem_info_index)->image_index)->mem_index;
+        uint32 mem_index = GetImageState(GetPtr(mem_infos, mem_info_index)->image_index)->mem_index;
         Push(&mem_info_index_arrays[mem_index], mem_info_index);
     }
 
     // Calculate size of each image memory based on the required sizes and alignments of all images they will store;
     // image memory offsets are also calculated at this time. Then allocate device memory and bind images to their
     // respective offsets.
-    auto base_offsets = CreateArray<VkDeviceSize>(&frame.allocator, g_img_group.image_count);
+    auto base_offsets = CreateArray<VkDeviceSize>(&frame.allocator, res_group->image_count);
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
         Array<uint32>* mem_info_indexes = &mem_info_index_arrays[mem_index];
@@ -419,9 +258,9 @@ static void AllocateImages(Stack* temp_stack)
         {
             ImageMemoryInfo* mem_info = GetPtr(mem_infos, Get(mem_info_indexes, i));
             VkDeviceSize base_offset = Get(base_offsets, i);
-            for (uint32 frame_index = 0; frame_index < GetImageStateUtil(mem_info->image_index)->frame_count; ++frame_index)
+            for (uint32 frame_index = 0; frame_index < GetImageState(mem_info->image_index)->frame_count; ++frame_index)
             {
-                VkImage image = GetImageUtil(mem_info->image_index, frame_index);
+                VkImage image = GetImage(mem_info->image_index, frame_index);
                 VkDeviceSize offset = base_offset + (mem_info->stride * frame_index);
                 res = vkBindImageMemory(device, image, image_mem->device, offset);
                 Validate(res, "vkBindImageMemory() failed");
@@ -430,17 +269,17 @@ static void AllocateImages(Stack* temp_stack)
     }
 
     // Create default views now that images have been backed with memory.
-    for (uint32 image_index = 0; image_index < g_img_group.image_count; ++image_index)
+    for (uint32 image_index = 0; image_index < res_group->image_count; ++image_index)
     {
-        ImageViewInfo* default_view_info = GetDefaultViewInfoUtil(image_index);
-        for (uint32 frame_index = 0; frame_index < GetImageStateUtil(image_index)->frame_count; ++frame_index)
+        ImageViewInfo* default_view_info = GetDefaultViewInfo(image_index);
+        for (uint32 frame_index = 0; frame_index < GetImageState(image_index)->frame_count; ++frame_index)
         {
             VkImageViewCreateInfo view_info =
             {
                 .sType            = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
                 .pNext            = NULL,
                 .flags            = default_view_info->flags,
-                .image            = GetImageUtil(image_index, frame_index),
+                .image            = GetImage(image_index, frame_index),
                 .viewType         = default_view_info->type,
                 .format           = default_view_info->format,
                 .components       = default_view_info->components,
@@ -478,7 +317,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
     DestroyImageData(&image_data);
 
     // Copy image data from buffer memory to image memory.
-    VkImage image = GetImageUtil(image_hnd.index, frame_index);
+    VkImage image = GetImage(image_hnd.index, frame_index);
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.
         VkImageMemoryBarrier pre_copy_mem_barrier =
@@ -529,7 +368,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
                 .y = 0,
                 .z = 0,
             },
-            .imageExtent = GetImageInfoUtil(image_hnd.index)->extent,
+            .imageExtent = GetImageInfo(image_hnd.index)->extent,
         };
         vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBuffer(image_data_buffer_hnd.index), image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
@@ -570,25 +409,25 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
 static ImageInfo* GetInfo(ImageHnd hnd)
 {
     ValidateImageHnd(hnd, "can't get image info");
-    return GetImageInfoUtil(hnd.index);
+    return GetImageInfo(hnd.index);
 }
 
 static VkImage GetImage(ImageHnd hnd, uint32 frame_index)
 {
     ValidateImageHnd(hnd, "can't get image");
-    CTK_ASSERT(frame_index < g_img_group.frame_count)
-    return GetImageUtil(hnd.index, frame_index);
+    CTK_ASSERT(frame_index < GetResourceGroup()->frame_count)
+    return GetImage(hnd.index, frame_index);
 }
 
 static ImageViewInfo* GetDefaultViewInfo(ImageHnd hnd)
 {
     ValidateImageHnd(hnd, "can't get image default view info");
-    return GetDefaultViewInfoUtil(hnd.index);
+    return GetDefaultViewInfo(hnd.index);
 }
 
 static VkImageView GetDefaultView(ImageHnd hnd, uint32 frame_index)
 {
     ValidateImageHnd(hnd, "can't get image default view");
-    CTK_ASSERT(frame_index < g_img_group.frame_count)
-    return GetDefaultViewUtil(hnd.index, frame_index);
+    CTK_ASSERT(frame_index < GetResourceGroup()->frame_count)
+    return GetDefaultView(hnd.index, frame_index);
 }

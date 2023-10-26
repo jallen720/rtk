@@ -318,10 +318,10 @@ static void AllocateImages(Stack* temp_stack)
     Stack frame = CreateFrame(temp_stack);
 
     VkDevice device = GetDevice();
-    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
     VkResult res = VK_SUCCESS;
 
     // Create images and get their memory information.
+    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
     auto mem_infos = CreateArray<ImageMemoryInfo>(&frame.allocator, g_img_group.image_count);
     uint32 mem_info_counts[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 image_index = 0; image_index < g_img_group.image_count; ++image_index)

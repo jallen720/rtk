@@ -144,7 +144,7 @@ static void UpdateView()
     // Rotation
     if (MouseButtonDown(1))
     {
-        static constexpr float32 ROTATION_SPEED = 0.2f;
+        static constexpr float32 ROTATION_SPEED = 0.1f;
         view->rotation.x -= game_state.mouse.delta.y * ROTATION_SPEED;
         view->rotation.y -= game_state.mouse.delta.x * ROTATION_SPEED;
         view->rotation.x = Clamp(view->rotation.x, -view->max_x_angle, view->max_x_angle);

@@ -72,30 +72,30 @@ static VkBuffer* GetBufferPtr(uint32 mem_index)
     return &g_res_group.buffers[mem_index];
 }
 
-static BufferInfo* GetBufferInfoUtil(uint32 buffer_index)
+static BufferInfo* GetBufferInfo(uint32 buffer_index)
 {
     return &g_res_group.buffer_infos[buffer_index];
 }
 
-static ResourceState* GetBufferStateUtil(uint32 buffer_index)
+static ResourceState* GetBufferState(uint32 buffer_index)
 {
     return &g_res_group.buffer_states[buffer_index];
 }
 
-static BufferFrameState* GetBufferFrameStateUtil(uint32 buffer_index, uint32 frame_index)
+static BufferFrameState* GetBufferFrameState(uint32 buffer_index, uint32 frame_index)
 {
-    uint32 frame_offset = GetBufferStateUtil(buffer_index)->frame_stride * frame_index;
+    uint32 frame_offset = GetBufferState(buffer_index)->frame_stride * frame_index;
     return &g_res_group.buffer_frame_states[frame_offset + buffer_index];
 }
 
-static VkBuffer GetBufferUtil(uint32 buffer_index)
+static VkBuffer GetBuffer(uint32 buffer_index)
 {
-    return g_res_group.buffers[GetBufferStateUtil(buffer_index)->mem_index];
+    return g_res_group.buffers[GetBufferState(buffer_index)->mem_index];
 }
 
-static ResourceMemory* GetBufferMemoryUtil(uint32 buffer_index)
+static ResourceMemory* GetBufferMemory(uint32 buffer_index)
 {
-    return GetMemory(GetBufferStateUtil(buffer_index)->mem_index);
+    return GetMemory(GetBufferState(buffer_index)->mem_index);
 }
 
 static uint32 GetMemoryIndex(BufferInfo* buffer_info)
@@ -133,8 +133,8 @@ static uint32 GetMemoryIndex(BufferInfo* buffer_info)
 
 static bool OffsetAlignmentDesc(uint32* buffer_index_a, uint32* buffer_index_b)
 {
-    return GetBufferInfoUtil(*buffer_index_a)->offset_alignment >=
-           GetBufferInfoUtil(*buffer_index_b)->offset_alignment;
+    return GetBufferInfo(*buffer_index_a)->offset_alignment >=
+           GetBufferInfo(*buffer_index_b)->offset_alignment;
 }
 
 /// Debug
@@ -144,8 +144,8 @@ static void LogBuffers()
     PrintLine("buffers:");
     for (uint32 buffer_index = 0; buffer_index < g_res_group.buffer_count; ++buffer_index)
     {
-        BufferInfo* info = GetBufferInfoUtil(buffer_index);
-        ResourceState* state = GetBufferStateUtil(buffer_index);
+        BufferInfo* info = GetBufferInfo(buffer_index);
+        ResourceState* state = GetBufferState(buffer_index);
         PrintLine("   [%2u] size:             %llu", buffer_index, info->size);
         PrintLine("        offset_alignment: %llu", info->offset_alignment);
         PrintLine("        per_frame:        %s", info->per_frame ? "true" : "false");
@@ -160,7 +160,7 @@ static void LogBuffers()
         PrintLine("        offsets:          ");
         for (uint32 frame_index = 0; frame_index < state->frame_count; ++frame_index)
         {
-            PrintLine("            [%u] %llu", frame_index, GetBufferFrameStateUtil(buffer_index, frame_index)->offset);
+            PrintLine("            [%u] %llu", frame_index, GetBufferFrameState(buffer_index, frame_index)->offset);
         }
         PrintLine();
     }
@@ -215,8 +215,8 @@ static void AllocateResourceGroup(Stack* temp_stack)
     uint32 mem_buffer_counts[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 buffer_index = 0; buffer_index < g_res_group.buffer_count; ++buffer_index)
     {
-        uint32 mem_index = GetMemoryIndex(GetBufferInfoUtil(buffer_index));
-        GetBufferStateUtil(buffer_index)->mem_index = mem_index;
+        uint32 mem_index = GetMemoryIndex(GetBufferInfo(buffer_index));
+        GetBufferState(buffer_index)->mem_index = mem_index;
         ++mem_buffer_counts[mem_index];
     }
 
@@ -229,7 +229,7 @@ static void AllocateResourceGroup(Stack* temp_stack)
     }
     for (uint32 buffer_index = 0; buffer_index < g_res_group.buffer_count; ++buffer_index)
     {
-        Push(&mem_buffer_index_arrays[GetBufferStateUtil(buffer_index)->mem_index], buffer_index);
+        Push(&mem_buffer_index_arrays[GetBufferState(buffer_index)->mem_index], buffer_index);
     }
 
     // Size buffer memory and calculate buffer offsets.
@@ -249,13 +249,13 @@ static void AllocateResourceGroup(Stack* temp_stack)
         for (uint32 i = 0; i < mem_buffer_count; ++i)
         {
             uint32 mem_buffer_index = Get(mem_buffer_index_array, i);
-            BufferInfo* info = GetBufferInfoUtil(mem_buffer_index);
+            BufferInfo* info = GetBufferInfo(mem_buffer_index);
 
             // Size buffer memory and get offsets based on buffer size and alignment memory requirements.
-            for (uint32 frame_index = 0; frame_index < GetBufferStateUtil(mem_buffer_index)->frame_count; ++frame_index)
+            for (uint32 frame_index = 0; frame_index < GetBufferState(mem_buffer_index)->frame_count; ++frame_index)
             {
                 buffer_mem->size = Align(buffer_mem->size, info->offset_alignment);
-                GetBufferFrameStateUtil(mem_buffer_index, frame_index)->offset = buffer_mem->size;
+                GetBufferFrameState(mem_buffer_index, frame_index)->offset = buffer_mem->size;
                 buffer_mem->size += info->size;
             }
 

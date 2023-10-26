@@ -111,6 +111,11 @@ static VkImageView* GetDefaultViewPtr(uint32 image_index, uint32 frame_index)
     return &g_img_group.default_views[GetImageFrameIndex(image_index, frame_index)];
 }
 
+static ResourceMemory* GetImageMemory(uint32 mem_index)
+{
+    return &g_img_group.mems[mem_index];
+}
+
 static bool AlignmentDesc(ImageMemoryInfo* a, ImageMemoryInfo* b)
 {
     return a->alignment >= b->alignment;
@@ -128,11 +133,6 @@ static void ValidateImageHnd(ImageHnd hnd, const char* action)
         CTK_FATAL("%s: image handle index %u exceeds max image count of %u",
                   action, hnd.index, g_img_group.image_count);
     }
-}
-
-static ResourceMemory* GetImageMemory(uint32 mem_index)
-{
-    return &g_img_group.mems[mem_index];
 }
 
 /// Debug

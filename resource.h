@@ -138,17 +138,25 @@ static ResourceMemory* GetBufferMemory(uint32 buffer_index)
     return GetMemory(GetBufferState(buffer_index)->mem_index);
 }
 
-static uint32 GetMemoryIndex(BufferInfo* buffer_info)
+static bool OffsetAlignmentDesc(uint32* buffer_index_a, uint32* buffer_index_b)
+{
+    return GetBufferInfo(*buffer_index_a)->offset_alignment >=
+           GetBufferInfo(*buffer_index_b)->offset_alignment;
+}
+
+static void GetMemoryRequirements(uint32 buffer_index)
 {
     VkDevice device = GetDevice();
     QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
 
+    BufferInfo* buffer_info = GetBufferInfo(buffer_index);
+    ResourceState* buffer_state = GetBufferState(buffer_index);
+
+    // Create dummy buffer to get memory requirements.
     VkBufferCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     create_info.size  = buffer_info->size;
     create_info.usage = buffer_info->usage;
-
-    // Check if sharing mode needs to be concurrent due to separate graphics & present queue families.
     if (queue_families->graphics != queue_families->present)
     {
         create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
@@ -168,13 +176,8 @@ static uint32 GetMemoryIndex(BufferInfo* buffer_info)
     vkGetBufferMemoryRequirements(device, temp, &mem_requirements);
     vkDestroyBuffer(device, temp, NULL);
 
-    return GetCapableMemoryTypeIndex(&mem_requirements, buffer_info->mem_properties);
-}
-
-static bool OffsetAlignmentDesc(uint32* buffer_index_a, uint32* buffer_index_b)
-{
-    return GetBufferInfo(*buffer_index_a)->offset_alignment >=
-           GetBufferInfo(*buffer_index_b)->offset_alignment;
+    buffer_state->mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_info->mem_properties);
+    buffer_info->size = mem_requirements.size;
 }
 
 /// Image Utils
@@ -330,4 +333,42 @@ static void InitResourceGroup(const Allocator* allocator, ResourceGroupInfo* inf
     g_res_group.images              = Allocate<VkImage>      (allocator, info->max_images * frame_count);
     g_res_group.default_view_infos  = Allocate<ImageViewInfo>(allocator, info->max_images);
     g_res_group.default_views       = Allocate<VkImageView>  (allocator, info->max_images * frame_count);
+}
+
+static void AllocateResourceGroup(Stack* temp_stack)
+{
+    Stack frame = CreateFrame(temp_stack);
+
+    VkDevice device = GetDevice();
+    PhysicalDevice* physical_device = GetPhysicalDevice();
+    QueueFamilies* queue_families = &physical_device->queue_families;
+    VkResult res = VK_SUCCESS;
+
+    // Get memory information for buffer
+    auto buffer_indexes = CreateArrayFull<uint32>(&frame.allocator, g_res_group.buffer_count);
+    for (uint32 buffer_index = 0; buffer_index < g_res_group.buffer_count; ++buffer_index)
+    {
+        GetMemoryRequirements(buffer_index);
+
+        // Add buffer index for sorting.
+        Set(buffer_indexes, buffer_index, buffer_index);
+    }
+
+    // Sort buffer indexes by descending order of offset alignement before calculating memory size and offsets.
+    InsertionSort(buffer_indexes, OffsetAlignmentDesc);
+
+    // Calculate memory size and buffer offsets in that memory.
+    for (uint32 i = 0; i < buffer_indexes->count; ++i)
+    {
+        uint32 buffer_index = Get(buffer_indexes, i);
+        BufferInfo* buffer_info = GetBufferInfo(buffer_index);
+        ResourceState* buffer_state = GetBufferState(buffer_index);
+        ResourceMemory* mem = GetMemory(buffer_state->mem_index);
+        for (uint32 frame_index = 0; frame_index < buffer_state->frame_count; ++frame_index)
+        {
+            mem->size = Align(mem->size, buffer_info->offset_alignment);
+            GetBufferFrameState(buffer_index, frame_index)->offset = mem->size;
+            mem->size += buffer_info->size;
+        }
+    }
 }

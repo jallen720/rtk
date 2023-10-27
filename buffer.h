@@ -86,9 +86,8 @@ static void AllocateBuffers(Stack* temp_stack)
     uint32 mem_buffer_counts[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 buffer_index = 0; buffer_index < res_group->buffer_count; ++buffer_index)
     {
-        uint32 mem_index = GetMemoryIndex(GetBufferInfo(buffer_index));
-        GetBufferState(buffer_index)->mem_index = mem_index;
-        ++mem_buffer_counts[mem_index];
+        GetMemoryRequirements(buffer_index);
+        ++mem_buffer_counts[GetBufferState(buffer_index)->mem_index];
     }
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {

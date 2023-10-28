@@ -403,7 +403,7 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitPipelines(temp_stack, free_list);
 
     // AllocateBuffers(temp_stack);
-    AllocateImages(temp_stack);
+    // AllocateImages(temp_stack);
     AllocateResourceGroup(temp_stack);
 LogBuffers();
 LogImages();

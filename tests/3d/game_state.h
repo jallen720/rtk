@@ -153,27 +153,27 @@ static void UpdateView()
 
 static void UpdateEntities()
 {
-    EntityData* entity_data = &game_state.entity_data;
-    for (uint32 entity_index = 0; entity_index < entity_data->count; ++entity_index)
-    {
-        Transform* transform = entity_data->transforms + entity_index;
-        Entity* entity = entity_data->entities + entity_index;
+    // EntityData* entity_data = &game_state.entity_data;
+    // for (uint32 entity_index = 0; entity_index < entity_data->count; ++entity_index)
+    // {
+    //     Transform* transform = entity_data->transforms + entity_index;
+    //     Entity* entity = entity_data->entities + entity_index;
 
-        static constexpr float32 ROTATION_SPEED = 0.1f;
-        float32 rotation = entity->rotate_direction * ROTATION_SPEED;
-        if (entity->rotate_axis == 0)
-        {
-            transform->rotation.x += rotation;
-        }
-        else if (entity->rotate_axis == 1)
-        {
-            transform->rotation.y += rotation;
-        }
-        else
-        {
-            transform->rotation.z += rotation;
-        }
-    }
+    //     static constexpr float32 ROTATION_SPEED = 0.1f;
+    //     float32 rotation = entity->rotate_direction * ROTATION_SPEED;
+    //     if (entity->rotate_axis == 0)
+    //     {
+    //         transform->rotation.x += rotation;
+    //     }
+    //     else if (entity->rotate_axis == 1)
+    //     {
+    //         transform->rotation.y += rotation;
+    //     }
+    //     else
+    //     {
+    //         transform->rotation.z += rotation;
+    //     }
+    // }
 }
 
 static Matrix GetViewProjectionMatrix()

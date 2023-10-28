@@ -380,8 +380,6 @@ static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
-    // InitBufferModule(&perm_stack->allocator, 32);
-    // InitImageModule(&perm_stack->allocator, 32);
     ResourceGroupInfo res_group_info =
     {
         .max_buffers = 32,
@@ -402,13 +400,10 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitVertexLayout(perm_stack);
     InitPipelines(temp_stack, free_list);
 
-    // AllocateBuffers(temp_stack);
-    // AllocateImages(temp_stack);
     AllocateResourceGroup(temp_stack);
 LogBuffers();
 LogImages();
 LogMemory();
-exit(0);
     AllocateDescriptorSets(temp_stack);
     WriteResources();
 }

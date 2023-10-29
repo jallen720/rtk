@@ -400,10 +400,10 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitVertexLayout(perm_stack);
     InitPipelines(temp_stack, free_list);
 
-    AllocateResourceGroup(temp_stack);
 LogBuffers();
 LogImages();
 LogMemory();
+    InitResources(temp_stack);
     AllocateDescriptorSets(temp_stack);
     WriteResources();
 }

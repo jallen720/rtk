@@ -33,7 +33,7 @@ static void ValidateImageHnd(ImageHnd hnd, const char* action)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_info)
+static ImageHnd CreateImage(ImageInfo* info, ImageViewInfo* view_info)
 {
     ResourceGroup* res_group = GetResourceGroup();
     if (res_group->image_count >= res_group->max_images)
@@ -44,19 +44,8 @@ static ImageHnd CreateImage(ImageInfo* image_info, ImageViewInfo* default_view_i
     // Copy info.
     ImageHnd hnd = { .index = res_group->image_count };
     ++res_group->image_count;
-    *GetImageInfo(hnd.index) = *image_info;
-    *GetImageViewInfo(hnd.index) = *default_view_info;
-    ImageState* image_state = GetImageState(hnd.index);
-    if (image_info->per_frame)
-    {
-        image_state->frame_stride = res_group->max_images;
-        image_state->frame_count  = res_group->frame_count;
-    }
-    else
-    {
-        image_state->frame_stride = 0;
-        image_state->frame_count  = 1;
-    }
+    *GetImageInfo(hnd.index) = *info;
+    *GetImageViewInfo(hnd.index) = *view_info;
 
     return hnd;
 }

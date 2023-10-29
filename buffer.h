@@ -57,17 +57,6 @@ static BufferHnd CreateBuffer(BufferInfo* info)
     BufferHnd hnd = { .index = res_group->buffer_count };
     ++res_group->buffer_count;
     *GetBufferInfo(hnd.index) = *info;
-    BufferState* state = GetBufferState(hnd.index);
-    if (info->per_frame)
-    {
-        state->frame_stride = res_group->max_buffers;
-        state->frame_count  = res_group->frame_count;
-    }
-    else
-    {
-        state->frame_stride = 0;
-        state->frame_count  = 1;
-    }
 
     return hnd;
 }
@@ -164,7 +153,7 @@ static void AppendDeviceBufferCmd(BufferHnd dst_hnd, BufferHnd src_hnd, uint32 f
 static void Clear(BufferHnd hnd)
 {
     ValidateBufferHnd(hnd, "can't clear buffer");
-    for (uint32 frame_index = 0; frame_index < GetResourceGroup()->frame_count; ++frame_index)
+    for (uint32 frame_index = 0; frame_index < GetBufferState(hnd.index)->frame_count; ++frame_index)
     {
         GetBufferFrameState(hnd.index, frame_index)->index = 0;
     }

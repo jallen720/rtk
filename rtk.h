@@ -11,9 +11,9 @@
 #include "rtk/stb/stb_image.h"
 #pragma warning(pop)
 
+#include "ctk3/ctk3.h"
 #include "ctk3/allocator.h"
 #include "ctk3/array.h"
-#include "ctk3/ctk3.h"
 #include "ctk3/debug.h"
 #include "ctk3/file.h"
 #include "ctk3/free_list.h"

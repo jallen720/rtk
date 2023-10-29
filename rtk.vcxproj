@@ -155,6 +155,24 @@
   <ItemGroup>
     <ClCompile Include="test.cc" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="buffer.h" />
+    <ClInclude Include="context.h" />
+    <ClInclude Include="debug.h" />
+    <ClInclude Include="descriptor_set.h" />
+    <ClInclude Include="device_features.h" />
+    <ClInclude Include="frame_metrics.h" />
+    <ClInclude Include="image.h" />
+    <ClInclude Include="mesh.h" />
+    <ClInclude Include="pipeline.h" />
+    <ClInclude Include="pipeline_defaults.h" />
+    <ClInclude Include="rendering.h" />
+    <ClInclude Include="render_target.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="rtk.h" />
+    <ClInclude Include="shader.h" />
+    <ClInclude Include="vk_array.h" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

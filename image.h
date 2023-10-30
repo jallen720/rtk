@@ -171,15 +171,9 @@ static ImageInfo* GetInfo(ImageHnd hnd)
     return GetImageInfo(hnd.index);
 }
 
-static ImageViewInfo* GetImageViewInfo(ImageHnd hnd)
+static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
 {
-    ValidateImageHnd(hnd, "can't get image view info");
-    return GetImageViewInfo(hnd.index);
-}
-
-static VkImageView GetImageView(ImageHnd hnd, uint32 frame_index)
-{
-    ValidateImageHnd(hnd, "can't get image");
+    ValidateImageHnd(hnd, "can't get image view");
     CTK_ASSERT(frame_index < GetResourceGroup()->frame_count)
     return GetImageFrameState(hnd.index, frame_index)->view;
 }

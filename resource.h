@@ -344,8 +344,7 @@ static void InitResources(Stack* temp_stack)
     VkResult res = VK_SUCCESS;
 
     // Initialize resource state and sort into arrays per memory type.
-    auto buffer_index_arrays = Allocate<uint32>(&frame.allocator, VK_MAX_MEMORY_TYPES * g_res_group.buffer_count);
-    uint32 buffer_index_counts[VK_MAX_MEMORY_TYPES] = {};
+    auto mem_buffer_indexes = CreateArray2D<uint32>(&frame.allocator, VK_MAX_MEMORY_TYPES, g_res_group.buffer_count);
     VkBufferUsageFlags buffer_usage[VK_MAX_MEMORY_TYPES] = {};
     for (uint32 buffer_index = 0; buffer_index < g_res_group.buffer_count; ++buffer_index)
     {
@@ -390,24 +389,19 @@ static void InitResources(Stack* temp_stack)
         buffer_state->mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_info->mem_properties);
         buffer_info->size = mem_requirements.size;
 
-        uint32* buffer_index_count = &buffer_index_counts[buffer_state->mem_index];
-        uint32* buffer_indexes = &buffer_index_arrays[buffer_state->mem_index * g_res_group.buffer_count];
-        buffer_indexes[*buffer_index_count] = buffer_index;
-        ++*buffer_index_count;
+        Push(mem_buffer_indexes, buffer_state->mem_index, buffer_index);
 
         // Append buffer usage for creating associated buffer memory.
         buffer_usage[buffer_state->mem_index] |= buffer_info->usage;
     }
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        uint32 buffer_index_count = buffer_index_counts[mem_index];
+        uint32 buffer_index_count = GetCount(mem_buffer_indexes, mem_index);
         if (buffer_index_count == 0) { continue; }
-        InsertionSort(&buffer_index_arrays[mem_index * g_res_group.buffer_count], buffer_index_count,
-                      OffsetAlignmentDesc);
+        InsertionSort(GetColumn(mem_buffer_indexes, mem_index), buffer_index_count, OffsetAlignmentDesc);
     }
 
-    auto image_index_arrays = Allocate<uint32>(&frame.allocator, VK_MAX_MEMORY_TYPES * g_res_group.image_count);
-    uint32 image_index_counts[VK_MAX_MEMORY_TYPES] = {};
+    auto mem_image_indexes = CreateArray2D<uint32>(&frame.allocator, VK_MAX_MEMORY_TYPES, g_res_group.image_count);
     for (uint32 image_index = 0; image_index < g_res_group.image_count; ++image_index)
     {
         ImageInfo* image_info = GetImageInfo(image_index);
@@ -465,42 +459,39 @@ static void InitResources(Stack* temp_stack)
         image_state->size      = mem_requirements.size;
         image_state->alignment = mem_requirements.alignment;
 
-        uint32* image_index_count = &image_index_counts[image_state->mem_index];
-        uint32* image_indexes = &image_index_arrays[image_state->mem_index * g_res_group.image_count];
-        image_indexes[*image_index_count] = image_index;
-        ++*image_index_count;
+        Push(mem_image_indexes, image_state->mem_index, image_index);
     }
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        uint32 image_index_count = image_index_counts[mem_index];
+        uint32 image_index_count = GetCount(mem_image_indexes, mem_index);
         if (image_index_count == 0) { continue; }
-        InsertionSort(&image_index_arrays[mem_index * g_res_group.image_count], image_index_count, AlignmentDesc);
+        InsertionSort(GetColumn(mem_image_indexes, mem_index), image_index_count, OffsetAlignmentDesc);
     }
 
     // Adjust memory size, calculate offsets, and create buffer for each memory type.
     VkMemoryType* memory_types = physical_device->mem_properties.memoryTypes;
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        uint32 buffer_index_count = buffer_index_counts[mem_index];
-        uint32 image_index_count  = image_index_counts[mem_index];
+        uint32 buffer_index_count = GetCount(mem_buffer_indexes, mem_index);
+        uint32 image_index_count  = GetCount(mem_image_indexes, mem_index);
         if (buffer_index_count == 0 && image_index_count == 0)
         {
             continue;
         }
 
-        uint32* buffer_indexes = &buffer_index_arrays[mem_index * g_res_group.buffer_count];
-        uint32* image_indexes  = &image_index_arrays[mem_index * g_res_group.image_count];
+        uint32* buffer_indexes = GetColumn(mem_buffer_indexes, mem_index);
+        uint32* image_indexes  = GetColumn(mem_image_indexes, mem_index);
         ResourceMemory* mem = GetMemory(mem_index);
 
         // Adjust memory size & calculate offsets for buffers.
         for (uint32 i = 0; i < buffer_index_count; ++i)
+        CTK_ITER_PTR(buffer_index, buffer_indexes, buffer_index_count)
         {
-            uint32 buffer_index = buffer_indexes[i];
-            BufferInfo* buffer_info = GetBufferInfo(buffer_index);
-            for (uint32 frame_index = 0; frame_index < GetBufferState(buffer_index)->frame_count; ++frame_index)
+            BufferInfo* buffer_info = GetBufferInfo(*buffer_index);
+            for (uint32 frame_index = 0; frame_index < GetBufferState(*buffer_index)->frame_count; ++frame_index)
             {
                 mem->size = Align(mem->size, buffer_info->offset_alignment);
-                GetBufferFrameState(buffer_index, frame_index)->offset = mem->size;
+                GetBufferFrameState(*buffer_index, frame_index)->offset = mem->size;
                 mem->size += buffer_info->size;
             }
         }
@@ -531,14 +522,13 @@ static void InitResources(Stack* temp_stack)
         }
 
         // Adjust memory size & calculate offsets for images.
-        for (uint32 i = 0; i < image_index_count; ++i)
+        CTK_ITER_PTR(image_index, image_indexes, image_index_count)
         {
-            uint32 image_index = image_indexes[i];
-            ImageState* image_state = GetImageState(image_index);
+            ImageState* image_state = GetImageState(*image_index);
             for (uint32 frame_index = 0; frame_index < image_state->frame_count; ++frame_index)
             {
                 mem->size = Align(mem->size, image_state->alignment);
-                GetImageFrameState(image_index, frame_index)->offset = mem->size;
+                GetImageFrameState(*image_index, frame_index)->offset = mem->size;
                 mem->size += image_state->size;
             }
         }
@@ -561,12 +551,11 @@ static void InitResources(Stack* temp_stack)
         }
 
         // Bind images to memory.
-        for (uint32 i = 0; i < image_index_count; ++i)
+        CTK_ITER_PTR(image_index, image_indexes, image_index_count)
         {
-            uint32 image_index = image_indexes[i];
-            for (uint32 frame_index = 0; frame_index < GetImageState(image_index)->frame_count; ++frame_index)
+            for (uint32 frame_index = 0; frame_index < GetImageState(*image_index)->frame_count; ++frame_index)
             {
-                ImageFrameState* image_frame_state = GetImageFrameState(image_index, frame_index);
+                ImageFrameState* image_frame_state = GetImageFrameState(*image_index, frame_index);
                 res = vkBindImageMemory(device, image_frame_state->image, mem->device, image_frame_state->offset);
                 Validate(res, "vkBindImageMemory() failed");
             }

@@ -149,24 +149,24 @@ static void InitDescriptorDatas(Stack* perm_stack)
         .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
     };
-    ImageViewInfo default_view_info =
+    ImageViewInfo texture_view_info =
     {
-        .flags = 0,
-        .type = VK_IMAGE_VIEW_TYPE_2D,
-        .format = texture_info.format,
+        .flags      = 0,
+        .type       = VK_IMAGE_VIEW_TYPE_2D,
+        .format     = texture_info.format,
         .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
         .subresource_range =
         {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = VK_REMAINING_MIP_LEVELS,
+            .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel   = 0,
+            .levelCount     = VK_REMAINING_MIP_LEVELS,
             .baseArrayLayer = 0,
-            .layerCount = VK_REMAINING_ARRAY_LAYERS,
+            .layerCount     = VK_REMAINING_ARRAY_LAYERS,
         },
     };
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
-        Push(&g_render_state.textures, CreateImage(&texture_info, &default_view_info));
+        Push(&g_render_state.textures, CreateImage(&texture_info, &texture_view_info));
     }
 
     // Texture Sampler

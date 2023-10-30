@@ -237,7 +237,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                         Push(image_infos,
                              {
                                  .sampler     = VK_NULL_HANDLE,
-                                 .imageView   = GetImageView(*image_hnd, frame_index),
+                                 .imageView   = GetView(*image_hnd, frame_index),
                                  .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                              });
                     }
@@ -250,7 +250,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                         Push(image_infos,
                              {
                                  .sampler     = data_binding->combined_image_samplers.sampler,
-                                 .imageView   = GetImageView(*image_hnd, frame_index),
+                                 .imageView   = GetView(*image_hnd, frame_index),
                                  .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                              });
                     }

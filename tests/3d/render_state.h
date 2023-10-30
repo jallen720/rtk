@@ -146,6 +146,7 @@ static void InitDescriptorDatas(Stack* perm_stack)
         .array_layers   = 1,
         .samples        = VK_SAMPLE_COUNT_1_BIT,
         .tiling         = VK_IMAGE_TILING_OPTIMAL,
+        .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
         .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
     };

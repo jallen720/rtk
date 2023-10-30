@@ -33,6 +33,7 @@ struct ImageInfo
     uint32                array_layers;
     VkSampleCountFlagBits samples;
     VkImageTiling         tiling;
+    VkImageLayout         initial_layout;
     VkMemoryPropertyFlags mem_properties;
     VkImageUsageFlags     usage;
 };
@@ -431,7 +432,7 @@ static void InitResources(Stack* temp_stack)
         info.samples       = image_info->samples;
         info.tiling        = image_info->tiling;
         info.usage         = image_info->usage;
-        info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        info.initialLayout = image_info->initial_layout;
         if (queue_families->graphics != queue_families->present)
         {
             info.sharingMode           = VK_SHARING_MODE_CONCURRENT;

@@ -8,10 +8,11 @@ static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
 ////////////////////////////////////////////////////////////
 static void ValidateBufferHnd(BufferHnd hnd, const char* action)
 {
-    uint32 buffer_count = GetResourceGroup()->buffer_count;
-    if (hnd.index >= buffer_count)
+    ResourceGroup* res_group = GetResourceGroup();
+    if (hnd.index >= res_group->buffer_count)
     {
-        CTK_FATAL("%s: buffer handle index %u exceeds max buffer count of %u", action, hnd.index, buffer_count);
+        CTK_FATAL("%s: buffer handle index %u exceeds max buffer count of %u",
+                  action, hnd.index, res_group->buffer_count);
     }
 }
 

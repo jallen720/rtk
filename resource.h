@@ -485,7 +485,6 @@ static void InitResources(Stack* temp_stack)
         ResourceMemory* mem = GetMemory(mem_index);
 
         // Adjust memory size & calculate offsets for buffers.
-        for (uint32 i = 0; i < buffer_index_count; ++i)
         CTK_ITER_PTR(buffer_index, buffer_indexes, buffer_index_count)
         {
             BufferInfo* buffer_info = GetBufferInfo(*buffer_index);

@@ -32,6 +32,7 @@ struct RenderState
     Mesh         quad_mesh;
 
     // Descriptor Datas
+    uint32          res_group_index;
     BufferHnd       entity_buffer;
     Array<ImageHnd> textures;
     VkSampler       texture_sampler;
@@ -81,7 +82,7 @@ static void InitDeviceMemory()
         .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     };
-    g_render_state.staging_buffer = CreateBuffer(&staging_buffer_info);
+    g_render_state.staging_buffer = CreateBuffer(g_render_state.res_group_index, &staging_buffer_info);
 }
 
 static void InitRenderTargets(Stack* temp_stack, FreeList* free_list)
@@ -112,7 +113,7 @@ static void InitMeshes()
         .vertex_buffer_size = Megabyte32<1>(),
         .index_buffer_size  = Megabyte32<1>(),
     };
-    InitMeshData(&g_render_state.mesh_data, &mesh_data_info);
+    InitMeshData(&g_render_state.mesh_data, g_render_state.res_group_index, &mesh_data_info);
 }
 
 static void InitDescriptorDatas(Stack* perm_stack)
@@ -126,7 +127,7 @@ static void InitDescriptorDatas(Stack* perm_stack)
         .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
     };
-    g_render_state.entity_buffer = CreateBuffer(&entity_buffer_info);
+    g_render_state.entity_buffer = CreateBuffer(g_render_state.res_group_index, &entity_buffer_info);
 
     // Textures
     InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
@@ -167,7 +168,7 @@ static void InitDescriptorDatas(Stack* perm_stack)
     };
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
-        Push(&g_render_state.textures, CreateImage(&texture_info, &texture_view_info));
+        Push(&g_render_state.textures, CreateImage(g_render_state.res_group_index, &texture_info, &texture_view_info));
     }
 
     // Texture Sampler
@@ -381,12 +382,13 @@ static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
+    InitResourceGroups(&perm_stack->allocator, 4);
     ResourceGroupInfo res_group_info =
     {
         .max_buffers = 32,
         .max_images  = 32,
     };
-    InitResourceGroup(&perm_stack->allocator, &res_group_info);
+    g_render_state.res_group_index = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
     InitDescriptorSetModule(&perm_stack->allocator, 16);
 
     InitRenderJob(perm_stack);
@@ -401,10 +403,8 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitVertexLayout(perm_stack);
     InitPipelines(temp_stack, free_list);
 
-LogBuffers();
-LogImages();
-LogMemory();
-    InitResources(temp_stack);
+    InitResources(g_render_state.res_group_index, temp_stack);
+LogResourceGroups();
     AllocateDescriptorSets(temp_stack);
     WriteResources();
 }

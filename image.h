@@ -1,7 +1,5 @@
 /// Data
 ////////////////////////////////////////////////////////////
-struct ImageHnd { uint32 index; };
-
 static constexpr VkComponentMapping RGBA_COMPONENT_SWIZZLE_IDENTITY =
 {
     .r = VK_COMPONENT_SWIZZLE_IDENTITY,
@@ -21,31 +19,32 @@ struct ImageData
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void ValidateImageHnd(ImageHnd hnd, const char* action)
+static void ValidateHnd(ImageHnd hnd, const char* action)
 {
-    ResourceGroup* res_group = GetResourceGroup();
-    if (hnd.index >= res_group->image_count)
+    ResourceGroup* res_group = GetResourceGroup(hnd);
+    uint32 image_index = GetResourceIndex(hnd.index);
+    if (image_index >= res_group->image_count)
     {
-        CTK_FATAL("%s: image handle index %u exceeds max image count of %u",
-                  action, hnd.index, res_group->image_count);
+        CTK_FATAL("%s: image index %u exceeds image count of %u", action, image_index, res_group->image_count);
     }
 }
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ImageHnd CreateImage(ImageInfo* info, ImageViewInfo* view_info)
+static ImageHnd CreateImage(uint32 resource_group_index, ImageInfo* info, ImageViewInfo* view_info)
 {
-    ResourceGroup* res_group = GetResourceGroup();
+    ResourceGroup* res_group = GetResourceGroup(resource_group_index);
     if (res_group->image_count >= res_group->max_images)
     {
         CTK_FATAL("can't create image: already at max of %u", res_group->max_images);
     }
 
     // Copy info.
-    ImageHnd hnd = { .index = res_group->image_count };
+    uint32 image_index = res_group->image_count;
+    ImageHnd hnd = { .index = GetResourceHndIndex(resource_group_index, image_index) };
     ++res_group->image_count;
-    *GetImageInfo(hnd.index) = *info;
-    *GetImageViewInfo(hnd.index) = *view_info;
+    *GetImageInfo(res_group, image_index) = *info;
+    *GetImageViewInfo(res_group, image_index) = *view_info;
 
     return hnd;
 }
@@ -69,6 +68,9 @@ static void DestroyImageData(ImageData* image_data)
 
 static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint32 frame_index, const char* path)
 {
+    ValidateHnd(image_hnd, "can't load image");
+    ValidateHnd(image_data_buffer_hnd, "can't load image from buffer");
+
     // Load image data and write to staging buffer.
     ImageData image_data = {};
     LoadImageData(&image_data, path);
@@ -76,7 +78,10 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
     DestroyImageData(&image_data);
 
     // Copy image data from buffer memory to image memory.
-    VkImage image = GetImageFrameState(image_hnd.index, frame_index)->image;
+    ResourceGroup* res_group = GetResourceGroup(image_hnd);
+    uint32 image_index = GetResourceIndex(image_hnd.index);
+    uint32 image_data_buffer_index = GetResourceIndex(image_data_buffer_hnd.index);
+    VkImage image = GetImageFrameState(res_group, image_index, frame_index)->image;
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.
         VkImageMemoryBarrier pre_copy_mem_barrier =
@@ -127,9 +132,9 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
                 .y = 0,
                 .z = 0,
             },
-            .imageExtent = GetImageInfo(image_hnd.index)->extent,
+            .imageExtent = GetImageInfo(res_group, image_index)->extent,
         };
-        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBuffer(image_data_buffer_hnd.index), image,
+        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBuffer(res_group, image_data_buffer_index), image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.
@@ -167,13 +172,14 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
 
 static ImageInfo* GetInfo(ImageHnd hnd)
 {
-    ValidateImageHnd(hnd, "can't get image info");
-    return GetImageInfo(hnd.index);
+    ValidateHnd(hnd, "can't get image info");
+    return GetImageInfo(GetResourceGroup(hnd), GetResourceIndex(hnd.index));
 }
 
 static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
 {
-    ValidateImageHnd(hnd, "can't get image view");
-    CTK_ASSERT(frame_index < GetResourceGroup()->frame_count)
-    return GetImageFrameState(hnd.index, frame_index)->view;
+    ValidateHnd(hnd, "can't get image view");
+    ResourceGroup* res_group = GetResourceGroup(hnd);
+    CTK_ASSERT(frame_index < res_group->frame_count)
+    return GetImageFrameState(res_group, GetResourceIndex(hnd.index), frame_index)->view;
 }

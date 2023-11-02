@@ -229,25 +229,29 @@ static void InitResourceGroups(const Allocator* allocator, uint32 max_resource_g
 static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, ResourceGroupInfo* info)
 {
     ResourceGroupHnd hnd = { .index = g_res_groups.count };
-    ++g_res_groups.count;
-
-    ResourceGroup* res_group = GetResourceGroup(hnd);
+    ResourceGroup* res_group = Push(&g_res_groups);
     uint32 frame_count = GetFrameCount();
+    CTK_ASSERT(frame_count > 0);
 
-    res_group->frame_count         = frame_count;
+    res_group->frame_count  = frame_count;
+    res_group->max_buffers  = info->max_buffers;
+    res_group->max_images   = info->max_images;
+    res_group->buffer_count = 0;
+    res_group->image_count  = 0;
 
-    res_group->max_buffers         = info->max_buffers;
-    res_group->buffer_count        = 0;
-    res_group->buffer_infos        = Allocate<BufferInfo>      (allocator, info->max_buffers);
-    res_group->buffer_states       = Allocate<BufferState>     (allocator, info->max_buffers);
-    res_group->buffer_frame_states = Allocate<BufferFrameState>(allocator, info->max_buffers * frame_count);
-
-    res_group->max_images          = info->max_images;
-    res_group->image_count         = 0;
-    res_group->image_infos         = Allocate<ImageInfo>      (allocator, info->max_images);
-    res_group->image_view_infos    = Allocate<ImageViewInfo>  (allocator, info->max_images);
-    res_group->image_states        = Allocate<ImageState>     (allocator, info->max_images);
-    res_group->image_frame_states  = Allocate<ImageFrameState>(allocator, info->max_images * frame_count);
+    if (res_group->max_buffers > 0)
+    {
+        res_group->buffer_infos        = Allocate<BufferInfo>      (allocator, info->max_buffers);
+        res_group->buffer_states       = Allocate<BufferState>     (allocator, info->max_buffers);
+        res_group->buffer_frame_states = Allocate<BufferFrameState>(allocator, info->max_buffers * frame_count);
+    }
+    if (res_group->max_images > 0)
+    {
+        res_group->image_infos         = Allocate<ImageInfo>      (allocator, info->max_images);
+        res_group->image_view_infos    = Allocate<ImageViewInfo>  (allocator, info->max_images);
+        res_group->image_states        = Allocate<ImageState>     (allocator, info->max_images);
+        res_group->image_frame_states  = Allocate<ImageFrameState>(allocator, info->max_images * frame_count);
+    }
 
     return hnd;
 }
@@ -684,7 +688,7 @@ static void LogResourceGroups()
             ResourceMemory* mem = GetMemory(res_group, mem_index);
             if (mem->size == 0)
             {
-                return;
+                continue;
             }
             PrintLine("   memory %u:", mem_index);
             PrintLine("        size:   %llu", mem->size);

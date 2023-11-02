@@ -179,7 +179,9 @@ static ImageInfo* GetInfo(ImageHnd hnd)
 static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
 {
     ValidateHnd(hnd, "can't get image view");
+
     ResourceGroup* res_group = GetResourceGroup(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count)
+
     return GetImageFrameState(res_group, GetImageIndex(hnd), frame_index)->view;
 }

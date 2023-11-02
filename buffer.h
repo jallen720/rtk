@@ -66,9 +66,9 @@ static void WriteHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDev
     ValidateHnd(hnd, "can't write to host buffer");
 
     ResourceGroup* res_group = GetResourceGroup(hnd);
+    uint32 buffer_index = GetBufferIndex(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count);
 
-    uint32 buffer_index = GetBufferIndex(hnd);
     BufferInfo* buffer_info = GetBufferInfo(res_group, buffer_index);
     BufferFrameState* buffer_frame_state = GetBufferFrameState(res_group, buffer_index, frame_index);
     if (data_size > buffer_info->size)
@@ -88,9 +88,9 @@ static void AppendHostBuffer(BufferHnd hnd, uint32 frame_index, void* data, VkDe
     ValidateHnd(hnd, "can't append to host buffer");
 
     ResourceGroup* res_group = GetResourceGroup(hnd);
+    uint32 buffer_index = GetBufferIndex(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count);
 
-    uint32 buffer_index = GetBufferIndex(hnd);
     BufferInfo* buffer_info = GetBufferInfo(res_group, buffer_index);
     BufferFrameState* buffer_frame_state = GetBufferFrameState(res_group, buffer_index, frame_index);
     if (buffer_frame_state->index + data_size > buffer_info->size)
@@ -113,10 +113,10 @@ static void WriteDeviceBufferCmd(BufferHnd dst_hnd, BufferHnd src_hnd, uint32 fr
     ValidateHnd(src_hnd, "can't write from source buffer to destination device buffer");
 
     ResourceGroup* res_group = GetResourceGroup(dst_hnd);
-    CTK_ASSERT(frame_index < res_group->frame_count);
-
     uint32 dst_index = GetBufferIndex(dst_hnd);
     uint32 src_index = GetBufferIndex(src_hnd);
+    CTK_ASSERT(frame_index < res_group->frame_count);
+
     BufferInfo* dst_info = GetBufferInfo(res_group, dst_index);
     if (size > dst_info->size)
     {
@@ -145,10 +145,10 @@ static void AppendDeviceBufferCmd(BufferHnd dst_hnd, BufferHnd src_hnd, uint32 f
     ValidateHnd(src_hnd, "can't append from source buffer to destination device buffer");
 
     ResourceGroup* res_group = GetResourceGroup(dst_hnd);
-    CTK_ASSERT(frame_index < res_group->frame_count);
-
     uint32 dst_index = GetBufferIndex(dst_hnd);
     uint32 src_index = GetBufferIndex(src_hnd);
+    CTK_ASSERT(frame_index < res_group->frame_count);
+
     BufferInfo* dst_info = GetBufferInfo(res_group, dst_index);
     BufferFrameState* dst_frame_state = GetBufferFrameState(res_group, dst_index, frame_index);
     if (dst_frame_state->index + size > dst_info->size)

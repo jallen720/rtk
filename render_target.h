@@ -24,10 +24,8 @@ struct RenderTarget
     VkExtent2D           extent;
     Array<VkFramebuffer> framebuffers;
     Array<VkClearValue>  attachment_clear_values;
-
-    VkImage            depth_image;
-    VkDeviceMemory     depth_image_mem;
-    Array<VkImageView> depth_image_views;
+    ResourceGroupHnd     depth_image_group;
+    ImageHnd             depth_image;
 };
 
 /// Utils
@@ -54,7 +52,7 @@ static void SetDepthAttachment(RenderPassAttachments* attachments, VkAttachmentD
     });
 }
 
-static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
+static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
 {
     Stack frame = CreateFrame(temp_stack);
 
@@ -69,75 +67,43 @@ static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, F
     if (render_target->depth_testing)
     {
         // Create image resource with array layers for each swapchain image.
-        VkFormat depth_image_format = GetPhysicalDevice()->depth_image_format;
-        VkImageCreateInfo image_info =
+        ImageInfo image_info =
         {
-            .sType     = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-            .pNext     = NULL,
-            .flags     = 0,
-            .imageType = VK_IMAGE_TYPE_2D,
-            .format    = depth_image_format,
             .extent =
             {
                 .width  = render_target->extent.width,
                 .height = render_target->extent.height,
                 .depth  = 1
             },
-            .mipLevels             = 1,
-            .arrayLayers           = swapchain->image_views.count,
-            .samples               = VK_SAMPLE_COUNT_1_BIT,
-            .tiling                = VK_IMAGE_TILING_OPTIMAL,
-            .usage                 = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-            .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-            .queueFamilyIndexCount = 0,
-            .pQueueFamilyIndices   = NULL,
-            .initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED,
+            .per_frame      = false,
+            .flags          = 0,
+            .type           = VK_IMAGE_TYPE_2D,
+            .format         = GetPhysicalDevice()->depth_image_format,
+            .mip_levels     = 1,
+            .array_layers   = 1,
+            .samples        = VK_SAMPLE_COUNT_1_BIT,
+            .tiling         = VK_IMAGE_TILING_OPTIMAL,
+            .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            .usage          = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         };
-        res = vkCreateImage(device, &image_info, NULL, &render_target->depth_image);
-        Validate(res, "vkCreateImage() failed");
-
-        // Allocate/bind image memory.
-        VkMemoryRequirements mem_requirements = {};
-        vkGetImageMemoryRequirements(device, render_target->depth_image, &mem_requirements);
-
-        render_target->depth_image_mem = AllocateDeviceMemory(&mem_requirements, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                                                              NULL);
-        res = vkBindImageMemory(device, render_target->depth_image, render_target->depth_image_mem, 0);
-        Validate(res, "vkBindImageMemory() failed");
-
-        // Create image views for each array layer.
-        InitArray(&render_target->depth_image_views, &free_list->allocator, swapchain->image_views.count);
-        for (uint32 array_layer_index = 0; array_layer_index < swapchain->image_views.count; ++array_layer_index)
+        ImageViewInfo image_view_info =
         {
-            VkImageViewCreateInfo image_view_info =
+            .flags      = 0,
+            .type       = VK_IMAGE_VIEW_TYPE_2D,
+            .format     = image_info.format,
+            .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
+            .subresource_range =
             {
-                .sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-                .pNext    = NULL,
-                .flags    = 0,
-                .image    = render_target->depth_image,
-                .viewType = VK_IMAGE_VIEW_TYPE_2D,
-                .format   = depth_image_format,
-                .components =
-                {
-                    .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                    .a = VK_COMPONENT_SWIZZLE_IDENTITY,
-                },
-                .subresourceRange =
-                {
-                    // Ignored for framebuffer attachments
-                    .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
-
-                    .baseMipLevel   = 0,
-                    .levelCount     = VK_REMAINING_MIP_LEVELS,
-                    .baseArrayLayer = array_layer_index,
-                    .layerCount     = 1,
-                },
-            };
-            res = vkCreateImageView(device, &image_view_info, NULL, Push(&render_target->depth_image_views));
-            Validate(res, "vkCreateImageView() failed");
-        }
+                .aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = VK_REMAINING_MIP_LEVELS,
+                .baseArrayLayer = 0,
+                .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+            },
+        };
+        render_target->depth_image = CreateImage(render_target->depth_image_group, &image_info, &image_view_info);
+        InitResources(render_target->depth_image_group, &frame);
     }
 
     // Init framebuffers.
@@ -149,7 +115,7 @@ static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, F
 
         if (render_target->depth_testing)
         {
-            Push(attachments, Get(&render_target->depth_image_views, i));
+            Push(attachments, GetView(render_target->depth_image, 0));
         }
 
         VkFramebufferCreateInfo info =
@@ -172,12 +138,17 @@ static void CreateRenderTarget(RenderTarget* render_target, Stack* temp_stack, F
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRenderTarget(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list,
+static void InitRenderTarget(RenderTarget* render_target, Stack* perm_stack, Stack* temp_stack, FreeList* free_list,
                              RenderTargetInfo* info)
 {
     Stack frame = CreateFrame(temp_stack);
 
     render_target->depth_testing = info->depth_testing;
+    if (render_target->depth_testing)
+    {
+        ResourceGroupInfo info = { .max_images = GetSwapchain()->image_views.count };
+        render_target->depth_image_group = CreateResourceGroup(&perm_stack->allocator, &info);
+    }
 
     uint32 depth_attachment_count = render_target->depth_testing ? 1u : 0u;
     uint32 color_attachment_count = 1;
@@ -239,18 +210,10 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fre
     Validate(res, "vkCreateRenderPass() failed");
 
     // Copy attachment clear values.
-    InitArray(&render_target->attachment_clear_values, &free_list->allocator, &info->attachment_clear_values);
+    InitArray(&render_target->attachment_clear_values, &perm_stack->allocator, &info->attachment_clear_values);
 
     // Create depth images and framebuffers based on swapchain extent.
-    CreateRenderTarget(render_target, &frame, free_list);
-}
-
-static RenderTarget* CreateRenderTarget(const Allocator* allocator, Stack* temp_stack, FreeList* free_list,
-                                        RenderTargetInfo* info)
-{
-    auto render_target = Allocate<RenderTarget>(allocator, 1);
-    InitRenderTarget(render_target, temp_stack, free_list, info);
-    return render_target;
+    SetupRenderTarget(render_target, &frame, free_list);
 }
 
 static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* temp_stack, FreeList* free_list)
@@ -258,18 +221,7 @@ static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* te
     // Destroy depth images.
     if (render_target->depth_testing)
     {
-        VkDevice device = GetDevice();
-
-        // Destroy views.
-        for (uint32 i = 0; i < render_target->depth_image_views.count; ++i)
-        {
-            vkDestroyImageView(device, Get(&render_target->depth_image_views, i), NULL);
-        }
-        DeinitArray(&render_target->depth_image_views, &free_list->allocator);
-
-        // Destroy image.
-        vkDestroyImage(device, render_target->depth_image, NULL);
-        vkFreeMemory(device, render_target->depth_image_mem, NULL);
+        DestroyResources(render_target->depth_image_group);
     }
 
     // Destroy framebuffers.
@@ -280,5 +232,5 @@ static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* te
     DeinitArray(&render_target->framebuffers, &free_list->allocator);
 
     // Re-create depth images and framebuffers with new swapchain extent.
-    CreateRenderTarget(render_target, temp_stack, free_list);
+    SetupRenderTarget(render_target, temp_stack, free_list);
 }

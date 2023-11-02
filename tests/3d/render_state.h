@@ -85,7 +85,7 @@ static void InitDeviceMemory()
     g_render_state.staging_buffer = CreateBuffer(g_render_state.res_group, &staging_buffer_info);
 }
 
-static void InitRenderTargets(Stack* temp_stack, FreeList* free_list)
+static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
     VkClearValue attachment_clear_values[] =
     {
@@ -97,7 +97,7 @@ static void InitRenderTargets(Stack* temp_stack, FreeList* free_list)
         .depth_testing           = true,
         .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
     };
-    InitRenderTarget(&g_render_state.render_target, temp_stack, free_list, &info);
+    InitRenderTarget(&g_render_state.render_target, perm_stack, temp_stack, free_list, &info);
 }
 
 static void InitShaders(Stack* temp_stack)
@@ -394,7 +394,7 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitRenderJob(perm_stack);
     InitDeviceMemory();
 
-    InitRenderTargets(temp_stack, free_list);
+    InitRenderTargets(perm_stack, temp_stack, free_list);
     InitShaders(temp_stack);
     InitMeshes();
 

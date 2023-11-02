@@ -1,7 +1,8 @@
 /// Data
 ////////////////////////////////////////////////////////////
-struct BufferHnd { uint32 index; };
-struct ImageHnd  { uint32 index; };
+struct BufferHnd        { uint32 index; };
+struct ImageHnd         { uint32 index; };
+struct ResourceGroupHnd { uint32 index; };
 
 struct BufferInfo
 {
@@ -115,14 +116,19 @@ static uint32 GetResourceGroupIndex(uint32 res_hnd_index)
     return (0xFF000000 & res_hnd_index) >> 24;
 }
 
-static uint32 GetResourceHndIndex(uint32 res_group_index, uint32 res_index)
+static uint32 GetResourceHndIndex(ResourceGroupHnd res_group_hnd, uint32 res_index)
 {
-    return (res_group_index << 24) | res_index;
+    return (res_group_hnd.index << 24) | res_index;
 }
 
 static ResourceGroup* GetResourceGroup(uint32 index)
 {
     return GetPtr(&g_res_groups, index);
+}
+
+static ResourceGroup* GetResourceGroup(ResourceGroupHnd hnd)
+{
+    return GetResourceGroup(hnd.index);
 }
 
 static ResourceMemory* GetMemory(ResourceGroup* res_group, uint32 mem_index)
@@ -132,6 +138,11 @@ static ResourceMemory* GetMemory(ResourceGroup* res_group, uint32 mem_index)
 
 /// Buffer Utils
 ////////////////////////////////////////////////////////////
+static uint32 GetBufferIndex(BufferHnd hnd)
+{
+    return GetResourceIndex(hnd.index);
+}
+
 static ResourceGroup* GetResourceGroup(BufferHnd hnd)
 {
     return GetResourceGroup(GetResourceGroupIndex(hnd.index));
@@ -171,6 +182,11 @@ static bool OffsetAlignmentDesc(uint32* a_buffer_index, uint32* b_buffer_index, 
 
 /// Image Utils
 ////////////////////////////////////////////////////////////
+static uint32 GetImageIndex(ImageHnd hnd)
+{
+    return GetResourceIndex(hnd.index);
+}
+
 static ResourceGroup* GetResourceGroup(ImageHnd hnd)
 {
     return GetResourceGroup(GetResourceGroupIndex(hnd.index));
@@ -210,12 +226,12 @@ static void InitResourceGroups(const Allocator* allocator, uint32 max_resource_g
     InitArray(&g_res_groups, allocator, max_resource_groups);
 }
 
-static uint32 CreateResourceGroup(const Allocator* allocator, ResourceGroupInfo* info)
+static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, ResourceGroupInfo* info)
 {
-    uint32 index = g_res_groups.count;
+    ResourceGroupHnd hnd = { .index = g_res_groups.count };
     ++g_res_groups.count;
 
-    ResourceGroup* res_group = GetResourceGroup(index);
+    ResourceGroup* res_group = GetResourceGroup(hnd);
     uint32 frame_count = GetFrameCount();
 
     res_group->frame_count         = frame_count;
@@ -233,17 +249,17 @@ static uint32 CreateResourceGroup(const Allocator* allocator, ResourceGroupInfo*
     res_group->image_states        = Allocate<ImageState>     (allocator, info->max_images);
     res_group->image_frame_states  = Allocate<ImageFrameState>(allocator, info->max_images * frame_count);
 
-    return index;
+    return hnd;
 }
 
-static void InitResources(uint32 resource_group_index, Stack* temp_stack)
+static void InitResources(ResourceGroupHnd res_group_hnd, Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);
 
     VkDevice device = GetDevice();
     PhysicalDevice* physical_device = GetPhysicalDevice();
     QueueFamilies* queue_families = &physical_device->queue_families;
-    ResourceGroup* res_group = GetResourceGroup(resource_group_index);
+    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
     VkResult res = VK_SUCCESS;
 
     // Initialize resource state and sort into arrays per memory type.
@@ -491,10 +507,10 @@ static void InitResources(uint32 resource_group_index, Stack* temp_stack)
     }
 }
 
-static void DestroyResources(uint32 resource_group_index)
+static void DestroyResources(ResourceGroupHnd res_group_hnd)
 {
     VkDevice device = GetDevice();
-    ResourceGroup* res_group = GetResourceGroup(resource_group_index);
+    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
 
     // Destroy resources.
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)

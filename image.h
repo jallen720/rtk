@@ -22,7 +22,7 @@ struct ImageData
 static void ValidateHnd(ImageHnd hnd, const char* action)
 {
     ResourceGroup* res_group = GetResourceGroup(hnd);
-    uint32 image_index = GetResourceIndex(hnd.index);
+    uint32 image_index = GetImageIndex(hnd);
     if (image_index >= res_group->image_count)
     {
         CTK_FATAL("%s: image index %u exceeds image count of %u", action, image_index, res_group->image_count);
@@ -31,9 +31,9 @@ static void ValidateHnd(ImageHnd hnd, const char* action)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static ImageHnd CreateImage(uint32 resource_group_index, ImageInfo* info, ImageViewInfo* view_info)
+static ImageHnd CreateImage(ResourceGroupHnd res_group_hnd, ImageInfo* info, ImageViewInfo* view_info)
 {
-    ResourceGroup* res_group = GetResourceGroup(resource_group_index);
+    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
     if (res_group->image_count >= res_group->max_images)
     {
         CTK_FATAL("can't create image: already at max of %u", res_group->max_images);
@@ -41,7 +41,7 @@ static ImageHnd CreateImage(uint32 resource_group_index, ImageInfo* info, ImageV
 
     // Copy info.
     uint32 image_index = res_group->image_count;
-    ImageHnd hnd = { .index = GetResourceHndIndex(resource_group_index, image_index) };
+    ImageHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, image_index) };
     ++res_group->image_count;
     *GetImageInfo(res_group, image_index) = *info;
     *GetImageViewInfo(res_group, image_index) = *view_info;
@@ -79,8 +79,8 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
 
     // Copy image data from buffer memory to image memory.
     ResourceGroup* res_group = GetResourceGroup(image_hnd);
-    uint32 image_index = GetResourceIndex(image_hnd.index);
-    uint32 image_data_buffer_index = GetResourceIndex(image_data_buffer_hnd.index);
+    uint32 image_index = GetImageIndex(image_hnd);
+    uint32 image_data_buffer_index = GetBufferIndex(image_data_buffer_hnd);
     VkImage image = GetImageFrameState(res_group, image_index, frame_index)->image;
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.
@@ -173,7 +173,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
 static ImageInfo* GetInfo(ImageHnd hnd)
 {
     ValidateHnd(hnd, "can't get image info");
-    return GetImageInfo(GetResourceGroup(hnd), GetResourceIndex(hnd.index));
+    return GetImageInfo(GetResourceGroup(hnd), GetImageIndex(hnd));
 }
 
 static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
@@ -181,5 +181,5 @@ static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
     ValidateHnd(hnd, "can't get image view");
     ResourceGroup* res_group = GetResourceGroup(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count)
-    return GetImageFrameState(res_group, GetResourceIndex(hnd.index), frame_index)->view;
+    return GetImageFrameState(res_group, GetImageIndex(hnd), frame_index)->view;
 }

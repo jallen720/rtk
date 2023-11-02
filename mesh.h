@@ -21,7 +21,7 @@ struct Mesh
 
 // /// Interface
 // ////////////////////////////////////////////////////////////
-static void InitMeshData(MeshData* mesh_data, uint32 res_group_index, MeshDataInfo* info)
+static void InitMeshData(MeshData* mesh_data, ResourceGroupHnd res_group_hnd, MeshDataInfo* info)
 {
     BufferInfo vertex_buffer_info =
     {
@@ -31,7 +31,7 @@ static void InitMeshData(MeshData* mesh_data, uint32 res_group_index, MeshDataIn
         .mem_properties   = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
     };
-    mesh_data->vertex_buffer = CreateBuffer(res_group_index, &vertex_buffer_info);
+    mesh_data->vertex_buffer = CreateBuffer(res_group_hnd, &vertex_buffer_info);
 
     BufferInfo index_buffer_info =
     {
@@ -41,13 +41,13 @@ static void InitMeshData(MeshData* mesh_data, uint32 res_group_index, MeshDataIn
         .mem_properties   = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
     };
-    mesh_data->index_buffer = CreateBuffer(res_group_index, &index_buffer_info);
+    mesh_data->index_buffer = CreateBuffer(res_group_hnd, &index_buffer_info);
 }
 
-static MeshData* CreateMeshData(const Allocator* allocator, uint32 res_group_index, MeshDataInfo* info)
+static MeshData* CreateMeshData(const Allocator* allocator, ResourceGroupHnd res_group_hnd, MeshDataInfo* info)
 {
     auto mesh_data = Allocate<MeshData>(allocator, 1);
-    InitMeshData(mesh_data, res_group_index, info);
+    InitMeshData(mesh_data, res_group_hnd, info);
     return mesh_data;
 }
 

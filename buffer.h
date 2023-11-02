@@ -54,8 +54,8 @@ static BufferHnd CreateBuffer(ResourceGroupHnd res_group_hnd, BufferInfo* info)
     }
 
     uint32 buffer_index = res_group->buffer_count;
-    BufferHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, buffer_index) };
     ++res_group->buffer_count;
+    BufferHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, buffer_index) };
     *GetBufferInfo(res_group, buffer_index) = *info;
 
     return hnd;

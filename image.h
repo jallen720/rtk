@@ -41,8 +41,8 @@ static ImageHnd CreateImage(ResourceGroupHnd res_group_hnd, ImageInfo* info, Ima
 
     // Copy info.
     uint32 image_index = res_group->image_count;
-    ImageHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, image_index) };
     ++res_group->image_count;
+    ImageHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, image_index) };
     *GetImageInfo(res_group, image_index) = *info;
     *GetImageViewInfo(res_group, image_index) = *view_info;
 

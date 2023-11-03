@@ -342,9 +342,8 @@ static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint
     PrintTabs(tabs);
     PrintLine("alignment:      %u", mem_requirements->alignment);
     PrintTabs(tabs);
-    Print(    "memoryTypeBits: ");
-    PrintBits((uint8*)&mem_requirements->memoryTypeBits, sizeof(mem_requirements->memoryTypeBits));
-    PrintLine();
+    PrintBitsLine((uint8*)&mem_requirements->memoryTypeBits, sizeof(mem_requirements->memoryTypeBits),
+                  "memoryTypeBits: ");
 }
 
 /// Flag Printing

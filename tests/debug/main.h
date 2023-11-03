@@ -20,13 +20,13 @@ namespace TestDebug
 
 struct RenderState
 {
+    ResourceGroupHnd res_group;
     BufferHnd        staging_buffer;
-    RenderTarget     render_target;
     BufferHnd        entity_buffer;
-    ImageGroupHnd    textures_group;
     Array<ImageHnd>  textures;
     VkSampler        texture_sampler;
     DescriptorSetHnd descriptor_set;
+    RenderTarget     render_target;
     Shader           vert_shader;
     Shader           frag_shader;
     VertexLayout     vertex_layout;

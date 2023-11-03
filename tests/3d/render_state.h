@@ -21,6 +21,7 @@ struct RenderState
     Array<Stack>            render_thread_temp_stacks;
 
     // Device Memory
+    ResourceGroupHnd res_group;
     BufferHnd staging_buffer;
 
     // Rendering State
@@ -32,7 +33,6 @@ struct RenderState
     Mesh         quad_mesh;
 
     // Descriptor Datas
-    ResourceGroupHnd res_group;
     BufferHnd        entity_buffer;
     Array<ImageHnd>  textures;
     VkSampler        texture_sampler;

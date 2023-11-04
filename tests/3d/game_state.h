@@ -77,6 +77,16 @@ static uint32 PushEntity(EntityData* entity_data)
     return new_entity;
 }
 
+static uint32 TextureIndex(uint32 entity_index)
+{
+    return (entity_index / (MAX_ENTITIES / TEXTURE_COUNT)) % TEXTURE_COUNT;
+}
+
+static uint32 CycleTextureIndex(uint32 entity_index)
+{
+    return entity_index % TEXTURE_COUNT;
+}
+
 static void InitEntities()
 {
     EntityData* entity_data = &game_state.entity_data;
@@ -84,20 +94,20 @@ static void InitEntities()
     for (uint32 y = 0; y < CUBE_SIZE; ++y)
     for (uint32 z = 0; z < CUBE_SIZE; ++z)
     {
-        uint32 entity = PushEntity(&game_state.entity_data);
-        entity_data->transforms[entity] =
+        uint32 entity_index = PushEntity(&game_state.entity_data);
+        entity_data->transforms[entity_index] =
         {
             .position = { x * 1.5f, y * 1.5f, z * 1.5f },
             .rotation = { 0, 0, 0 },
         };
-        entity_data->entities[entity] =
+        entity_data->entities[entity_index] =
         {
             .rotate_axis      = (uint8)RandomRange(0u, 3u),
             .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
         };
-        entity_data->texture_indexes[entity] = entity < MAX_ENTITIES / 3 ? 0 :
-                                               entity < 2 * (MAX_ENTITIES / 3) ? 1 :
-                                               2;
+        entity_data->texture_indexes[entity_index] =
+            TextureIndex(entity_index);
+            // CycleTextureIndex(entity_index);
     }
 }
 

@@ -338,11 +338,11 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
 static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint32 tabs = 0)
 {
     PrintTabs(tabs);
-    PrintLine("size:           %u", mem_requirements->size);
+    PrintLine    ("size:           %u", mem_requirements->size);
     PrintTabs(tabs);
-    PrintLine("alignment:      %u", mem_requirements->alignment);
+    PrintLine    ("alignment:      %u", mem_requirements->alignment);
     PrintTabs(tabs);
-    PrintBitsLine((uint8*)&mem_requirements->memoryTypeBits, sizeof(mem_requirements->memoryTypeBits),
+    PrintBitsLine(mem_requirements->memoryTypeBits,
                   "memoryTypeBits: ");
 }
 

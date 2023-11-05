@@ -117,7 +117,7 @@ static void LogMemoryTypes(VkPhysicalDeviceMemoryProperties* mem_properties, uin
     Print("    memory types:");
     for (uint32 i = 0; i < mem_properties->memoryTypeCount; ++i)
     {
-        VkMemoryType* type = mem_properties->memoryTypes + i;
+        VkMemoryType* type = &mem_properties->memoryTypes[i];
         PrintLine();
 
         PrintTabs(tabs);

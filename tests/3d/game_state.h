@@ -166,8 +166,8 @@ static void UpdateEntities()
     // EntityData* entity_data = &game_state.entity_data;
     // for (uint32 entity_index = 0; entity_index < entity_data->count; ++entity_index)
     // {
-    //     Transform* transform = entity_data->transforms + entity_index;
-    //     Entity* entity = entity_data->entities + entity_index;
+    //     Transform* transform = &entity_data->transforms[entity_index];
+    //     Entity* entity = &entity_data->entities[entity_index];
 
     //     static constexpr float32 ROTATION_SPEED = 0.1f;
     //     float32 rotation = entity->rotate_direction * ROTATION_SPEED;
@@ -223,7 +223,7 @@ static void UpdateMVPMatrixesThread(void* data)
     // Update entity MVP matrixes.
     for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
     {
-        Transform* entity_transform = game_state.entity_data.transforms + i;
+        Transform* entity_transform = &game_state.entity_data.transforms[i];
         Matrix model_matrix = ID_MATRIX;
         model_matrix = Translate(model_matrix, entity_transform->position);
         model_matrix = RotateX(model_matrix, entity_transform->rotation.x);

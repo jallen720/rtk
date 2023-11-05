@@ -40,11 +40,11 @@ static uint32 PrintToChar(const char* msg, uint32 msg_size, char end_char, uint3
 
     if (color != NULL)
     {
-        Print("%s%.*s" CTK_ANSI_RESET, color, index - start, msg + start);
+        Print("%s%.*s" CTK_ANSI_RESET, color, index - start, &msg[start]);
     }
     else
     {
-        Print("%.*s" CTK_ANSI_RESET, index - start, msg + start);
+        Print("%.*s" CTK_ANSI_RESET, index - start, &msg[start]);
     }
 
     return index;
@@ -256,7 +256,7 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
         Print("]" CTK_ERROR_NL);
 
         // Print each object on separate line.
-        while (StringsMatch(callback_data->pMessage + index, "Object", 6))
+        while (StringsMatch(&callback_data->pMessage[index], "Object", 6))
         {
             index = PrintToChar(callback_data->pMessage, msg_size, ':', index, CTK_ANSI_COLOR_SKY);
             index = PrintToChar(callback_data->pMessage, msg_size, ';', index);
@@ -312,7 +312,7 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
                     break;
                 }
             }
-            Print("%.*s", print_size, callback_data->pMessage + index);
+            Print("%.*s", print_size, &callback_data->pMessage[index]);
             Print(CTK_ERROR_NL);
             index += print_size;
             line_start = ERROR_TAG_SIZE; // Subsequent lines start after error tag.

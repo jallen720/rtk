@@ -61,7 +61,7 @@ static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* t
     ++g_descriptor_state.set_count;
 
     // Copy data bindings.
-    InitArray(g_descriptor_state.data_bindings + hnd.index, allocator, &datas);
+    InitArray(&g_descriptor_state.data_bindings[hnd.index], allocator, &datas);
 
     // Generate layout bindings.
     Array<VkDescriptorSetLayoutBinding> layout_bindings = {};
@@ -147,7 +147,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
             .descriptorSetCount = g_descriptor_state.set_count,
             .pSetLayouts        = g_descriptor_state.layouts,
         };
-        res = vkAllocateDescriptorSets(device, &allocate_info, g_descriptor_state.sets + frame_offset);
+        res = vkAllocateDescriptorSets(device, &allocate_info, &g_descriptor_state.sets[frame_offset]);
         Validate(res, "vkAllocateDescriptorSets() failed");
     }
 
@@ -189,7 +189,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
         uint32 frame_offset = frame_index * g_descriptor_state.set_count;
         for (uint32 set_index = 0; set_index < g_descriptor_state.set_count; ++set_index)
         {
-            Array<DescriptorData>* data_bindings = g_descriptor_state.data_bindings + set_index;
+            Array<DescriptorData>* data_bindings = &g_descriptor_state.data_bindings[set_index];
             VkDescriptorSet descriptor_set = g_descriptor_state.sets[frame_offset + set_index];
             for (uint32 binding_index = 0; binding_index < data_bindings->count; ++binding_index)
             {

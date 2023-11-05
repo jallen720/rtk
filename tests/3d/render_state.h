@@ -329,13 +329,13 @@ static void RecordRenderCommandsThread(void* data)
     auto state = (RenderCommandState*)data;
     VkCommandBuffer command_buffer = BeginRenderCommands(&g_render_state.render_target, state->thread_index);
         Pipeline* pipeline = &g_render_state.pipeline;
-        BindPipeline(command_buffer, pipeline);
         DescriptorSetHnd descriptor_sets[] =
         {
             g_render_state.entity_descriptor_set,
             g_render_state.textures_descriptor_set,
         };
         BindDescriptorSets(command_buffer, pipeline, state->temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
+        BindPipeline(command_buffer, pipeline);
         BindMeshData(command_buffer, &g_render_state.mesh_data);
 #if 1
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);

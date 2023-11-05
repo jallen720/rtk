@@ -26,10 +26,10 @@ static struct DescriptorState
     Array<DescriptorData>* data_bindings;
     VkDescriptorSetLayout* layouts;
     VkDescriptorSet*       sets;
+    VkDescriptorPool       pool;
     uint32                 max_sets;
     uint32                 set_count;
     uint32                 frame_count;
-    VkDescriptorPool       pool;
 }
 g_descriptor_state;
 
@@ -41,10 +41,10 @@ static void InitDescriptorSetModule(const Allocator* allocator, uint32 max_sets)
     g_descriptor_state.data_bindings = Allocate<Array<DescriptorData>>(allocator, max_sets);
     g_descriptor_state.layouts       = Allocate<VkDescriptorSetLayout>(allocator, max_sets);
     g_descriptor_state.sets          = Allocate<VkDescriptorSet>(allocator, max_sets * frame_count);
+    g_descriptor_state.pool          = VK_NULL_HANDLE;
     g_descriptor_state.max_sets      = max_sets;
     g_descriptor_state.set_count     = 0;
     g_descriptor_state.frame_count   = frame_count;
-    g_descriptor_state.pool          = VK_NULL_HANDLE;
 }
 
 static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* temp_stack, Array<DescriptorData> datas)

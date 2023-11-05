@@ -19,8 +19,8 @@ struct Mesh
     uint32 index_count;
 };
 
-// /// Interface
-// ////////////////////////////////////////////////////////////
+/// Interface
+////////////////////////////////////////////////////////////
 static void InitMeshData(MeshData* mesh_data, ResourceGroupHnd res_group_hnd, MeshDataInfo* info)
 {
     BufferInfo vertex_buffer_info =

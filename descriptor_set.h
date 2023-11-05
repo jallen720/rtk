@@ -9,12 +9,12 @@ struct DescriptorData
     uint32             count;
     union
     {
-        BufferHnd* buffer_hnds;
-        ImageHnd*  image_hnds;
-        VkSampler* samplers;
+        BufferHnd* buffer_hnd_array;
+        ImageHnd*  image_hnd_array;
+        VkSampler* sampler_array;
         struct
         {
-            ImageHnd* image_hnds;
+            ImageHnd* image_hnd_array;
             VkSampler sampler;
         }
         combined_image_samplers;
@@ -94,7 +94,7 @@ static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* t
     return hnd;
 }
 
-static void AllocateDescriptorSets(Stack* temp_stack)
+static void InitDescriptorSets(Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);
     VkDevice device = GetDevice();
@@ -135,7 +135,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
     VkResult res = vkCreateDescriptorPool(device, &pool_info, NULL, &g_desc_state.pool);
     Validate(res, "vkCreateDescriptorPool() failed");
 
-    // Allocate descriptor all sets for each frame from pool.
+    // Allocate all descriptor sets for each frame from pool.
     for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
     {
         uint32 frame_offset = frame_index * g_desc_state.set_count;
@@ -152,7 +152,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
     }
 
     ///
-    /// Bind Resources To Descriptor Sets
+    /// Bind Resources
     ///
 
     // Add up total number of data bindings for all descriptor sets.
@@ -206,7 +206,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                     data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
                 {
                     write->pBufferInfo = End(buffer_infos);
-                    CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnds, data_binding->count)
+                    CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnd_array, data_binding->count)
                     {
                         Push(buffer_infos,
                              {
@@ -219,7 +219,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
                 {
                     write->pImageInfo = End(image_infos);
-                    CTK_ITER_PTR(sampler, data_binding->samplers, data_binding->count)
+                    CTK_ITER_PTR(sampler, data_binding->sampler_array, data_binding->count)
                     {
                         Push(image_infos,
                              {
@@ -232,7 +232,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
                 {
                     write->pImageInfo = End(image_infos);
-                    CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
+                    CTK_ITER_PTR(image_hnd, data_binding->image_hnd_array, data_binding->count)
                     {
                         Push(image_infos,
                              {
@@ -245,7 +245,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
                 {
                     write->pImageInfo = End(image_infos);
-                    CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnds, data_binding->count)
+                    CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnd_array, data_binding->count)
                     {
                         Push(image_infos,
                              {

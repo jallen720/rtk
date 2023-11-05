@@ -22,6 +22,6 @@ layout(set = 1, binding = 1) uniform sampler texture_sampler;
 
 void main()
 {
-    out_color = texture(sampler2D(textures[nonuniformEXT(entity.texture_indexes[in_entity_index])], texture_sampler),
-                        in_vert_uv);
+    uint texture_index = entity.texture_indexes[in_entity_index];
+    out_color = texture(sampler2D(textures[nonuniformEXT(texture_index)], texture_sampler), in_vert_uv);
 }

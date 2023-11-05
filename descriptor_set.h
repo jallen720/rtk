@@ -31,37 +31,37 @@ static struct DescriptorState
     uint32                 set_count;
     uint32                 frame_count;
 }
-g_descriptor_state;
+g_desc_state;
 
 /// Interface
 ////////////////////////////////////////////////////////////
 static void InitDescriptorSetModule(const Allocator* allocator, uint32 max_sets)
 {
     uint32 frame_count = GetFrameCount();
-    g_descriptor_state.data_bindings = Allocate<Array<DescriptorData>>(allocator, max_sets);
-    g_descriptor_state.layouts       = Allocate<VkDescriptorSetLayout>(allocator, max_sets);
-    g_descriptor_state.sets          = Allocate<VkDescriptorSet>(allocator, max_sets * frame_count);
-    g_descriptor_state.pool          = VK_NULL_HANDLE;
-    g_descriptor_state.max_sets      = max_sets;
-    g_descriptor_state.set_count     = 0;
-    g_descriptor_state.frame_count   = frame_count;
+    g_desc_state.data_bindings = Allocate<Array<DescriptorData>>(allocator, max_sets);
+    g_desc_state.layouts       = Allocate<VkDescriptorSetLayout>(allocator, max_sets);
+    g_desc_state.sets          = Allocate<VkDescriptorSet>(allocator, max_sets * frame_count);
+    g_desc_state.pool          = VK_NULL_HANDLE;
+    g_desc_state.max_sets      = max_sets;
+    g_desc_state.set_count     = 0;
+    g_desc_state.frame_count   = frame_count;
 }
 
 static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* temp_stack, Array<DescriptorData> datas)
 {
-    if (g_descriptor_state.set_count >= g_descriptor_state.max_sets)
+    if (g_desc_state.set_count >= g_desc_state.max_sets)
     {
-        CTK_FATAL("can't create descriptor set: already at max of %u", g_descriptor_state.max_sets);
+        CTK_FATAL("can't create descriptor set: already at max of %u", g_desc_state.max_sets);
     }
 
     Stack frame = CreateFrame(temp_stack);
 
     // Assign handle.
-    DescriptorSetHnd hnd = { .index = g_descriptor_state.set_count };
-    ++g_descriptor_state.set_count;
+    DescriptorSetHnd hnd = { .index = g_desc_state.set_count };
+    ++g_desc_state.set_count;
 
     // Copy data bindings.
-    InitArray(&g_descriptor_state.data_bindings[hnd.index], allocator, &datas);
+    InitArray(&g_desc_state.data_bindings[hnd.index], allocator, &datas);
 
     // Generate layout bindings.
     Array<VkDescriptorSetLayoutBinding> layout_bindings = {};
@@ -88,7 +88,7 @@ static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* t
         .bindingCount = layout_bindings.count,
         .pBindings    = layout_bindings.data,
     };
-    VkResult res = vkCreateDescriptorSetLayout(GetDevice(), &layout_info, NULL, &g_descriptor_state.layouts[hnd.index]);
+    VkResult res = vkCreateDescriptorSetLayout(GetDevice(), &layout_info, NULL, &g_desc_state.layouts[hnd.index]);
     Validate(res, "vkCreateDescriptorSetLayout() failed");
 
     return hnd;
@@ -98,7 +98,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
 {
     Stack frame = CreateFrame(temp_stack);
     VkDevice device = GetDevice();
-    uint32 frame_count = g_descriptor_state.frame_count;
+    uint32 frame_count = g_desc_state.frame_count;
 
     ///
     /// Allocate Descriptor Sets
@@ -113,7 +113,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
         *pool_size_index = UINT32_MAX;
     }
 
-    CTK_ITER_PTR(data_bindings, g_descriptor_state.data_bindings, g_descriptor_state.set_count)
+    CTK_ITER_PTR(data_bindings, g_desc_state.data_bindings, g_desc_state.set_count)
     {
         CTK_ITER(data_binding, data_bindings)
         {
@@ -128,26 +128,26 @@ static void AllocateDescriptorSets(Stack* temp_stack)
     {
         .sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .flags         = 0,
-        .maxSets       = g_descriptor_state.set_count * frame_count,
+        .maxSets       = g_desc_state.set_count * frame_count,
         .poolSizeCount = pool_sizes.count,
         .pPoolSizes    = pool_sizes.data,
     };
-    VkResult res = vkCreateDescriptorPool(device, &pool_info, NULL, &g_descriptor_state.pool);
+    VkResult res = vkCreateDescriptorPool(device, &pool_info, NULL, &g_desc_state.pool);
     Validate(res, "vkCreateDescriptorPool() failed");
 
     // Allocate descriptor all sets for each frame from pool.
     for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
     {
-        uint32 frame_offset = frame_index * g_descriptor_state.set_count;
+        uint32 frame_offset = frame_index * g_desc_state.set_count;
         VkDescriptorSetAllocateInfo allocate_info =
         {
             .sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
             .pNext              = NULL,
-            .descriptorPool     = g_descriptor_state.pool,
-            .descriptorSetCount = g_descriptor_state.set_count,
-            .pSetLayouts        = g_descriptor_state.layouts,
+            .descriptorPool     = g_desc_state.pool,
+            .descriptorSetCount = g_desc_state.set_count,
+            .pSetLayouts        = g_desc_state.layouts,
         };
-        res = vkAllocateDescriptorSets(device, &allocate_info, &g_descriptor_state.sets[frame_offset]);
+        res = vkAllocateDescriptorSets(device, &allocate_info, &g_desc_state.sets[frame_offset]);
         Validate(res, "vkAllocateDescriptorSets() failed");
     }
 
@@ -158,7 +158,7 @@ static void AllocateDescriptorSets(Stack* temp_stack)
     // Add up total number of data bindings for all descriptor sets.
     uint32 buffer_write_count = 0;
     uint32 image_write_count  = 0;
-    CTK_ITER_PTR(data_bindings, g_descriptor_state.data_bindings, g_descriptor_state.set_count)
+    CTK_ITER_PTR(data_bindings, g_desc_state.data_bindings, g_desc_state.set_count)
     {
         CTK_ITER(data_binding, data_bindings)
         {
@@ -186,11 +186,11 @@ static void AllocateDescriptorSets(Stack* temp_stack)
     auto writes       = CreateArray<VkWriteDescriptorSet>  (&frame.allocator, buffer_infos->size + image_infos->size);
     for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
     {
-        uint32 frame_offset = frame_index * g_descriptor_state.set_count;
-        for (uint32 set_index = 0; set_index < g_descriptor_state.set_count; ++set_index)
+        uint32 frame_offset = frame_index * g_desc_state.set_count;
+        for (uint32 set_index = 0; set_index < g_desc_state.set_count; ++set_index)
         {
-            Array<DescriptorData>* data_bindings = &g_descriptor_state.data_bindings[set_index];
-            VkDescriptorSet descriptor_set = g_descriptor_state.sets[frame_offset + set_index];
+            Array<DescriptorData>* data_bindings = &g_desc_state.data_bindings[set_index];
+            VkDescriptorSet descriptor_set = g_desc_state.sets[frame_offset + set_index];
             for (uint32 binding_index = 0; binding_index < data_bindings->count; ++binding_index)
             {
                 DescriptorData* data_binding = GetPtr(data_bindings, binding_index);
@@ -269,29 +269,29 @@ static void AllocateDescriptorSets(Stack* temp_stack)
 
 static VkDescriptorSetLayout GetLayout(DescriptorSetHnd hnd)
 {
-    if (hnd.index >= g_descriptor_state.set_count)
+    if (hnd.index >= g_desc_state.set_count)
     {
         CTK_FATAL("can't get descriptor set layout: handle index %u exceeds descriptor set count of %u",
-                  hnd.index, g_descriptor_state.set_count);
+                  hnd.index, g_desc_state.set_count);
     }
-    return g_descriptor_state.layouts[hnd.index];
+    return g_desc_state.layouts[hnd.index];
 }
 
 static VkDescriptorSet GetFrameSet(DescriptorSetHnd hnd, uint32 frame_index)
 {
-    if (hnd.index >= g_descriptor_state.set_count)
+    if (hnd.index >= g_desc_state.set_count)
     {
         CTK_FATAL("can't get frame descriptor set: handle index %u exceeds descriptor set count of %u",
-                  hnd.index, g_descriptor_state.set_count);
+                  hnd.index, g_desc_state.set_count);
     }
 
-    if (frame_index >= g_descriptor_state.frame_count)
+    if (frame_index >= g_desc_state.frame_count)
     {
         CTK_FATAL("can't get frame descriptor set: frame index %u exceeds frame count of %u that descriptor set module "
                   "was initialized with",
-                  frame_index, g_descriptor_state.frame_count);
+                  frame_index, g_desc_state.frame_count);
     }
 
-    uint32 frame_offset = frame_index * g_descriptor_state.set_count;
-    return g_descriptor_state.sets[frame_offset + hnd.index];
+    uint32 frame_offset = frame_index * g_desc_state.set_count;
+    return g_desc_state.sets[frame_offset + hnd.index];
 }

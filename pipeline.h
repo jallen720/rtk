@@ -107,10 +107,8 @@ static void CreatePipeline(Pipeline* pipeline)
     }
 
     // Color Blend
-    static constexpr VkPipelineColorBlendAttachmentState SWAPCHAIN_IMAGE_COLOR_BLEND =
-        DEFAULT_COLOR_BLEND_ATTACHMENT_STATE;
     static constexpr VkPipelineColorBlendStateCreateInfo COLOR_BLEND_STATE =
-        DefaultColorBlendStateCreateInfo(&SWAPCHAIN_IMAGE_COLOR_BLEND, 1);
+        DefaultColorBlendStateCreateInfo(&DEFAULT_COLOR_BLEND_ATTACHMENT_STATE, 1);
 
     VkPipelineDynamicStateCreateInfo dynamic_state = DEFAULT_DYNAMIC_STATE;
 

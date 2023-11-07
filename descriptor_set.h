@@ -9,15 +9,15 @@ struct DescriptorData
     uint32             count;
     union
     {
-        BufferHnd* buffer_hnd_array;
-        ImageHnd*  image_hnd_array;
-        VkSampler* sampler_array;
+        BufferHnd* buffer_hnds;
+        ImageHnd*  image_hnds;
+        VkSampler* samplers;
         struct
         {
-            ImageHnd* image_hnd_array;
+            ImageHnd* image_hnds;
             VkSampler sampler;
         }
-        combined_image_samplers;
+        image_samplers;
     };
 };
 
@@ -206,7 +206,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                     data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
                 {
                     write->pBufferInfo = End(buffer_infos);
-                    CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnd_array, data_binding->count)
+                    CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnds, data_binding->count)
                     {
                         Push(buffer_infos,
                              {
@@ -219,7 +219,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
                 {
                     write->pImageInfo = End(image_infos);
-                    CTK_ITER_PTR(sampler, data_binding->sampler_array, data_binding->count)
+                    CTK_ITER_PTR(sampler, data_binding->samplers, data_binding->count)
                     {
                         Push(image_infos,
                              {
@@ -232,7 +232,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
                 {
                     write->pImageInfo = End(image_infos);
-                    CTK_ITER_PTR(image_hnd, data_binding->image_hnd_array, data_binding->count)
+                    CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
                     {
                         Push(image_infos,
                              {
@@ -245,11 +245,11 @@ static void InitDescriptorSets(Stack* temp_stack)
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
                 {
                     write->pImageInfo = End(image_infos);
-                    CTK_ITER_PTR(image_hnd, data_binding->combined_image_samplers.image_hnd_array, data_binding->count)
+                    CTK_ITER_PTR(image_hnd, data_binding->image_samplers.image_hnds, data_binding->count)
                     {
                         Push(image_infos,
                              {
-                                 .sampler     = data_binding->combined_image_samplers.sampler,
+                                 .sampler     = data_binding->image_samplers.sampler,
                                  .imageView   = GetView(*image_hnd, frame_index),
                                  .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                              });

@@ -204,10 +204,10 @@ static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
         DescriptorData datas[] =
         {
             {
-                .type             = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .stages           = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                .count            = 1,
-                .buffer_hnd_array = &g_render_state.entity_buffer,
+                .type        = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .stages      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                .count       = 1,
+                .buffer_hnds = &g_render_state.entity_buffer,
             },
         };
         g_render_state.entity_descriptor_set =
@@ -219,16 +219,16 @@ static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
         DescriptorData datas[] =
         {
             {
-                .type            = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                .stages          = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .count           = g_render_state.textures.count,
-                .image_hnd_array = g_render_state.textures.data,
+                .type       = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+                .stages     = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .count      = g_render_state.textures.count,
+                .image_hnds = g_render_state.textures.data,
             },
             {
-                .type          = VK_DESCRIPTOR_TYPE_SAMPLER,
-                .stages        = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .count         = 1,
-                .sampler_array = &g_render_state.texture_sampler,
+                .type     = VK_DESCRIPTOR_TYPE_SAMPLER,
+                .stages   = VK_SHADER_STAGE_FRAGMENT_BIT,
+                .count    = 1,
+                .samplers = &g_render_state.texture_sampler,
             },
         };
         g_render_state.textures_descriptor_set =

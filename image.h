@@ -19,7 +19,7 @@ struct ImageData
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void ValidateHnd(ImageHnd hnd, const char* action)
+static void ValidateImageHnd(ImageHnd hnd, const char* action)
 {
     ResourceGroup* res_group = GetResourceGroup(hnd);
     uint32 image_index = GetImageIndex(hnd);
@@ -33,7 +33,7 @@ static void ValidateHnd(ImageHnd hnd, const char* action)
 ////////////////////////////////////////////////////////////
 static ImageHnd CreateImage(ResourceGroupHnd res_group_hnd, ImageInfo* info, ImageViewInfo* view_info)
 {
-    ValidateHnd(res_group_hnd, "can't create image");
+    ValidateResourceGroupHnd(res_group_hnd, "can't create image");
 
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
     if (res_group->image_count >= res_group->max_images)
@@ -70,8 +70,8 @@ static void DestroyImageData(ImageData* image_data)
 
 static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint32 frame_index, const char* path)
 {
-    ValidateHnd(image_hnd, "can't load image");
-    ValidateHnd(image_data_buffer_hnd, "can't load image from buffer");
+    ValidateImageHnd(image_hnd, "can't load image");
+    ValidateBufferHnd(image_data_buffer_hnd, "can't load image from buffer");
 
     // Load image data and write to staging buffer.
     ImageData image_data = {};
@@ -174,13 +174,13 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
 
 static ImageInfo* GetInfo(ImageHnd hnd)
 {
-    ValidateHnd(hnd, "can't get image info");
+    ValidateImageHnd(hnd, "can't get image info");
     return GetImageInfo(GetResourceGroup(hnd), GetImageIndex(hnd));
 }
 
 static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
 {
-    ValidateHnd(hnd, "can't get image view");
+    ValidateImageHnd(hnd, "can't get image view");
 
     ResourceGroup* res_group = GetResourceGroup(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count)

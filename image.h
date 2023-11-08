@@ -19,8 +19,11 @@ struct ImageData
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void ValidateImageHnd(ImageHnd hnd, const char* action)
+static void ValidateImage(ImageHnd hnd, const char* action)
 {
+    uint32 res_group_index = GetResourceGroupIndex(hnd.index);
+    ValidateResourceGroup(res_group_index, action);
+
     ResourceGroup* res_group = GetResourceGroup(hnd);
     uint32 image_index = GetImageIndex(hnd);
     if (image_index >= res_group->image_count)
@@ -33,7 +36,7 @@ static void ValidateImageHnd(ImageHnd hnd, const char* action)
 ////////////////////////////////////////////////////////////
 static ImageHnd CreateImage(ResourceGroupHnd res_group_hnd, ImageInfo* info, ImageViewInfo* view_info)
 {
-    ValidateResourceGroupHnd(res_group_hnd, "can't create image");
+    ValidateResourceGroup(res_group_hnd, "can't create image");
 
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
     if (res_group->image_count >= res_group->max_images)
@@ -70,8 +73,8 @@ static void DestroyImageData(ImageData* image_data)
 
 static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint32 frame_index, const char* path)
 {
-    ValidateImageHnd(image_hnd, "can't load image");
-    ValidateBufferHnd(image_data_buffer_hnd, "can't load image from buffer");
+    ValidateImage(image_hnd, "can't load image");
+    ValidateBuffer(image_data_buffer_hnd, "can't load image from buffer");
 
     // Load image data and write to staging buffer.
     ImageData image_data = {};
@@ -174,13 +177,13 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
 
 static ImageInfo* GetInfo(ImageHnd hnd)
 {
-    ValidateImageHnd(hnd, "can't get image info");
+    ValidateImage(hnd, "can't get image info");
     return GetImageInfo(GetResourceGroup(hnd), GetImageIndex(hnd));
 }
 
 static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
 {
-    ValidateImageHnd(hnd, "can't get image view");
+    ValidateImage(hnd, "can't get image view");
 
     ResourceGroup* res_group = GetResourceGroup(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count)

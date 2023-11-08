@@ -18,6 +18,8 @@ static void ValidateHnd(BufferHnd hnd, const char* action)
 ////////////////////////////////////////////////////////////
 static BufferHnd CreateBuffer(ResourceGroupHnd res_group_hnd, BufferInfo* info)
 {
+    ValidateHnd(res_group_hnd, "can't create buffer");
+
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
     if (res_group->buffer_count >= res_group->max_buffers)
     {

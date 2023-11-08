@@ -123,7 +123,7 @@ static uint32 GetResourceHndIndex(ResourceGroupHnd res_group_hnd, uint32 res_ind
 
 static ResourceGroup* GetResourceGroup(uint32 index)
 {
-    return GetPtr(&g_res_groups, index);
+    return &g_res_groups.data[index];
 }
 
 static ResourceGroup* GetResourceGroup(ResourceGroupHnd hnd)
@@ -134,6 +134,15 @@ static ResourceGroup* GetResourceGroup(ResourceGroupHnd hnd)
 static ResourceMemory* GetMemory(ResourceGroup* res_group, uint32 mem_index)
 {
     return &res_group->mems[mem_index];
+}
+
+static void ValidateHnd(ResourceGroupHnd hnd, const char* action)
+{
+    if (hnd.index >= g_res_groups.count)
+    {
+        CTK_FATAL("%s: resource group index %u exceeds resource group count of %u",
+                  action, hnd.index, g_res_groups.count);
+    }
 }
 
 /// Buffer Utils
@@ -258,6 +267,8 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
 
 static void InitResources(ResourceGroupHnd res_group_hnd, Stack* temp_stack)
 {
+    ValidateHnd(res_group_hnd, "can't initialize resources");
+
     Stack frame = CreateFrame(temp_stack);
 
     VkDevice device = GetDevice();
@@ -513,6 +524,8 @@ static void InitResources(ResourceGroupHnd res_group_hnd, Stack* temp_stack)
 
 static void DestroyResources(ResourceGroupHnd res_group_hnd)
 {
+    ValidateHnd(res_group_hnd, "can't destroy resources");
+
     VkDevice device = GetDevice();
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
 

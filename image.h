@@ -33,6 +33,8 @@ static void ValidateHnd(ImageHnd hnd, const char* action)
 ////////////////////////////////////////////////////////////
 static ImageHnd CreateImage(ResourceGroupHnd res_group_hnd, ImageInfo* info, ImageViewInfo* view_info)
 {
+    ValidateHnd(res_group_hnd, "can't create image");
+
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
     if (res_group->image_count >= res_group->max_images)
     {

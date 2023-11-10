@@ -10,7 +10,7 @@ struct RenderCommandState
 {
     uint32     thread_index;
     BatchRange batch_range;
-    Mesh*      mesh;
+    MeshHnd    mesh;
     Stack*     temp_stack;
 };
 
@@ -22,15 +22,16 @@ struct RenderState
 
     // Device Memory
     ResourceGroupHnd res_group;
-    BufferHnd staging_buffer;
+    BufferHnd        staging_buffer;
 
     // Rendering State
     RenderTarget render_target;
     Shader       vert_shader;
     Shader       frag_shader;
-    MeshData     mesh_data;
-    Mesh         cube_mesh;
-    Mesh         quad_mesh;
+
+    MeshGroupHnd mesh_group;
+    MeshHnd      cube_mesh;
+    MeshHnd      quad_mesh;
 
     // Descriptor Datas
     BufferHnd        entity_buffer;
@@ -42,6 +43,19 @@ struct RenderState
     DescriptorSetHnd textures_descriptor_set;
     VertexLayout     vertex_layout;
     Pipeline         pipeline;
+};
+
+struct Vertex
+{
+    Vec3<float32> position;
+    Vec2<float32> uv;
+};
+
+template<typename VertexType>
+struct MeshData
+{
+    Array<VertexType> vertexes;
+    Array<uint32>     indexes;
 };
 
 static constexpr const char* TEXTURE_IMAGE_PATHS[] =
@@ -106,14 +120,32 @@ static void InitShaders(Stack* temp_stack)
     InitShader(&g_render_state.frag_shader, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
-static void InitMeshes()
+static void InitMeshState(Stack* perm_stack, MeshData<Vertex>* cube_mesh_data, MeshData<Vertex>* quad_mesh_data)
 {
-    MeshDataInfo mesh_data_info =
+    InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
+    MeshGroupInfo mesh_group_info =
     {
-        .vertex_buffer_size = Megabyte32<1>(),
-        .index_buffer_size  = Megabyte32<1>(),
+        .max_meshes     = 16,
+        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    InitMeshData(&g_render_state.mesh_data, g_render_state.res_group, &mesh_data_info);
+    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, &mesh_group_info);
+    MeshInfo cube_mesh_info =
+    {
+        .vertex_size  = sizeof(Vertex),
+        .vertex_count = cube_mesh_data->vertexes.count,
+        .index_size   = sizeof(uint32),
+        .index_count  = cube_mesh_data->indexes.count,
+    };
+    g_render_state.cube_mesh = CreateMesh(g_render_state.mesh_group, &cube_mesh_info);
+    MeshInfo quad_mesh_info =
+    {
+        .vertex_size  = sizeof(Vertex),
+        .vertex_count = quad_mesh_data->vertexes.count,
+        .index_size   = sizeof(uint32),
+        .index_count  = quad_mesh_data->indexes.count,
+    };
+    g_render_state.quad_mesh = CreateMesh(g_render_state.mesh_group, &quad_mesh_info);
+    InitMeshGroup(g_render_state.mesh_group, g_render_state.res_group);
 }
 
 static void CreateDescriptorDatas(Stack* perm_stack)
@@ -308,20 +340,14 @@ static void WriteResources()
     {
         LoadImage(Get(&g_render_state.textures, i), g_render_state.staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
     }
+}
 
-    // Meshes
-    {
-        #include "rtk/meshes/cube.h"
-        InitDeviceMesh(&g_render_state.cube_mesh, &g_render_state.mesh_data,
-                       CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                       g_render_state.staging_buffer);
-    }
-    {
-        #include "rtk/meshes/quad.h"
-        InitDeviceMesh(&g_render_state.quad_mesh, &g_render_state.mesh_data,
-                       CTK_WRAP_ARRAY(vertexes), CTK_WRAP_ARRAY(indexes),
-                       g_render_state.staging_buffer);
-    }
+static void LoadMeshes(MeshData<Vertex>* cube_mesh_data, MeshData<Vertex>* quad_mesh_data)
+{
+    LoadDeviceMesh(g_render_state.cube_mesh, g_render_state.staging_buffer,
+                   cube_mesh_data->vertexes, cube_mesh_data->indexes);
+    LoadDeviceMesh(g_render_state.quad_mesh, g_render_state.staging_buffer,
+                   quad_mesh_data->vertexes, quad_mesh_data->indexes);
 }
 
 static void RecordRenderCommandsThread(void* data)
@@ -336,7 +362,7 @@ static void RecordRenderCommandsThread(void* data)
         };
         BindDescriptorSets(command_buffer, pipeline, state->temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
         BindPipeline(command_buffer, pipeline);
-        BindMeshData(command_buffer, &g_render_state.mesh_data);
+        BindMeshGroup(command_buffer, g_render_state.mesh_group);
 #if 1
         DrawMesh(command_buffer, state->mesh, state->batch_range.start, state->batch_range.size);
 #else
@@ -396,7 +422,20 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     InitRenderTargets(perm_stack, temp_stack, free_list);
     InitShaders(temp_stack);
-    InitMeshes();
+
+    #include "meshes/cube.h"
+    MeshData<Vertex> cube_mesh_data =
+    {
+        .vertexes = CTK_WRAP_ARRAY(cube_vertexes),
+        .indexes  = CTK_WRAP_ARRAY(cube_indexes),
+    };
+    #include "meshes/quad.h"
+    MeshData<Vertex> quad_mesh_data =
+    {
+        .vertexes = CTK_WRAP_ARRAY(quad_vertexes),
+        .indexes  = CTK_WRAP_ARRAY(quad_indexes),
+    };
+    InitMeshState(perm_stack, &cube_mesh_data, &quad_mesh_data);
 
     CreateDescriptorDatas(perm_stack);
     CreateDescriptorSets(perm_stack, temp_stack);
@@ -407,16 +446,17 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
 LogResourceGroups();
     InitDescriptorSets(temp_stack);
     WriteResources();
+    LoadMeshes(&cube_mesh_data, &quad_mesh_data);
 }
 
 static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
 {
     Job<RenderCommandState>* job = &g_render_state.render_command_job;
 
-    static Mesh* meshes[] =
+    static MeshHnd meshes[] =
     {
-        &g_render_state.quad_mesh,
-        &g_render_state.cube_mesh,
+        g_render_state.quad_mesh,
+        g_render_state.cube_mesh,
     };
     static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(meshes);
 

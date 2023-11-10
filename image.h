@@ -79,7 +79,16 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
     // Load image data and write to staging buffer.
     ImageData image_data = {};
     LoadImageData(&image_data, path);
-    WriteHostBuffer(image_data_buffer_hnd, frame_index, image_data.data, (VkDeviceSize)image_data.size);
+
+    HostBufferWrite image_data_write =
+    {
+        .size       = (uint32)image_data.size,
+        .src_data   = image_data.data,
+        .src_offset = 0,
+        .dst_hnd    = image_data_buffer_hnd,
+    };
+    WriteHostBuffer(&image_data_write, frame_index);
+
     DestroyImageData(&image_data);
 
     // Copy image data from buffer memory to image memory.

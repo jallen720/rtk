@@ -1,6 +1,4 @@
-struct Vertex { Vec3<float32> position; Vec2<float32> uv; };
-
-Vertex vertexes[] =
+Vertex cube_vertexes[] =
 {
     // +X
     { .position = { 1.0f, 0.0f, 0.0f }, .uv = { 0.00f, 0.50f } },
@@ -39,7 +37,7 @@ Vertex vertexes[] =
     { .position = { 1.0f, 0.0f, 0.0f }, .uv = { 0.75f, 1.00f } },
 };
 
-uint32 indexes[] =
+uint32 cube_indexes[] =
 {
     // +X
     0, 1, 2,

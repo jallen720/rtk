@@ -92,29 +92,31 @@ static void BindDescriptorSets(VkCommandBuffer command_buffer, Pipeline* pipelin
                             0, NULL); // Dynamic Offsets
 }
 
-static void BindMeshData(VkCommandBuffer command_buffer, MeshData* mesh_data)
+static void BindMeshGroup(VkCommandBuffer command_buffer, MeshGroupHnd mesh_group_hnd)
 {
-    VkDeviceSize vertex_buffer_offset = GetOffset(mesh_data->vertex_buffer, 0);
-    VkBuffer vertex_buffer = GetBuffer(mesh_data->vertex_buffer);
+    MeshGroup* mesh_group = GetMeshGroup(mesh_group_hnd);
+    VkDeviceSize vertex_buffer_offset = GetOffset(mesh_group->vertex_buffer, 0);
+    VkBuffer vertex_buffer = GetBuffer(mesh_group->vertex_buffer);
     vkCmdBindVertexBuffers(command_buffer,
                            0, // First Binding
                            1, // Binding Count
                            &vertex_buffer,
                            &vertex_buffer_offset);
     vkCmdBindIndexBuffer(command_buffer,
-                         GetBuffer(mesh_data->index_buffer),
-                         GetOffset(mesh_data->index_buffer, 0),
+                         GetBuffer(mesh_group->index_buffer),
+                         GetOffset(mesh_group->index_buffer, 0),
                          VK_INDEX_TYPE_UINT32);
 }
 
-static void DrawMesh(VkCommandBuffer command_buffer, Mesh* mesh, uint32 instance_start, uint32 instance_count)
+static void DrawMesh(VkCommandBuffer command_buffer, MeshHnd mesh_hnd, uint32 instance_start, uint32 instance_count)
 {
+    Mesh* mesh = GetMesh(mesh_hnd);
     vkCmdDrawIndexed(command_buffer,
-                     mesh->index_count,   // Index Count
-                     instance_count,      // Instance Count
-                     mesh->index_offset,  // Index Offset
-                     mesh->vertex_offset, // Vertex Offset (sint32)
-                     instance_start);     // First Instance
+                     mesh->index_count,                       // Index Count
+                     instance_count,                          // Instance Count
+                     mesh->index_offset  / mesh->index_size,  // Index Offset
+                     mesh->vertex_offset / mesh->vertex_size, // Vertex Offset (sint32)
+                     instance_start);                         // First Instance
 }
 
 static void EndRenderCommands(VkCommandBuffer command_buffer)

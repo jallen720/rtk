@@ -977,60 +977,6 @@ static void WaitIdle()
     vkDeviceWaitIdle(g_context.device);
 }
 
-static uint32 GetCapableMemoryTypeIndex(VkMemoryRequirements* mem_requirements, VkMemoryPropertyFlags mem_properties)
-{
-    // Reference: https://registry.khronos.org/vulkan/specs/1.3/html/vkspec.html#memory-device
-    VkPhysicalDeviceMemoryProperties* device_mem_properties = &g_context.physical_device->mem_properties;
-    for (uint32 i = 0; i < device_mem_properties->memoryTypeCount; ++i)
-    {
-        // Memory type at index must be supported for resource.
-        if ((mem_requirements->memoryTypeBits & (1 << i)) == 0)
-        {
-            continue;
-        }
-
-        // Memory type at index must support all resource memory properties.
-        if ((device_mem_properties->memoryTypes[i].propertyFlags & mem_properties) != mem_properties)
-        {
-            continue;
-        }
-
-        return i;
-    }
-
-    CTK_FATAL("failed to find memory type that satisfies memory requirements");
-}
-
-static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize size, VkAllocationCallbacks* allocators)
-{
-    // From https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkAllocateMemory.html:
-    // Allocations returned by vkAllocateMemory are guaranteed to meet any alignment requirement of the implementation.
-    // For example, if an implementation requires 128 byte alignment for images and 64 byte alignment for buffers, the
-    // device memory returned through this mechanism would be 128-byte aligned. This ensures that applications can
-    // correctly suballocate objects of different types (with potentially different alignment requirements) in the same
-    // memory object.
-
-    // Allocate memory using selected memory type index.
-    VkMemoryAllocateInfo info =
-    {
-        .sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize  = size,
-        .memoryTypeIndex = mem_type_index,
-    };
-    VkDeviceMemory mem = VK_NULL_HANDLE;
-    VkResult res = vkAllocateMemory(g_context.device, &info, allocators, &mem);
-    Validate(res, "vkAllocateMemory() failed");
-
-    return mem;
-}
-
-static VkDeviceMemory
-AllocateDeviceMemory(VkMemoryRequirements* requirements, VkMemoryPropertyFlags properties,
-                     VkAllocationCallbacks* allocators)
-{
-    return AllocateDeviceMemory(GetCapableMemoryTypeIndex(requirements, properties), requirements->size, allocators);
-}
-
 static void NextFrame()
 {
     Next(&g_context.frames);

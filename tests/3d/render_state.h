@@ -20,27 +20,21 @@ struct RenderState
     Job<RenderCommandState> render_command_job;
     Array<Stack>            render_thread_temp_stacks;
 
-    // Device Memory
+    // Resources
     ResourceGroupHnd res_group;
     BufferHnd        staging_buffer;
-
-    // Rendering State
-    RenderTarget render_target;
-    Shader       vert_shader;
-    Shader       frag_shader;
-
-    MeshGroupHnd mesh_group;
-    MeshHnd      cube_mesh;
-    MeshHnd      quad_mesh;
-
-    // Descriptor Datas
     BufferHnd        entity_buffer;
     Array<ImageHnd>  textures;
     VkSampler        texture_sampler;
+    MeshGroupHnd     mesh_group;
+    Array<MeshHnd>   meshes;
 
-    // Descriptor Sets/Pipelines
+    // Assets
     DescriptorSetHnd entity_descriptor_set;
     DescriptorSetHnd textures_descriptor_set;
+    RenderTarget     render_target;
+    Shader           vert_shader;
+    Shader           frag_shader;
     VertexLayout     vertex_layout;
     Pipeline         pipeline;
 };
@@ -51,18 +45,14 @@ struct Vertex
     Vec2<float32> uv;
 };
 
-template<typename VertexType>
-struct MeshData
-{
-    Array<VertexType> vertexes;
-    Array<uint32>     indexes;
-};
-
 static constexpr const char* TEXTURE_IMAGE_PATHS[] =
 {
     "images/axis_cube.png",
     "images/axis_cube_inv.png",
     "images/dirt_block.png",
+    "images/dirt_block.png",
+    "images/axis_cube_inv.png",
+    "images/axis_cube.png",
 };
 static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
 static_assert(TEXTURE_COUNT == MAX_TEXTURES);
@@ -86,8 +76,18 @@ static void InitRenderJob(Stack* perm_stack)
     }
 }
 
-static void InitDeviceMemory()
+static void CreateResources(Stack* perm_stack, Stack* temp_stack)
 {
+    InitResourceModule(&perm_stack->allocator, { .max_resource_groups = 4 });
+
+    ResourceGroupInfo res_group_info =
+    {
+        .max_buffers = 32,
+        .max_images  = 32,
+    };
+    g_render_state.res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
+
+    // Staging Buffer
     BufferInfo staging_buffer_info =
     {
         .size             = Megabyte32<4>(),
@@ -97,59 +97,7 @@ static void InitDeviceMemory()
         .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     };
     g_render_state.staging_buffer = CreateBuffer(g_render_state.res_group, &staging_buffer_info);
-}
 
-static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
-{
-    VkClearValue attachment_clear_values[] =
-    {
-        { .color        = { 0.0f, 0.1f, 0.2f, 1.0f } },
-        { .depthStencil = { 1.0f, 0u }               },
-    };
-    RenderTargetInfo info =
-    {
-        .depth_testing           = true,
-        .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
-    };
-    InitRenderTarget(&g_render_state.render_target, perm_stack, temp_stack, free_list, &info);
-}
-
-static void InitShaders(Stack* temp_stack)
-{
-    InitShader(&g_render_state.vert_shader, temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    InitShader(&g_render_state.frag_shader, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-}
-
-static void InitMeshState(Stack* perm_stack, MeshData<Vertex>* cube_mesh_data, MeshData<Vertex>* quad_mesh_data)
-{
-    InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
-    MeshGroupInfo mesh_group_info =
-    {
-        .max_meshes     = 16,
-        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    };
-    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, &mesh_group_info);
-    MeshInfo cube_mesh_info =
-    {
-        .vertex_size  = sizeof(Vertex),
-        .vertex_count = cube_mesh_data->vertexes.count,
-        .index_size   = sizeof(uint32),
-        .index_count  = cube_mesh_data->indexes.count,
-    };
-    g_render_state.cube_mesh = CreateMesh(g_render_state.mesh_group, &cube_mesh_info);
-    MeshInfo quad_mesh_info =
-    {
-        .vertex_size  = sizeof(Vertex),
-        .vertex_count = quad_mesh_data->vertexes.count,
-        .index_size   = sizeof(uint32),
-        .index_count  = quad_mesh_data->indexes.count,
-    };
-    g_render_state.quad_mesh = CreateMesh(g_render_state.mesh_group, &quad_mesh_info);
-    InitMeshGroup(g_render_state.mesh_group, g_render_state.res_group);
-}
-
-static void CreateDescriptorDatas(Stack* perm_stack)
-{
     // Entity Buffer
     BufferInfo entity_buffer_info =
     {
@@ -163,47 +111,104 @@ static void CreateDescriptorDatas(Stack* perm_stack)
 
     // Textures
     InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
-    ImageInfo texture_info =
-    {
-        .extent =
-        {
-            .width  = 64,
-            .height = 32,
-            .depth  = 1
-        },
-        .per_frame      = false,
-        .flags          = 0,
-        .type           = VK_IMAGE_TYPE_2D,
-        .format         = GetSwapchain()->surface_format.format,
-        .mip_levels     = 1,
-        .array_layers   = 1,
-        .samples        = VK_SAMPLE_COUNT_1_BIT,
-        .tiling         = VK_IMAGE_TILING_OPTIMAL,
-        .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-    };
-    ImageViewInfo texture_view_info =
-    {
-        .flags      = 0,
-        .type       = VK_IMAGE_VIEW_TYPE_2D,
-        .format     = texture_info.format,
-        .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
-        .subresource_range =
-        {
-            .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel   = 0,
-            .levelCount     = VK_REMAINING_MIP_LEVELS,
-            .baseArrayLayer = 0,
-            .layerCount     = VK_REMAINING_ARRAY_LAYERS,
-        },
-    };
+    ImageData texture_datas[TEXTURE_COUNT] = {};
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
+        ImageData* texture_data = &texture_datas[i];
+        LoadImageData(texture_data, TEXTURE_IMAGE_PATHS[i]);
+        ImageInfo texture_info =
+        {
+            .extent =
+            {
+                .width  = (uint32)texture_data->width,
+                .height = (uint32)texture_data->height,
+                .depth  = 1
+            },
+            .per_frame      = false,
+            .flags          = 0,
+            .type           = VK_IMAGE_TYPE_2D,
+            .format         = GetSwapchain()->surface_format.format,
+            .mip_levels     = 1,
+            .array_layers   = 1,
+            .samples        = VK_SAMPLE_COUNT_1_BIT,
+            .tiling         = VK_IMAGE_TILING_OPTIMAL,
+            .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        };
+        ImageViewInfo texture_view_info =
+        {
+            .flags      = 0,
+            .type       = VK_IMAGE_VIEW_TYPE_2D,
+            .format     = texture_info.format,
+            .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
+            .subresource_range =
+            {
+                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel   = 0,
+                .levelCount     = VK_REMAINING_MIP_LEVELS,
+                .baseArrayLayer = 0,
+                .layerCount     = VK_REMAINING_ARRAY_LAYERS,
+            },
+        };
         Push(&g_render_state.textures, CreateImage(g_render_state.res_group, &texture_info, &texture_view_info));
     }
 
-    // Texture Sampler
+    // Meshes
+    #include "meshes/quad.h"
+    #include "meshes/cube.h"
+    InitArray(&g_render_state.meshes, &perm_stack->allocator, 2);
+    MeshData<Vertex> mesh_datas[] =
+    {
+        {
+            .vertexes = CTK_WRAP_ARRAY(quad_vertexes),
+            .indexes  = CTK_WRAP_ARRAY(quad_indexes),
+        },
+        {
+            .vertexes = CTK_WRAP_ARRAY(cube_vertexes),
+            .indexes  = CTK_WRAP_ARRAY(cube_indexes),
+        },
+    };
+    InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
+    MeshGroupInfo mesh_group_info =
+    {
+        .max_meshes     = 16,
+        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, &mesh_group_info);
+    CTK_ITER_PTR(mesh_data, mesh_datas, CTK_ARRAY_SIZE(mesh_datas))
+    {
+        MeshInfo mesh_info =
+        {
+            .vertex_size  = sizeof(Vertex),
+            .vertex_count = mesh_data->vertexes.count,
+            .index_size   = sizeof(uint32),
+            .index_count  = mesh_data->indexes.count,
+        };
+        Push(&g_render_state.meshes, CreateMesh(g_render_state.mesh_group, &mesh_info));
+    }
+    InitMeshGroup(g_render_state.mesh_group, g_render_state.res_group);
+
+    // Load data into assets resources.
+    InitResourceGroup(g_render_state.res_group, temp_stack);
+
+    // Textures
+    for (uint32 i = 0; i < g_render_state.textures.count; ++i)
+    {
+        ImageData* texture_data = &texture_datas[i];
+        LoadImage(Get(&g_render_state.textures, i), g_render_state.staging_buffer, 0, texture_data);
+        DestroyImageData(texture_data);
+    }
+
+    // Meshes
+    for (uint32 i = 0; i < g_render_state.meshes.count; ++i)
+    {
+        LoadDeviceMesh(Get(&g_render_state.meshes, i), g_render_state.staging_buffer, &mesh_datas[i]);
+    }
+}
+
+static void CreateSampler()
+{
     VkSamplerCreateInfo texture_sampler_info =
     {
         .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
@@ -231,6 +236,8 @@ static void CreateDescriptorDatas(Stack* perm_stack)
 
 static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
 {
+    InitDescriptorSetModule(&perm_stack->allocator, 16);
+
     // Entity
     {
         DescriptorData datas[] =
@@ -266,6 +273,29 @@ static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
         g_render_state.textures_descriptor_set =
             CreateDescriptorSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
     }
+
+    InitDescriptorSets(temp_stack);
+}
+
+static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
+{
+    VkClearValue attachment_clear_values[] =
+    {
+        { .color        = { 0.0f, 0.1f, 0.2f, 1.0f } },
+        { .depthStencil = { 1.0f, 0u }               },
+    };
+    RenderTargetInfo info =
+    {
+        .depth_testing           = true,
+        .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
+    };
+    InitRenderTarget(&g_render_state.render_target, perm_stack, temp_stack, free_list, &info);
+}
+
+static void InitShaders(Stack* temp_stack)
+{
+    InitShader(&g_render_state.vert_shader, temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    InitShader(&g_render_state.frag_shader, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 }
 
 static void InitVertexLayout(Stack* perm_stack)
@@ -333,23 +363,6 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
     InitPipeline(&g_render_state.pipeline, temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
 }
 
-static void WriteResources()
-{
-    // Images
-    for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
-    {
-        LoadImage(Get(&g_render_state.textures, i), g_render_state.staging_buffer, 0, TEXTURE_IMAGE_PATHS[i]);
-    }
-}
-
-static void LoadMeshes(MeshData<Vertex>* cube_mesh_data, MeshData<Vertex>* quad_mesh_data)
-{
-    LoadDeviceMesh(g_render_state.cube_mesh, g_render_state.staging_buffer,
-                   cube_mesh_data->vertexes, cube_mesh_data->indexes);
-    LoadDeviceMesh(g_render_state.quad_mesh, g_render_state.staging_buffer,
-                   quad_mesh_data->vertexes, quad_mesh_data->indexes);
-}
-
 static void RecordRenderCommandsThread(void* data)
 {
     auto state = (RenderCommandState*)data;
@@ -408,64 +421,32 @@ static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
 ////////////////////////////////////////////////////////////
 static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
-    InitResourceGroups(&perm_stack->allocator, 4);
-    ResourceGroupInfo res_group_info =
-    {
-        .max_buffers = 32,
-        .max_images  = 32,
-    };
-    g_render_state.res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
-    InitDescriptorSetModule(&perm_stack->allocator, 16);
-
     InitRenderJob(perm_stack);
-    InitDeviceMemory();
 
+    // Resources
+    CreateResources(perm_stack, temp_stack);
+
+    // Assets
+    CreateSampler();
+    CreateDescriptorSets(perm_stack, temp_stack);
     InitRenderTargets(perm_stack, temp_stack, free_list);
     InitShaders(temp_stack);
-
-    #include "meshes/cube.h"
-    MeshData<Vertex> cube_mesh_data =
-    {
-        .vertexes = CTK_WRAP_ARRAY(cube_vertexes),
-        .indexes  = CTK_WRAP_ARRAY(cube_indexes),
-    };
-    #include "meshes/quad.h"
-    MeshData<Vertex> quad_mesh_data =
-    {
-        .vertexes = CTK_WRAP_ARRAY(quad_vertexes),
-        .indexes  = CTK_WRAP_ARRAY(quad_indexes),
-    };
-    InitMeshState(perm_stack, &cube_mesh_data, &quad_mesh_data);
-
-    CreateDescriptorDatas(perm_stack);
-    CreateDescriptorSets(perm_stack, temp_stack);
     InitVertexLayout(perm_stack);
     InitPipelines(temp_stack, free_list);
 
-    InitResources(g_render_state.res_group, temp_stack);
 LogResourceGroups();
-    InitDescriptorSets(temp_stack);
-    WriteResources();
-    LoadMeshes(&cube_mesh_data, &quad_mesh_data);
 }
 
 static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
 {
     Job<RenderCommandState>* job = &g_render_state.render_command_job;
 
-    static MeshHnd meshes[] =
-    {
-        g_render_state.quad_mesh,
-        g_render_state.cube_mesh,
-    };
-    static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(meshes);
-
     uint32 render_thread_count = GetRenderThreadCount();
     for (uint32 thread_index = 0; thread_index < render_thread_count; ++thread_index)
     {
         RenderCommandState* state = GetPtr(&job->states, thread_index);
         state->thread_index = thread_index;
-        state->mesh         = meshes[thread_index % MESH_COUNT];
+        state->mesh         = Get(&g_render_state.meshes, thread_index % g_render_state.meshes.count);
         state->batch_range  = GetBatchRange(thread_index, render_thread_count, entity_count);
         state->temp_stack   = GetPtr(&g_render_state.render_thread_temp_stacks, thread_index);
 

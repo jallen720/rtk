@@ -42,6 +42,13 @@ struct MeshModuleInfo
     uint32 max_mesh_groups;
 };
 
+template<typename VertexType>
+struct MeshData
+{
+    Array<VertexType> vertexes;
+    Array<uint32>     indexes;
+};
+
 static Array<MeshGroup> g_mesh_groups;
 
 /// Utils
@@ -179,7 +186,7 @@ static void InitMeshGroup(MeshGroupHnd mesh_group_hnd, ResourceGroupHnd res_grou
 }
 
 template<typename VertexType>
-static void LoadHostMesh(MeshHnd mesh_hnd, Array<VertexType> vertexes, Array<uint32> indexes)
+static void LoadHostMesh(MeshHnd mesh_hnd, MeshData<VertexType>* mesh_data)
 {
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
@@ -189,15 +196,15 @@ static void LoadHostMesh(MeshHnd mesh_hnd, Array<VertexType> vertexes, Array<uin
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
 
-    VkDeviceSize vertexes_byte_size = ByteSize(&vertexes);
-    VkDeviceSize indexes_byte_size  = ByteSize(&indexes);
+    VkDeviceSize vertexes_byte_size = ByteSize(&mesh_data->vertexes);
+    VkDeviceSize indexes_byte_size  = ByteSize(&mesh_data->indexes);
     ValidateMeshLoad(mesh_group, mesh_group_index, vertexes_byte_size, indexes_byte_size);
 
     static constexpr uint32 FRAME_INDEX = 0;
     HostBufferWrite vertex_buffer_write =
     {
         .size       = vertexes_byte_size,
-        .src_data   = vertexes.data,
+        .src_data   = mesh_data->vertexes.data,
         .src_offset = 0,
         .dst_hnd    = mesh_group->vertex_buffer,
         .dst_offset = mesh->vertex_offset,
@@ -206,7 +213,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, Array<VertexType> vertexes, Array<uin
     HostBufferWrite index_buffer_write =
     {
         .size       = indexes_byte_size,
-        .src_data   = indexes.data,
+        .src_data   = mesh_data->indexes.data,
         .src_offset = 0,
         .dst_hnd    = mesh_group->index_buffer,
         .dst_offset = mesh->index_offset,
@@ -215,8 +222,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, Array<VertexType> vertexes, Array<uin
 }
 
 template<typename VertexType>
-static void
-LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer, Array<VertexType> vertexes, Array<uint32> indexes)
+static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshData<VertexType>* mesh_data)
 {
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
@@ -226,27 +232,29 @@ LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer, Array<VertexType> ver
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
 
-    VkDeviceSize vertexes_byte_size = ByteSize(&vertexes);
-    VkDeviceSize indexes_byte_size  = ByteSize(&indexes);
+    ValidateBuffer(staging_buffer_hnd, "can't load mesh from buffer");
+
+    VkDeviceSize vertexes_byte_size = ByteSize(&mesh_data->vertexes);
+    VkDeviceSize indexes_byte_size  = ByteSize(&mesh_data->indexes);
     ValidateMeshLoad(mesh_group, mesh_group_index, vertexes_byte_size, indexes_byte_size);
 
     static constexpr uint32 FRAME_INDEX = 0;
-    Clear(staging_buffer);
+    Clear(staging_buffer_hnd);
 
     HostBufferAppend vertex_staging =
     {
         .size       = vertexes_byte_size,
-        .src_data   = vertexes.data,
+        .src_data   = mesh_data->vertexes.data,
         .src_offset = 0,
-        .dst_hnd    = staging_buffer,
+        .dst_hnd    = staging_buffer_hnd,
     };
     AppendHostBuffer(&vertex_staging, FRAME_INDEX);
     HostBufferAppend index_staging =
     {
         .size       = indexes_byte_size,
-        .src_data   = indexes.data,
+        .src_data   = mesh_data->indexes.data,
         .src_offset = 0,
-        .dst_hnd    = staging_buffer,
+        .dst_hnd    = staging_buffer_hnd,
     };
     AppendHostBuffer(&index_staging, FRAME_INDEX);
 
@@ -254,7 +262,7 @@ LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer, Array<VertexType> ver
         DeviceBufferWrite vertex_buffer_write =
         {
             .size       = vertexes_byte_size,
-            .src_hnd    = staging_buffer,
+            .src_hnd    = staging_buffer_hnd,
             .src_offset = 0,
             .dst_hnd    = mesh_group->vertex_buffer,
             .dst_offset = mesh->vertex_offset,
@@ -263,7 +271,7 @@ LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer, Array<VertexType> ver
         DeviceBufferWrite index_buffer_write =
         {
             .size       = indexes_byte_size,
-            .src_hnd    = staging_buffer,
+            .src_hnd    = staging_buffer_hnd,
             .src_offset = vertexes_byte_size,
             .dst_hnd    = mesh_group->index_buffer,
             .dst_offset = mesh->index_offset,

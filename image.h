@@ -71,30 +71,24 @@ static void DestroyImageData(ImageData* image_data)
     *image_data = {};
 }
 
-static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint32 frame_index, const char* path)
+static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 frame_index, ImageData* image_data)
 {
     ValidateImage(image_hnd, "can't load image");
-    ValidateBuffer(image_data_buffer_hnd, "can't load image from buffer");
-
-    // Load image data and write to staging buffer.
-    ImageData image_data = {};
-    LoadImageData(&image_data, path);
+    ValidateBuffer(staging_buffer_hnd, "can't load image from buffer");
 
     HostBufferWrite image_data_write =
     {
-        .size       = (uint32)image_data.size,
-        .src_data   = image_data.data,
+        .size       = (uint32)image_data->size,
+        .src_data   = image_data->data,
         .src_offset = 0,
-        .dst_hnd    = image_data_buffer_hnd,
+        .dst_hnd    = staging_buffer_hnd,
     };
     WriteHostBuffer(&image_data_write, frame_index);
-
-    DestroyImageData(&image_data);
 
     // Copy image data from buffer memory to image memory.
     ResourceGroup* res_group = GetResourceGroup(image_hnd);
     uint32 image_index = GetImageIndex(image_hnd);
-    uint32 image_data_buffer_index = GetBufferIndex(image_data_buffer_hnd);
+    uint32 image_data_buffer_index = GetBufferIndex(staging_buffer_hnd);
     VkImage image = GetImageFrameState(res_group, image_index, frame_index)->image;
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.
@@ -130,7 +124,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd image_data_buffer_hnd, uint3
 
         VkBufferImageCopy copy =
         {
-            .bufferOffset      = GetOffset(image_data_buffer_hnd, frame_index),
+            .bufferOffset      = GetOffset(staging_buffer_hnd, frame_index),
             .bufferRowLength   = 0,
             .bufferImageHeight = 0,
             .imageSubresource =

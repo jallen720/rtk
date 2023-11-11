@@ -103,7 +103,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
             },
         };
         render_target->depth_image = CreateImage(render_target->depth_image_group, &image_info, &image_view_info);
-        InitResources(render_target->depth_image_group, &frame);
+        InitResourceGroup(render_target->depth_image_group, &frame);
     }
 
     // Init framebuffers.

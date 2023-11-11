@@ -81,6 +81,11 @@ struct ResourceGroupInfo
     uint32 max_images;
 };
 
+struct ResourceModuleInfo
+{
+    uint32 max_resource_groups;
+};
+
 struct ResourceGroup
 {
     uint32            frame_count;
@@ -282,9 +287,9 @@ static bool AlignmentDesc(uint32* a_image_index, uint32* b_image_index, Resource
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitResourceGroups(const Allocator* allocator, uint32 max_resource_groups)
+static void InitResourceModule(const Allocator* allocator, ResourceModuleInfo info)
 {
-    InitArray(&g_res_groups, allocator, max_resource_groups);
+    InitArray(&g_res_groups, allocator, info.max_resource_groups);
 }
 
 static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, ResourceGroupInfo* info)
@@ -317,7 +322,7 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
     return hnd;
 }
 
-static void InitResources(ResourceGroupHnd res_group_hnd, Stack* temp_stack)
+static void InitResourceGroup(ResourceGroupHnd res_group_hnd, Stack* temp_stack)
 {
     ValidateResourceGroup(res_group_hnd, "can't initialize resources");
 

@@ -3,6 +3,6 @@
 
 #define CUBE_SIZE 66
 #define MAX_ENTITIES (CUBE_SIZE * CUBE_SIZE * CUBE_SIZE)
-#define MAX_TEXTURES 3
+#define MAX_TEXTURES 6
 
 #endif

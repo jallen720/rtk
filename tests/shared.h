@@ -1,14 +1,3 @@
-#pragma once
-
-#include "ctk3/ctk3.h"
-#include "ctk3/math.h"
-#include "ctk3/stack.h"
-#include "ctk3/array.h"
-#include "ctk3/thread_pool.h"
-#include "ctk3/window.h"
-
-using namespace CTK;
-
 /// Data
 ////////////////////////////////////////////////////////////
 template<typename StateType>

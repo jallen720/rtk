@@ -1,24 +1,4 @@
-#pragma once
-
-#include <windows.h>
-#include "ctk3/ctk3.h"
-#include "ctk3/debug.h"
-#include "ctk3/math.h"
-#include "ctk3/stack.h"
-#include "ctk3/array.h"
-#include "ctk3/free_list.h"
-#include "ctk3/thread_pool.h"
-#include "ctk3/profile.h"
-#include "ctk3/window.h"
-
-#define RTK_ENABLE_VALIDATION
-#include "rtk/rtk.h"
-
-#include "rtk/tests/shared.h"
 #include "rtk/tests/3d/defs.h"
-
-using namespace CTK;
-using namespace RTK;
 
 namespace Test3D
 {

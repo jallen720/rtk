@@ -11,22 +11,7 @@
 #include "rtk/stb/stb_image.h"
 #pragma warning(pop)
 
-#include "ctk3/ctk3.h"
-#include "ctk3/allocator.h"
-#include "ctk3/array.h"
-#include "ctk3/array2d.h"
-#include "ctk3/debug.h"
-#include "ctk3/file.h"
-#include "ctk3/free_list.h"
-#include "ctk3/io.h"
-#include "ctk3/optional.h"
-#include "ctk3/pair.h"
-#include "ctk3/ring_buffer.h"
-#include "ctk3/stack.h"
-#include "ctk3/string.h"
-#include "ctk3/thread_pool.h"
-#include "ctk3/window.h"
-
+#include "ctk3/ctk.h"
 using namespace CTK;
 
 namespace RTK

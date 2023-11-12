@@ -1,19 +1,4 @@
-#pragma once
-
-#include <windows.h>
-#include "ctk3/ctk3.h"
-#include "ctk3/stack.h"
-#include "ctk3/free_list.h"
-#include "ctk3/window.h"
-
-#define RTK_ENABLE_VALIDATION
-#include "rtk/rtk.h"
-
-#include "rtk/tests/shared.h"
 #include "rtk/tests/debug/defs.h"
-
-using namespace CTK;
-using namespace RTK;
 
 namespace TestDebug
 {

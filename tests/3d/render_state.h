@@ -48,11 +48,11 @@ struct Vertex
 static constexpr const char* TEXTURE_IMAGE_PATHS[] =
 {
     "images/axis_cube.png",
-    "images/axis_cube_inv.png",
     "images/dirt_block.png",
-    "images/dirt_block.png",
+    "images/stone_tiles.png",
     "images/axis_cube_inv.png",
     "images/axis_cube.png",
+    "images/stone_tiles.png",
 };
 static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
 static_assert(TEXTURE_COUNT == MAX_TEXTURES);
@@ -110,8 +110,8 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
     g_render_state.entity_buffer = CreateBuffer(g_render_state.res_group, &entity_buffer_info);
 
     // Textures
-    InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
     ImageData texture_datas[TEXTURE_COUNT] = {};
+    InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
         ImageData* texture_data = &texture_datas[i];
@@ -157,7 +157,8 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
     // Meshes
     #include "meshes/quad.h"
     #include "meshes/cube.h"
-    InitArray(&g_render_state.meshes, &perm_stack->allocator, 2);
+    #include "meshes/cube_repeating.h"
+    InitArray(&g_render_state.meshes, &perm_stack->allocator, 3);
     MeshData<Vertex> mesh_datas[] =
     {
         {
@@ -167,6 +168,10 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
         {
             .vertexes = CTK_WRAP_ARRAY(cube_vertexes),
             .indexes  = CTK_WRAP_ARRAY(cube_indexes),
+        },
+        {
+            .vertexes = CTK_WRAP_ARRAY(cube_repeating_vertexes),
+            .indexes  = CTK_WRAP_ARRAY(cube_repeating_indexes),
         },
     };
     InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });

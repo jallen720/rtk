@@ -142,11 +142,11 @@ static void LogDeviceFeature(const char* feature_name, VkBool32 enabled, uint32 
     Print(" %.*s ", longest_feature_name_size - StringSize(feature_name), ALIGN_BUFFER);
     if (enabled == VK_TRUE)
     {
-        PrintLine(OUTPUT_COLOR_GREEN, "%s", "TRUE");
+        PrintLine(OutputColor::GREEN, "%s", "TRUE");
     }
     else
     {
-        PrintLine(OUTPUT_COLOR_RED, "%s", "FALSE");
+        PrintLine(OutputColor::RED, "%s", "FALSE");
     }
 }
 

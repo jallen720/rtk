@@ -12,14 +12,15 @@ static void InitShader(Shader* shader, Stack* temp_stack, const char* path, VkSh
 {
     Stack frame = CreateFrame(temp_stack);
 
-    Array<uint32>* bytecode = ReadFile<uint32>(&frame.allocator, path);
+    Array<uint32> bytecode = {};
+    ReadFile(&bytecode, &frame.allocator, path);
     VkShaderModuleCreateInfo info =
     {
         .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
         .pNext    = NULL,
         .flags    = 0,
-        .codeSize = ByteSize(bytecode),
-        .pCode    = bytecode->data,
+        .codeSize = ByteSize(&bytecode),
+        .pCode    = bytecode.data,
     };
     VkResult res = vkCreateShaderModule(GetDevice(), &info, NULL, &shader->module);
     Validate(res, "vkCreateShaderModule() failed");

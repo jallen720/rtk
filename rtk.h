@@ -31,6 +31,7 @@ namespace RTK
 #include "rtk/image.h"
 
 // Assets
+#include "rtk/gltf.h"
 #include "rtk/mesh.h"
 #include "rtk/shader.h"
 #include "rtk/descriptor_set.h"

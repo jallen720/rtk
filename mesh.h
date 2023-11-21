@@ -296,3 +296,11 @@ static Mesh* GetMesh(MeshHnd mesh_hnd)
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't get mesh");
     return GetMesh(mesh_group, mesh_index);
 }
+
+template<typename VertexType>
+static void LoadMeshData(MeshData<VertexType>* mesh_data, const Allocator* allocator, const char* path)
+{
+    GLTF gltf = {};
+    LoadGLTF(&gltf, allocator, path);
+    PrintGLTF(&gltf);
+}

@@ -5,19 +5,19 @@ struct MeshGroupHnd { uint32 index; };
 
 struct MeshInfo
 {
-    VkDeviceSize vertex_size;
-    VkDeviceSize index_size;
-    uint32       vertex_count;
-    uint32       index_count;
+    uint32 vertex_size;
+    uint32 index_size;
+    uint32 vertex_count;
+    uint32 index_count;
 };
 
 struct Mesh
 {
-    VkDeviceSize vertex_size;
-    VkDeviceSize index_size;
-    uint32       vertex_buffer_offset;
-    uint32       index_buffer_offset;
-    uint32       index_count;
+    uint32 vertex_size;
+    uint32 index_size;
+    uint32 vertex_buffer_offset;
+    uint32 index_buffer_offset;
+    uint32 index_count;
 };
 
 struct MeshGroupInfo
@@ -31,10 +31,10 @@ struct MeshGroup
     Array<Mesh>           meshes;
     VkMemoryPropertyFlags mem_properties;
 
-    VkDeviceSize          vertex_buffer_size;
-    VkDeviceSize          index_buffer_size;
-    BufferHnd             vertex_buffer;
-    BufferHnd             index_buffer;
+    uint32    vertex_buffer_size;
+    uint32    index_buffer_size;
+    BufferHnd vertex_buffer;
+    BufferHnd index_buffer;
 };
 
 struct MeshModuleInfo
@@ -95,8 +95,8 @@ static void ValidateMeshIndex(MeshGroup* mesh_group, uint32 mesh_group_index, ui
     }
 }
 
-static void ValidateMeshLoad(MeshGroup* mesh_group, uint32 mesh_group_index, VkDeviceSize vertexes_byte_size,
-                             VkDeviceSize indexes_byte_size)
+static void ValidateMeshLoad(MeshGroup* mesh_group, uint32 mesh_group_index, uint32 vertexes_byte_size,
+                             uint32 indexes_byte_size)
 {
     if (vertexes_byte_size >= mesh_group->vertex_buffer_size)
     {

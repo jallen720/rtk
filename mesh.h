@@ -15,8 +15,8 @@ struct Mesh
 {
     VkDeviceSize vertex_size;
     VkDeviceSize index_size;
-    uint32       vertex_offset;
-    uint32       index_offset;
+    uint32       vertex_buffer_offset;
+    uint32       index_buffer_offset;
     uint32       index_count;
 };
 
@@ -146,11 +146,11 @@ static MeshHnd CreateMesh(MeshGroupHnd mesh_group_hnd, MeshInfo* info)
 
     MeshHnd mesh_hnd = { .index = CreateMeshHndIndex(mesh_group_hnd, mesh_group->meshes.count) };
     Mesh* mesh = Push(&mesh_group->meshes);
-    mesh->vertex_size   = info->vertex_size;
-    mesh->index_size    = info->index_size;
-    mesh->vertex_offset = mesh_group->vertex_buffer_size;
-    mesh->index_offset  = mesh_group->index_buffer_size;
-    mesh->index_count   = info->index_count;
+    mesh->vertex_size          = info->vertex_size;
+    mesh->index_size           = info->index_size;
+    mesh->vertex_buffer_offset = mesh_group->vertex_buffer_size;
+    mesh->index_buffer_offset  = mesh_group->index_buffer_size;
+    mesh->index_count          = info->index_count;
 
     mesh_group->vertex_buffer_size += info->vertex_count * info->vertex_size;
     mesh_group->index_buffer_size  += info->index_count  * info->index_size;
@@ -205,7 +205,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
         .src_data   = mesh_data->vertexes.data,
         .src_offset = 0,
         .dst_hnd    = mesh_group->vertex_buffer,
-        .dst_offset = mesh->vertex_offset,
+        .dst_offset = mesh->vertex_buffer_offset,
     };
     WriteHostBuffer(&vertex_buffer_write, FRAME_INDEX);
     HostBufferWrite index_buffer_write =
@@ -214,7 +214,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
         .src_data   = mesh_data->indexes.data,
         .src_offset = 0,
         .dst_hnd    = mesh_group->index_buffer,
-        .dst_offset = mesh->index_offset,
+        .dst_offset = mesh->index_buffer_offset,
     };
     WriteHostBuffer(&index_buffer_write, FRAME_INDEX);
 }
@@ -262,7 +262,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
             .src_hnd    = staging_buffer_hnd,
             .src_offset = 0,
             .dst_hnd    = mesh_group->vertex_buffer,
-            .dst_offset = mesh->vertex_offset,
+            .dst_offset = mesh->vertex_buffer_offset,
         };
         WriteDeviceBufferCmd(&vertex_buffer_write, FRAME_INDEX);
         DeviceBufferWrite index_buffer_write =
@@ -271,7 +271,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
             .src_hnd    = staging_buffer_hnd,
             .src_offset = vertexes_byte_size,
             .dst_hnd    = mesh_group->index_buffer,
-            .dst_offset = mesh->index_offset,
+            .dst_offset = mesh->index_buffer_offset,
         };
         WriteDeviceBufferCmd(&index_buffer_write, FRAME_INDEX);
     SubmitTempCommandBuffer();

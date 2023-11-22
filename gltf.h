@@ -75,8 +75,9 @@ struct GLTFBufferView
 
 struct GLTFBuffer
 {
-    uint32 byte_length;
-    String uri;
+    uint32       byte_length;
+    String       uri;
+    Array<uint8> data;
 };
 
 struct GLTFAttribute
@@ -339,7 +340,14 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
         GLTFBuffer* buffer = Push(&gltf->buffers);
         JSONNode* json_buffer = GetObject(&json, json_buffers, i);
         buffer->byte_length = GetUInt32(&json, json_buffer, "byteLength");
-        InitString(&buffer->uri, allocator, GetString(&json, json_buffer, "uri"));
+
+        // Append GLTF file directory to buffer uri.
+        String* json_uri = GetString(&json, json_buffer, "uri");
+        uint32 path_dir_size = GetPathDirSize(path);
+        InitString(&buffer->uri, allocator, path_dir_size + uri->size);
+        PushRange(&buffer->uri, path, path_dir_size);
+        PushRange(&buffer->uri, json_uri);
+        ReadFile(&buffer->data, allocator, buffer->uri.data);
     }
     for (uint32 i = 0; i < json_meshes->list.size; ++i)
     {

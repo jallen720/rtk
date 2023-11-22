@@ -163,12 +163,16 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     mesh_datas[0].vertex_buffer.data  = (uint8*)quad_vertexes;
     mesh_datas[0].vertex_buffer.size  = sizeof(quad_vertexes);
     mesh_datas[0].vertex_buffer.count = mesh_datas[0].vertex_buffer.size;
-    mesh_datas[0].index_buffer        = CTK_WRAP_ARRAY(quad_indexes);
+    mesh_datas[0].index_buffer.data   = (uint8*)quad_indexes;
+    mesh_datas[0].index_buffer.size   = sizeof(quad_indexes);
+    mesh_datas[0].index_buffer.count  = mesh_datas[0].index_buffer.size;
 
     mesh_datas[1].vertex_buffer.data  = (uint8*)cube_vertexes;
     mesh_datas[1].vertex_buffer.size  = sizeof(cube_vertexes);
     mesh_datas[1].vertex_buffer.count = mesh_datas[1].vertex_buffer.size;
-    mesh_datas[1].index_buffer        = CTK_WRAP_ARRAY(cube_indexes);
+    mesh_datas[1].index_buffer.data   = (uint8*)cube_indexes;
+    mesh_datas[1].index_buffer.size   = sizeof(cube_indexes);
+    mesh_datas[1].index_buffer.count  = mesh_datas[1].index_buffer.size;
 
     // mesh_datas[2].vertex_buffer.data  = (uint8*)cube_repeating_vertexes;
     // mesh_datas[2].vertex_buffer.size  = sizeof(cube_repeating_vertexes);

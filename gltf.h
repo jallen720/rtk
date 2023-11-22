@@ -106,17 +106,6 @@ struct GLTF
     Array<GLTFMesh>       meshes;
 };
 
-static constexpr uint32 GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)GLTFAccessorType::COUNT] =
-{
-    1,  // SCALAR
-    2,  // VEC2
-    3,  // VEC3
-    4,  // VEC4
-    4,  // MAT2
-    9,  // MAT3
-    16, // MAT4
-};
-
 static constexpr const char* GLTF_ACCESSOR_TYPE_NAMES[(uint32)GLTFAccessorType::COUNT] =
 {
     "SCALAR",
@@ -126,6 +115,17 @@ static constexpr const char* GLTF_ACCESSOR_TYPE_NAMES[(uint32)GLTFAccessorType::
     "MAT2",
     "MAT3",
     "MAT4",
+};
+
+static constexpr uint32 GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)GLTFAccessorType::COUNT] =
+{
+    1,  // SCALAR
+    2,  // VEC2
+    3,  // VEC3
+    4,  // VEC4
+    4,  // MAT2
+    9,  // MAT3
+    16, // MAT4
 };
 
 static constexpr const char* GLTF_COMPONENT_TYPE_NAMES[(uint32)GLTFComponentType::COUNT] =
@@ -139,12 +139,22 @@ static constexpr const char* GLTF_COMPONENT_TYPE_NAMES[(uint32)GLTFComponentType
     "FLOAT",
 };
 
+static constexpr uint32 GLTF_COMPONENT_TYPE_SIZES[(uint32)GLTFComponentType::COUNT] =
+{
+    1, // SIGNED_BYTE
+    1, // UNSIGNED_BYTE
+    2, // SIGNED_SHORT
+    2, // UNSIGNED_SHORT
+    4, // SIGNED_INT
+    4, // UNSIGNED_INT
+    4, // FLOAT
+};
+
 static constexpr const char* GLTF_TARGET_NAMES[(uint32)GLTFTarget::COUNT] =
 {
     "ARRAY_BUFFER",
     "ELEMENT_ARRAY_BUFFER",
 };
-
 
 static constexpr const char* GLTF_ATTRIBUTE_TYPE_NAMES[(uint32)GLTFAttributeType::COUNT] =
 {

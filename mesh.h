@@ -44,8 +44,8 @@ struct MeshModuleInfo
 
 struct MeshData
 {
-    Array<uint8>  vertex_buffer;
-    Array<uint32> index_buffer;
+    Array<uint8> vertex_buffer;
+    Array<uint8> index_buffer;
 };
 
 static Array<MeshGroup> g_mesh_groups;
@@ -194,14 +194,12 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
 
-    VkDeviceSize vertexes_byte_size = ByteSize(&mesh_data->vertex_buffer);
-    VkDeviceSize indexes_byte_size  = ByteSize(&mesh_data->index_buffer);
-    ValidateMeshLoad(mesh_group, mesh_group_index, vertexes_byte_size, indexes_byte_size);
+    ValidateMeshLoad(mesh_group, mesh_group_index, mesh_data->vertex_buffer.size, mesh_data->index_buffer.size);
 
     static constexpr uint32 FRAME_INDEX = 0;
     HostBufferWrite vertex_buffer_write =
     {
-        .size       = vertexes_byte_size,
+        .size       = mesh_data->vertex_buffer.size,
         .src_data   = mesh_data->vertex_buffer.data,
         .src_offset = 0,
         .dst_hnd    = mesh_group->vertex_buffer,
@@ -210,7 +208,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     WriteHostBuffer(&vertex_buffer_write, FRAME_INDEX);
     HostBufferWrite index_buffer_write =
     {
-        .size       = indexes_byte_size,
+        .size       = mesh_data->index_buffer.size,
         .src_data   = mesh_data->index_buffer.data,
         .src_offset = 0,
         .dst_hnd    = mesh_group->index_buffer,
@@ -230,17 +228,14 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
 
     ValidateBuffer(staging_buffer_hnd, "can't load mesh from buffer");
-
-    VkDeviceSize vertexes_byte_size = ByteSize(&mesh_data->vertex_buffer);
-    VkDeviceSize indexes_byte_size  = ByteSize(&mesh_data->index_buffer);
-    ValidateMeshLoad(mesh_group, mesh_group_index, vertexes_byte_size, indexes_byte_size);
+    ValidateMeshLoad(mesh_group, mesh_group_index, mesh_data->vertex_buffer.size, mesh_data->index_buffer.size);
 
     static constexpr uint32 FRAME_INDEX = 0;
     Clear(staging_buffer_hnd);
 
     HostBufferAppend vertex_staging =
     {
-        .size       = vertexes_byte_size,
+        .size       = mesh_data->vertex_buffer.size,
         .src_data   = mesh_data->vertex_buffer.data,
         .src_offset = 0,
         .dst_hnd    = staging_buffer_hnd,
@@ -248,7 +243,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     AppendHostBuffer(&vertex_staging, FRAME_INDEX);
     HostBufferAppend index_staging =
     {
-        .size       = indexes_byte_size,
+        .size       = mesh_data->index_buffer.size,
         .src_data   = mesh_data->index_buffer.data,
         .src_offset = 0,
         .dst_hnd    = staging_buffer_hnd,
@@ -258,7 +253,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     BeginTempCommandBuffer();
         DeviceBufferWrite vertex_buffer_write =
         {
-            .size       = vertexes_byte_size,
+            .size       = mesh_data->vertex_buffer.size,
             .src_hnd    = staging_buffer_hnd,
             .src_offset = 0,
             .dst_hnd    = mesh_group->vertex_buffer,
@@ -267,9 +262,9 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
         WriteDeviceBufferCmd(&vertex_buffer_write, FRAME_INDEX);
         DeviceBufferWrite index_buffer_write =
         {
-            .size       = indexes_byte_size,
+            .size       = mesh_data->index_buffer.size,
             .src_hnd    = staging_buffer_hnd,
-            .src_offset = vertexes_byte_size,
+            .src_offset = mesh_data->vertex_buffer.size,
             .dst_hnd    = mesh_group->index_buffer,
             .dst_offset = mesh->index_buffer_offset,
         };
@@ -298,5 +293,81 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
 {
     GLTF gltf = {};
     LoadGLTF(&gltf, allocator, path);
-    PrintGLTF(&gltf);
+    PrintLine("%s:", path);
+    PrintGLTF(&gltf, 1);
+    CTK_ASSERT(gltf.meshes.count == 1);
+    GLTFMesh* mesh = GetPtr(&gltf.meshes, 0);
+    uint32 vertex_size = 0;
+    uint32 index_size  = 0;
+    CTK_ITER(accessor, &gltf.accessors)
+    {
+        GLTFTarget target = GetPtr(&gltf.buffer_views, accessor->buffer_view)->target;
+        if (target == GLTFTarget::ARRAY_BUFFER)
+        {
+            vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
+                           GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
+        }
+        else
+        {
+            if (index_size != 0)
+            {
+                CTK_FATAL("found multiple ELEMENT_ARRAY_BUFFER buffer views");
+            }
+            index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
+                         GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
+        }
+    }
+    PrintLine("vertex size: %u", vertex_size);
+    PrintLine("index  size: %u", index_size);
+    // exit(0);
+    // InitArray(&mesh_data->vertex_buffer, allocator, mesh->);
 }
+
+// meshes/cube.gltf:
+//     accessors:
+//         type:           VEC3
+//         component_type: FLOAT
+//         count:          24
+//         buffer_view:    0
+
+//         type:           VEC2
+//         component_type: FLOAT
+//         count:          24
+//         buffer_view:    1
+
+//         type:           SCALAR
+//         component_type: UNSIGNED_SHORT
+//         count:          36
+//         buffer_view:    2
+
+//     buffer_views:
+//         buffer:      0
+//         byte_length: 288
+//         byte_offset: 0
+//         target:      ARRAY_BUFFER
+
+//         buffer:      0
+//         byte_length: 192
+//         byte_offset: 288
+//         target:      ARRAY_BUFFER
+
+//         buffer:      0
+//         byte_length: 72
+//         byte_offset: 480
+//         target:      ELEMENT_ARRAY_BUFFER
+
+//     buffers:
+//         byte_length: 552
+//         uri:         "meshes/cube.bin"
+
+//     meshes:
+//         name: Cube
+//         primitives:
+//             attributes:
+//                 type: POSITION
+//                 accessor: 0
+
+//                 type: TEXCOORD_0
+//                 accessor: 1
+
+//             indices_accessor: 2

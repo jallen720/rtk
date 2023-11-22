@@ -158,7 +158,6 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
     #include "meshes/quad.h"
     #include "meshes/cube.h"
     #include "meshes/cube_repeating.h"
-    InitArray(&g_render_state.meshes, &perm_stack->allocator, 3);
     MeshData mesh_datas[] =
     {
         {
@@ -189,6 +188,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
             .indexes  = CTK_WRAP_ARRAY(cube_repeating_indexes),
         },
     };
+    InitArray(&g_render_state.meshes, &perm_stack->allocator, CTK_ARRAY_SIZE(mesh_datas));
     InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
     MeshGroupInfo mesh_group_info =
     {

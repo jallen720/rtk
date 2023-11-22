@@ -6,16 +6,16 @@ struct MeshGroupHnd { uint32 index; };
 struct MeshInfo
 {
     VkDeviceSize vertex_size;
-    uint32       vertex_count;
     VkDeviceSize index_size;
+    uint32       vertex_count;
     uint32       index_count;
 };
 
 struct Mesh
 {
     VkDeviceSize vertex_size;
-    uint32       vertex_offset;
     VkDeviceSize index_size;
+    uint32       vertex_offset;
     uint32       index_offset;
     uint32       index_count;
 };
@@ -42,11 +42,10 @@ struct MeshModuleInfo
     uint32 max_mesh_groups;
 };
 
-template<typename VertexType>
 struct MeshData
 {
-    Array<VertexType> vertexes;
-    Array<uint32>     indexes;
+    Array<uint8>  vertexes;
+    Array<uint32> indexes;
 };
 
 static Array<MeshGroup> g_mesh_groups;
@@ -148,8 +147,8 @@ static MeshHnd CreateMesh(MeshGroupHnd mesh_group_hnd, MeshInfo* info)
     MeshHnd mesh_hnd = { .index = CreateMeshHndIndex(mesh_group_hnd, mesh_group->meshes.count) };
     Mesh* mesh = Push(&mesh_group->meshes);
     mesh->vertex_size   = info->vertex_size;
-    mesh->vertex_offset = mesh_group->vertex_buffer_size;
     mesh->index_size    = info->index_size;
+    mesh->vertex_offset = mesh_group->vertex_buffer_size;
     mesh->index_offset  = mesh_group->index_buffer_size;
     mesh->index_count   = info->index_count;
 
@@ -185,8 +184,7 @@ static void InitMeshGroup(MeshGroupHnd mesh_group_hnd, ResourceGroupHnd res_grou
     mesh_group->index_buffer = CreateBuffer(res_group_hnd, &index_buffer_info);
 }
 
-template<typename VertexType>
-static void LoadHostMesh(MeshHnd mesh_hnd, MeshData<VertexType>* mesh_data)
+static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
 {
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
@@ -221,8 +219,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData<VertexType>* mesh_data)
     WriteHostBuffer(&index_buffer_write, FRAME_INDEX);
 }
 
-template<typename VertexType>
-static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshData<VertexType>* mesh_data)
+static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshData* mesh_data)
 {
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
@@ -297,8 +294,7 @@ static Mesh* GetMesh(MeshHnd mesh_hnd)
     return GetMesh(mesh_group, mesh_index);
 }
 
-template<typename VertexType>
-static void LoadMeshData(MeshData<VertexType>* mesh_data, const Allocator* allocator, const char* path)
+static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const char* path)
 {
     GLTF gltf = {};
     LoadGLTF(&gltf, allocator, path);

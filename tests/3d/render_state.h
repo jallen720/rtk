@@ -159,18 +159,33 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
     #include "meshes/cube.h"
     #include "meshes/cube_repeating.h"
     InitArray(&g_render_state.meshes, &perm_stack->allocator, 3);
-    MeshData<Vertex> mesh_datas[] =
+    MeshData mesh_datas[] =
     {
         {
-            .vertexes = CTK_WRAP_ARRAY(quad_vertexes),
+            .vertexes =
+            {
+                .data = (uint8*)quad_vertexes,
+                .size = sizeof(quad_vertexes),
+                .count = sizeof(quad_vertexes),
+            },
             .indexes  = CTK_WRAP_ARRAY(quad_indexes),
         },
         {
-            .vertexes = CTK_WRAP_ARRAY(cube_vertexes),
+            .vertexes =
+            {
+                .data = (uint8*)cube_vertexes,
+                .size = sizeof(cube_vertexes),
+                .count = sizeof(cube_vertexes),
+            },
             .indexes  = CTK_WRAP_ARRAY(cube_indexes),
         },
         {
-            .vertexes = CTK_WRAP_ARRAY(cube_repeating_vertexes),
+            .vertexes =
+            {
+                .data = (uint8*)cube_repeating_vertexes,
+                .size = sizeof(cube_repeating_vertexes),
+                .count = sizeof(cube_repeating_vertexes),
+            },
             .indexes  = CTK_WRAP_ARRAY(cube_repeating_indexes),
         },
     };
@@ -186,8 +201,8 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
         MeshInfo mesh_info =
         {
             .vertex_size  = sizeof(Vertex),
-            .vertex_count = mesh_data->vertexes.count,
             .index_size   = sizeof(uint32),
+            .vertex_count = mesh_data->vertexes.count / sizeof(Vertex),
             .index_count  = mesh_data->indexes.count,
         };
         Push(&g_render_state.meshes, CreateMesh(g_render_state.mesh_group, &mesh_info));

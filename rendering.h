@@ -112,11 +112,11 @@ static void DrawMesh(VkCommandBuffer command_buffer, MeshHnd mesh_hnd, uint32 in
 {
     Mesh* mesh = GetMesh(mesh_hnd);
     vkCmdDrawIndexed(command_buffer,
-                     mesh->index_count,                       // Index Count
-                     instance_count,                          // Instance Count
+                     mesh->index_count,                              // Index Count
+                     instance_count,                                 // Instance Count
                      mesh->index_buffer_offset  / mesh->index_size,  // First index index
                      mesh->vertex_buffer_offset / mesh->vertex_size, // First vertex index offset (sint32)
-                     instance_start);                         // First instance index
+                     instance_start);                                // First instance index
 }
 
 static void EndRenderCommands(VkCommandBuffer command_buffer)

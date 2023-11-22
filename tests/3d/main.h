@@ -58,8 +58,8 @@ static void Run()
     InitRenderState(perm_stack, temp_stack, free_list);
     InitGameState(perm_stack, thread_pool->size);
 
-LoadMeshData<uint32>(NULL, &free_list->allocator, "meshes/cube.gltf");
-exit(0);
+// LoadMeshData<uint32>(NULL, &free_list->allocator, "meshes/cube.gltf");
+// exit(0);
 
     // Run game.
     bool recreate_swapchain = false;

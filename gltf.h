@@ -341,10 +341,10 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
         JSONNode* json_buffer = GetObject(&json, json_buffers, i);
         buffer->byte_length = GetUInt32(&json, json_buffer, "byteLength");
 
-        // Append GLTF file directory to buffer uri.
+        // Append buffer uri in GLTF file to GLTF file directory.
         String* json_uri = GetString(&json, json_buffer, "uri");
         uint32 path_dir_size = GetPathDirSize(path);
-        InitString(&buffer->uri, allocator, path_dir_size + uri->size);
+        InitString(&buffer->uri, allocator, path_dir_size + json_uri->size);
         PushRange(&buffer->uri, path, path_dir_size);
         PushRange(&buffer->uri, json_uri);
         ReadFile(&buffer->data, allocator, buffer->uri.data);

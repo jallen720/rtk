@@ -76,7 +76,7 @@ static void InitRenderJob(Stack* perm_stack)
     }
 }
 
-static void CreateResources(Stack* perm_stack, Stack* temp_stack)
+static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
 {
     InitResourceModule(&perm_stack->allocator, { .max_resource_groups = 4 });
 
@@ -158,36 +158,24 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
     #include "meshes/quad.h"
     #include "meshes/cube.h"
     #include "meshes/cube_repeating.h"
-    MeshData mesh_datas[] =
-    {
-        {
-            .vertexes =
-            {
-                .data = (uint8*)quad_vertexes,
-                .size = sizeof(quad_vertexes),
-                .count = sizeof(quad_vertexes),
-            },
-            .indexes  = CTK_WRAP_ARRAY(quad_indexes),
-        },
-        {
-            .vertexes =
-            {
-                .data = (uint8*)cube_vertexes,
-                .size = sizeof(cube_vertexes),
-                .count = sizeof(cube_vertexes),
-            },
-            .indexes  = CTK_WRAP_ARRAY(cube_indexes),
-        },
-        {
-            .vertexes =
-            {
-                .data = (uint8*)cube_repeating_vertexes,
-                .size = sizeof(cube_repeating_vertexes),
-                .count = sizeof(cube_repeating_vertexes),
-            },
-            .indexes  = CTK_WRAP_ARRAY(cube_repeating_indexes),
-        },
-    };
+    static constexpr uint32 MESH_COUNT = 3;
+    MeshData mesh_datas[MESH_COUNT] = {};
+    mesh_datas[0].vertex_buffer.data  = (uint8*)quad_vertexes;
+    mesh_datas[0].vertex_buffer.size  = sizeof(quad_vertexes);
+    mesh_datas[0].vertex_buffer.count = mesh_datas[0].vertex_buffer.size;
+    mesh_datas[0].index_buffer        = CTK_WRAP_ARRAY(quad_indexes);
+
+    mesh_datas[1].vertex_buffer.data  = (uint8*)cube_vertexes;
+    mesh_datas[1].vertex_buffer.size  = sizeof(cube_vertexes);
+    mesh_datas[1].vertex_buffer.count = mesh_datas[1].vertex_buffer.size;
+    mesh_datas[1].index_buffer        = CTK_WRAP_ARRAY(cube_indexes);
+
+    // mesh_datas[2].vertex_buffer.data  = (uint8*)cube_repeating_vertexes;
+    // mesh_datas[2].vertex_buffer.size  = sizeof(cube_repeating_vertexes);
+    // mesh_datas[2].vertex_buffer.count = mesh_datas[2].vertex_buffer.size;
+    // mesh_datas[2].index_buffer        = CTK_WRAP_ARRAY(cube_repeating_indexes);
+LoadMeshData(&mesh_datas[2], &free_list->allocator, "meshes/cube.gltf");
+
     InitArray(&g_render_state.meshes, &perm_stack->allocator, CTK_ARRAY_SIZE(mesh_datas));
     InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
     MeshGroupInfo mesh_group_info =
@@ -202,8 +190,8 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack)
         {
             .vertex_size  = sizeof(Vertex),
             .index_size   = sizeof(uint32),
-            .vertex_count = mesh_data->vertexes.count / sizeof(Vertex),
-            .index_count  = mesh_data->indexes.count,
+            .vertex_count = mesh_data->vertex_buffer.count / sizeof(Vertex),
+            .index_count  = mesh_data->index_buffer.count,
         };
         Push(&g_render_state.meshes, CreateMesh(g_render_state.mesh_group, &mesh_info));
     }
@@ -444,7 +432,7 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitRenderJob(perm_stack);
 
     // Resources
-    CreateResources(perm_stack, temp_stack);
+    CreateResources(perm_stack, temp_stack, free_list);
 
     // Assets
     CreateSampler();

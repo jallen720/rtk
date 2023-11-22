@@ -44,8 +44,8 @@ struct MeshModuleInfo
 
 struct MeshData
 {
-    Array<uint8>  vertexes;
-    Array<uint32> indexes;
+    Array<uint8>  vertex_buffer;
+    Array<uint32> index_buffer;
 };
 
 static Array<MeshGroup> g_mesh_groups;
@@ -194,15 +194,15 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
 
-    VkDeviceSize vertexes_byte_size = ByteSize(&mesh_data->vertexes);
-    VkDeviceSize indexes_byte_size  = ByteSize(&mesh_data->indexes);
+    VkDeviceSize vertexes_byte_size = ByteSize(&mesh_data->vertex_buffer);
+    VkDeviceSize indexes_byte_size  = ByteSize(&mesh_data->index_buffer);
     ValidateMeshLoad(mesh_group, mesh_group_index, vertexes_byte_size, indexes_byte_size);
 
     static constexpr uint32 FRAME_INDEX = 0;
     HostBufferWrite vertex_buffer_write =
     {
         .size       = vertexes_byte_size,
-        .src_data   = mesh_data->vertexes.data,
+        .src_data   = mesh_data->vertex_buffer.data,
         .src_offset = 0,
         .dst_hnd    = mesh_group->vertex_buffer,
         .dst_offset = mesh->vertex_buffer_offset,
@@ -211,7 +211,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     HostBufferWrite index_buffer_write =
     {
         .size       = indexes_byte_size,
-        .src_data   = mesh_data->indexes.data,
+        .src_data   = mesh_data->index_buffer.data,
         .src_offset = 0,
         .dst_hnd    = mesh_group->index_buffer,
         .dst_offset = mesh->index_buffer_offset,
@@ -231,8 +231,8 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
 
     ValidateBuffer(staging_buffer_hnd, "can't load mesh from buffer");
 
-    VkDeviceSize vertexes_byte_size = ByteSize(&mesh_data->vertexes);
-    VkDeviceSize indexes_byte_size  = ByteSize(&mesh_data->indexes);
+    VkDeviceSize vertexes_byte_size = ByteSize(&mesh_data->vertex_buffer);
+    VkDeviceSize indexes_byte_size  = ByteSize(&mesh_data->index_buffer);
     ValidateMeshLoad(mesh_group, mesh_group_index, vertexes_byte_size, indexes_byte_size);
 
     static constexpr uint32 FRAME_INDEX = 0;
@@ -241,7 +241,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     HostBufferAppend vertex_staging =
     {
         .size       = vertexes_byte_size,
-        .src_data   = mesh_data->vertexes.data,
+        .src_data   = mesh_data->vertex_buffer.data,
         .src_offset = 0,
         .dst_hnd    = staging_buffer_hnd,
     };
@@ -249,7 +249,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     HostBufferAppend index_staging =
     {
         .size       = indexes_byte_size,
-        .src_data   = mesh_data->indexes.data,
+        .src_data   = mesh_data->index_buffer.data,
         .src_offset = 0,
         .dst_hnd    = staging_buffer_hnd,
     };

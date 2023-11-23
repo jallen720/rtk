@@ -56,6 +56,7 @@ static void Run()
     // Initialize other test state.
     ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
     InitRenderState(perm_stack, temp_stack, free_list);
+// LogResourceGroups();
     InitGameState(perm_stack, thread_pool->size);
 
 // LoadMeshData<uint32>(NULL, &free_list->allocator, "meshes/cube.gltf");

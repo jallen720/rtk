@@ -445,8 +445,6 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitShaders(temp_stack);
     InitVertexLayout(perm_stack);
     InitPipelines(temp_stack, free_list);
-
-LogResourceGroups();
 }
 
 static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)

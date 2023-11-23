@@ -89,7 +89,7 @@ struct GLTFAttribute
 struct GLTFPrimitive
 {
     Array<GLTFAttribute> attributes;
-    uint32               indices_accessor;
+    uint32               indexes_accessor;
 };
 
 struct GLTFMesh
@@ -276,12 +276,19 @@ void PrintGLTFMesh(GLTFMesh* mesh, uint32 tabs = 0)
             PrintTabs(tabs + 2); PrintLine("accessor: %u", attribute->accessor);
             PrintLine();
         }
-        PrintTabs(tabs + 1); PrintLine("indices_accessor: %u", primitive->indices_accessor);
+        PrintTabs(tabs + 1); PrintLine("indexes_accessor: %u", primitive->indexes_accessor);
     }
 }
 
 void PrintGLTF(GLTF* gltf, uint32 tabs = 0)
 {
+    PrintTabs(tabs + 0);
+    PrintLine("meshes:");
+    CTK_ITER(mesh, &gltf->meshes)
+    {
+        PrintGLTFMesh(mesh, tabs + 1);
+        PrintLine();
+    }
     PrintTabs(tabs + 0);
     PrintLine("accessors:");
     CTK_ITER(accessor, &gltf->accessors)
@@ -301,13 +308,6 @@ void PrintGLTF(GLTF* gltf, uint32 tabs = 0)
     CTK_ITER(buffer, &gltf->buffers)
     {
         PrintGLTFBuffer(buffer, tabs + 1);
-        PrintLine();
-    }
-    PrintTabs(tabs + 0);
-    PrintLine("meshes:");
-    CTK_ITER(mesh, &gltf->meshes)
-    {
-        PrintGLTFMesh(mesh, tabs + 1);
         PrintLine();
     }
 }
@@ -372,7 +372,7 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
         {
             GLTFPrimitive* primitive = Push(&mesh->primitives);
             JSONNode* json_primitive = GetObject(&json, json_primitives, primitive_index);
-            primitive->indices_accessor = GetUInt32(&json, json_primitive, "indices");
+            primitive->indexes_accessor = GetUInt32(&json, json_primitive, "indices");
 
             // Attributes
             JSONNode* json_attributes = GetObject(&json, json_primitive, "attributes");

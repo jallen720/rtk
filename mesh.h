@@ -309,28 +309,25 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     LoadGLTF(&gltf, allocator, path);
     PrintLine("%s:", path);
     PrintGLTF(&gltf, 1);
+
     CTK_ASSERT(gltf.meshes.count == 1);
     GLTFMesh* mesh = GetPtr(&gltf.meshes, 0);
-    CTK_ITER(accessor, &gltf.accessors)
+    CTK_ASSERT(mesh->primitives.count == 1);
+    GLTFPrimitive* primitive = GetPtr(&mesh->primitives, 0);
+    CTK_ITER(attribute, &primitive->attributes)
     {
-        GLTFTarget target = GetPtr(&gltf.buffer_views, accessor->buffer_view)->target;
-        if (target == GLTFTarget::ARRAY_BUFFER)
-        {
-            mesh_data->vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
-                           GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
-        }
-        else
-        {
-            if (mesh_data->index_size != 0)
-            {
-                CTK_FATAL("found multiple ELEMENT_ARRAY_BUFFER buffer views");
-            }
-            mesh_data->index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
-                         GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
-        }
+        GLTFAccessor* attribute_accessor = GetPtr(&gltf.accessors, attribute->accessor);
+        mesh_data->vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)attribute_accessor->type] *
+                                  GLTF_COMPONENT_TYPE_SIZES[(uint32)attribute_accessor->component_type];
     }
+    GLTFAccessor* indexes_accesor = GetPtr(&gltf.accessors, primitive->indexes_accessor);
+    mesh_data->index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accesor->type] *
+                            GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accesor->component_type];
+
     PrintLine("vertex size: %u", mesh_data->vertex_size);
     PrintLine("index  size: %u", mesh_data->index_size);
+
+
     // exit(0);
     // InitArray(&mesh_data->vertex_buffer, allocator, mesh->);
 }
@@ -382,4 +379,4 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
 //                 type: TEXCOORD_0
 //                 accessor: 1
 
-//             indices_accessor: 2
+//             indexes_accessor: 2

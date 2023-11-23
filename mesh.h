@@ -95,19 +95,18 @@ static void ValidateMeshIndex(MeshGroup* mesh_group, uint32 mesh_group_index, ui
     }
 }
 
-static void ValidateMeshLoad(MeshGroup* mesh_group, uint32 mesh_group_index, uint32 vertexes_byte_size,
-                             uint32 indexes_byte_size)
+static void ValidateMeshLoad(MeshGroup* mesh_group, uint32 mesh_group_index, MeshData* mesh_data)
 {
-    if (vertexes_byte_size >= mesh_group->vertex_buffer_size)
+    if (mesh_data->vertex_buffer.size >= mesh_group->vertex_buffer_size)
     {
-        CTK_FATAL("can't load mesh data: vertex data size of %u exceeds mesh group %u's vertex buffer size of %u",
-                  vertexes_byte_size, mesh_group_index, mesh_group->vertex_buffer_size);
+        CTK_FATAL("can't load mesh data: vertex buffer size of %u exceeds mesh group %u's vertex buffer size of %u",
+                  mesh_data->vertex_buffer.size, mesh_group_index, mesh_group->vertex_buffer_size);
 
     }
-    if (indexes_byte_size >= mesh_group->index_buffer_size)
+    if (mesh_data->index_buffer.size >= mesh_group->index_buffer_size)
     {
-        CTK_FATAL("can't load mesh data: index data size of %u exceeds mesh group %u's index buffer size of %u",
-                  indexes_byte_size, mesh_group_index, mesh_group->index_buffer_size);
+        CTK_FATAL("can't load mesh data: index buffer size of %u exceeds mesh group %u's index buffer size of %u",
+                  mesh_data->index_buffer.size, mesh_group_index, mesh_group->index_buffer_size);
 
     }
 }
@@ -194,7 +193,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
 
-    ValidateMeshLoad(mesh_group, mesh_group_index, mesh_data->vertex_buffer.size, mesh_data->index_buffer.size);
+    ValidateMeshLoad(mesh_group, mesh_group_index, mesh_data);
 
     static constexpr uint32 FRAME_INDEX = 0;
     HostBufferWrite vertex_buffer_write =
@@ -228,7 +227,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
 
     ValidateBuffer(staging_buffer_hnd, "can't load mesh from buffer");
-    ValidateMeshLoad(mesh_group, mesh_group_index, mesh_data->vertex_buffer.size, mesh_data->index_buffer.size);
+    ValidateMeshLoad(mesh_group, mesh_group_index, mesh_data);
 
     static constexpr uint32 FRAME_INDEX = 0;
     Clear(staging_buffer_hnd);

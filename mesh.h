@@ -95,7 +95,7 @@ static void ValidateMeshIndex(MeshGroup* mesh_group, uint32 mesh_group_index, ui
     }
 }
 
-static void ValidateMeshLoad(MeshGroup* mesh_group, uint32 mesh_group_index, MeshData* mesh_data)
+static void ValidateMeshDataLoad(MeshGroup* mesh_group, uint32 mesh_group_index, MeshData* mesh_data)
 {
     if (mesh_data->vertex_buffer.size >= mesh_group->vertex_buffer_size)
     {
@@ -188,12 +188,11 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
+    ValidateMeshDataLoad(mesh_group, mesh_group_index, mesh_data);
 
     uint32 mesh_index = GetMeshIndex(mesh_hnd);
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
-
-    ValidateMeshLoad(mesh_group, mesh_group_index, mesh_data);
 
     static constexpr uint32 FRAME_INDEX = 0;
     HostBufferWrite vertex_buffer_write =
@@ -218,16 +217,16 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
 
 static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshData* mesh_data)
 {
+    ValidateBuffer(staging_buffer_hnd, "can't load mesh from buffer");
+
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
+    ValidateMeshDataLoad(mesh_group, mesh_group_index, mesh_data);
 
     uint32 mesh_index = GetMeshIndex(mesh_hnd);
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
     Mesh* mesh = GetMesh(mesh_group, mesh_index);
-
-    ValidateBuffer(staging_buffer_hnd, "can't load mesh from buffer");
-    ValidateMeshLoad(mesh_group, mesh_group_index, mesh_data);
 
     static constexpr uint32 FRAME_INDEX = 0;
     Clear(staging_buffer_hnd);

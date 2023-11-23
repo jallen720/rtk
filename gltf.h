@@ -61,23 +61,24 @@ struct GLTFAccessor
 {
     GLTFAccessorType  type;
     GLTFComponentType component_type;
-    uint32            count;
     uint32            buffer_view;
+    uint32            count;
+    uint32            offset;
 };
 
 struct GLTFBufferView
 {
-    uint32     buffer;
-    uint32     byte_length;
-    uint32     byte_offset;
     GLTFTarget target;
+    uint32     buffer;
+    uint32     size;
+    uint32     offset;
 };
 
 struct GLTFBuffer
 {
-    uint32       byte_length;
-    String       uri;
-    Array<uint8> data;
+    String uri;
+    uint8* data;
+    uint32 size;
 };
 
 struct GLTFAttribute
@@ -245,22 +246,23 @@ void PrintGLTFAccessor(GLTFAccessor* accessor, uint32 tabs = 0)
 {
     PrintTabs(tabs); PrintLine("type:           %s", GetGLTFAccessorTypeName(accessor->type));
     PrintTabs(tabs); PrintLine("component_type: %s", GetGLTFComponentTypeName(accessor->component_type));
-    PrintTabs(tabs); PrintLine("count:          %u", accessor->count);
     PrintTabs(tabs); PrintLine("buffer_view:    %u", accessor->buffer_view);
+    PrintTabs(tabs); PrintLine("count:          %u", accessor->count);
+    PrintTabs(tabs); PrintLine("offset:         %u", accessor->offset);
 }
 
 void PrintGLTFBufferView(GLTFBufferView* buffer_view, uint32 tabs = 0)
 {
-    PrintTabs(tabs); PrintLine("buffer:      %u", buffer_view->buffer);
-    PrintTabs(tabs); PrintLine("byte_length: %u", buffer_view->byte_length);
-    PrintTabs(tabs); PrintLine("byte_offset: %u", buffer_view->byte_offset);
-    PrintTabs(tabs); PrintLine("target:      %s", GetGLTFTargetName(buffer_view->target));
+    PrintTabs(tabs); PrintLine("target: %s", GetGLTFTargetName(buffer_view->target));
+    PrintTabs(tabs); PrintLine("buffer: %u", buffer_view->buffer);
+    PrintTabs(tabs); PrintLine("size:   %u", buffer_view->size);
+    PrintTabs(tabs); PrintLine("offset: %u", buffer_view->offset);
 }
 
 void PrintGLTFBuffer(GLTFBuffer* buffer, uint32 tabs = 0)
 {
-    PrintTabs(tabs); PrintLine("byte_length: %u", buffer->byte_length);
-    PrintTabs(tabs); PrintLine("uri:         \"%.*s\"", buffer->uri.size, buffer->uri.data);
+    PrintTabs(tabs); PrintLine("size: %u", buffer->size);
+    PrintTabs(tabs); PrintLine("uri:  \"%.*s\"", buffer->uri.size, buffer->uri.data);
 }
 
 void PrintGLTFMesh(GLTFMesh* mesh, uint32 tabs = 0)
@@ -331,25 +333,26 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
     {
         GLTFAccessor* accessor = Push(&gltf->accessors);
         JSONNode* json_accessor = GetObject(&json, json_accessors, i);
+        JSONNode* json_offset    = FindNode(&json, json_accessor, "offset");
+        accessor->buffer_view    = GetUInt32(&json, json_accessor, "bufferView");
+        accessor->count          = GetUInt32(&json, json_accessor, "count");
+        accessor->offset         = json_offset == NULL ? 0 : json_offset->num_uint32;
         accessor->type           = GetGLTFAccessorType(GetString(&json, json_accessor, "type"));
         accessor->component_type = GetGLTFComponentType(GetUInt32(&json, json_accessor, "componentType"));
-        accessor->count          = GetUInt32(&json, json_accessor, "count");
-        accessor->buffer_view    = GetUInt32(&json, json_accessor, "bufferView");
     }
     for (uint32 i = 0; i < json_buffer_views->list.size; ++i)
     {
         GLTFBufferView* buffer_view = Push(&gltf->buffer_views);
         JSONNode* json_buffer_view = GetObject(&json, json_buffer_views, i);
-        buffer_view->buffer      = GetUInt32(&json, json_buffer_view, "buffer");
-        buffer_view->byte_length = GetUInt32(&json, json_buffer_view, "byteLength");
-        buffer_view->byte_offset = GetUInt32(&json, json_buffer_view, "byteOffset");
-        buffer_view->target      = GetGLTFTarget(GetUInt32(&json, json_buffer_view, "target"));
+        buffer_view->buffer = GetUInt32(&json, json_buffer_view, "buffer");
+        buffer_view->size   = GetUInt32(&json, json_buffer_view, "byteLength");
+        buffer_view->offset = GetUInt32(&json, json_buffer_view, "byteOffset");
+        buffer_view->target = GetGLTFTarget(GetUInt32(&json, json_buffer_view, "target"));
     }
     for (uint32 i = 0; i < json_buffers->list.size; ++i)
     {
         GLTFBuffer* buffer = Push(&gltf->buffers);
         JSONNode* json_buffer = GetObject(&json, json_buffers, i);
-        buffer->byte_length = GetUInt32(&json, json_buffer, "byteLength");
 
         // Append buffer uri in GLTF file to GLTF file directory.
         String* json_uri = GetString(&json, json_buffer, "uri");
@@ -357,7 +360,8 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
         InitString(&buffer->uri, allocator, path_dir_size + json_uri->size);
         PushRange(&buffer->uri, path, path_dir_size);
         PushRange(&buffer->uri, json_uri);
-        ReadFile(&buffer->data, allocator, buffer->uri.data);
+        ReadFile(&buffer->data, &buffer->size, allocator, buffer->uri.data);
+        CTK_ASSERT(buffer->size == GetUInt32(&json, json_buffer, "byteLength"));
     }
     for (uint32 i = 0; i < json_meshes->list.size; ++i)
     {

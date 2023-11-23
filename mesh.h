@@ -200,7 +200,7 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
 
     uint32 vertex_buffer_size = mesh_data->vertex_size * mesh_data->vertex_count;
-    uint32 index_buffer_size  = mesh_data->index_size * mesh_data->index_count;
+    uint32 index_buffer_size  = mesh_data->index_size  * mesh_data->index_count;
     ValidateMeshDataLoad(mesh_group, mesh_group_index, vertex_buffer_size, index_buffer_size);
 
     uint32 mesh_index = GetMeshIndex(mesh_hnd);
@@ -307,68 +307,92 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
 {
     GLTF gltf = {};
     LoadGLTF(&gltf, allocator, path);
+
     PrintLine("%s:", path);
     PrintGLTF(&gltf, 1);
 
     CTK_ASSERT(gltf.meshes.count == 1);
     GLTFMesh* mesh = GetPtr(&gltf.meshes, 0);
+
     CTK_ASSERT(mesh->primitives.count == 1);
     GLTFPrimitive* primitive = GetPtr(&mesh->primitives, 0);
+    CTK_ASSERT(primitive->attributes.count > 0);
+
+    // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview:
+    // All attribute accessors for a given primitive MUST have the same count.
+    // So get mesh_data->vertex_count from first accessor's count.
+    GLTFAccessor* indexes_accessor = GetPtr(&gltf.accessors, primitive->indexes_accessor);
+    mesh_data->vertex_count = GetPtr(&gltf.accessors, GetPtr(&primitive->attributes, 0)->accessor)->count;
+    mesh_data->index_count  = indexes_accessor->count;
+
+    // Get vertex size from attribute accessors, and index size from index accessor.
     CTK_ITER(attribute, &primitive->attributes)
     {
-        GLTFAccessor* attribute_accessor = GetPtr(&gltf.accessors, attribute->accessor);
-        mesh_data->vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)attribute_accessor->type] *
-                                  GLTF_COMPONENT_TYPE_SIZES[(uint32)attribute_accessor->component_type];
+        GLTFAccessor* accessor = GetPtr(&gltf.accessors, attribute->accessor);
+        mesh_data->vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
+                                  GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
     }
-    GLTFAccessor* indexes_accesor = GetPtr(&gltf.accessors, primitive->indexes_accessor);
-    mesh_data->index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accesor->type] *
-                            GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accesor->component_type];
+    // Force index size to be 4.
+    // mesh_data->index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accessor->type] *
+    //                         GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accessor->component_type];
+    mesh_data->index_size = 4;
 
-    PrintLine("vertex size: %u", mesh_data->vertex_size);
-    PrintLine("index  size: %u", mesh_data->index_size);
+    PrintLine("vertex size:  %u", mesh_data->vertex_size);
+    PrintLine("vertex count: %u", mesh_data->vertex_count);
+    PrintLine("index  size:  %u", mesh_data->index_size);
+    PrintLine("index  count: %u", mesh_data->index_count);
 
+    mesh_data->vertex_buffer = Allocate<uint8>(allocator, mesh_data->vertex_size * mesh_data->vertex_count);
+    mesh_data->index_buffer  = Allocate<uint8>(allocator, mesh_data->index_size  * mesh_data->index_count);
 
-    // exit(0);
-    // InitArray(&mesh_data->vertex_buffer, allocator, mesh->);
+    // Write attributes from buffer to vertex buffer interleaved.
+    uint32 prev_attribute_size = 0;
+    CTK_ITER(attribute, &primitive->attributes)
+    {
+
+        GLTFAccessor*   accessor    = GetPtr(&gltf.accessors,    attribute->accessor);
+        GLTFBufferView* buffer_view = GetPtr(&gltf.buffer_views, accessor->buffer_view);
+        GLTFBuffer*     buffer      = GetPtr(&gltf.buffers,      buffer_view->buffer);
+
+        uint32 buffer_offset        = buffer_view->offset + accessor->offset;
+        uint32 buffer_view_offset   = 0;
+        uint32 vertex_buffer_offset = prev_attribute_size;
+        uint32 attribute_size       = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
+                                      GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
+        while (buffer_view_offset < buffer_view->size)
+        {
+            memcpy(&mesh_data->vertex_buffer[vertex_buffer_offset],
+                   &buffer->data[buffer_offset + buffer_view_offset],
+                   attribute_size);
+            buffer_view_offset   += attribute_size;
+            vertex_buffer_offset += mesh_data->vertex_size;
+        }
+
+        prev_attribute_size = attribute_size;
+    }
+
+    // Write indexes from buffer to index buffer. Done this way as we're force index size to 4. If we stored indexes in
+    // the same size as they are in the GLTF buffer, we could just memcpy() the entire buffer_view for indexes to the
+    // index buffer.
+    GLTFBufferView* buffer_view = GetPtr(&gltf.buffer_views, indexes_accessor->buffer_view);
+    GLTFBuffer*     buffer      = GetPtr(&gltf.buffers,      buffer_view->buffer);
+
+    uint32 buffer_offset       = buffer_view->offset + indexes_accessor->offset;
+    uint32 buffer_view_offset  = 0;
+    uint32 index_buffer_offset = 0;
+    uint32 index_size          = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accessor->type] *
+                                 GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accessor->component_type];
+    while (buffer_view_offset < buffer_view->size)
+    {
+        memcpy(&mesh_data->index_buffer[index_buffer_offset],
+               &buffer->data[buffer_offset + buffer_view_offset],
+               index_size);
+        buffer_view_offset  += index_size;
+        index_buffer_offset += mesh_data->index_size;
+    }
 }
 
 // meshes/cube.gltf:
-//     accessors:
-//         type:           VEC3
-//         component_type: FLOAT
-//         count:          24
-//         buffer_view:    0
-
-//         type:           VEC2
-//         component_type: FLOAT
-//         count:          24
-//         buffer_view:    1
-
-//         type:           SCALAR
-//         component_type: UNSIGNED_SHORT
-//         count:          36
-//         buffer_view:    2
-
-//     buffer_views:
-//         buffer:      0
-//         byte_length: 288
-//         byte_offset: 0
-//         target:      ARRAY_BUFFER
-
-//         buffer:      0
-//         byte_length: 192
-//         byte_offset: 288
-//         target:      ARRAY_BUFFER
-
-//         buffer:      0
-//         byte_length: 72
-//         byte_offset: 480
-//         target:      ELEMENT_ARRAY_BUFFER
-
-//     buffers:
-//         byte_length: 552
-//         uri:         "meshes/cube.bin"
-
 //     meshes:
 //         name: Cube
 //         primitives:
@@ -380,3 +404,42 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
 //                 accessor: 1
 
 //             indexes_accessor: 2
+
+//     accessors:
+//         type:           VEC3
+//         component_type: FLOAT
+//         buffer_view:    0
+//         count:          24
+//         offset:         0
+
+//         type:           VEC2
+//         component_type: FLOAT
+//         buffer_view:    1
+//         count:          24
+//         offset:         0
+
+//         type:           SCALAR
+//         component_type: UNSIGNED_SHORT
+//         buffer_view:    2
+//         count:          36
+//         offset:         0
+
+//     buffer_views:
+//         target: ARRAY_BUFFER
+//         buffer: 0
+//         size:   288
+//         offset: 0
+
+//         target: ARRAY_BUFFER
+//         buffer: 0
+//         size:   192
+//         offset: 288
+
+//         target: ELEMENT_ARRAY_BUFFER
+//         buffer: 0
+//         size:   72
+//         offset: 480
+
+//     buffers:
+//         size: 552
+//         uri:  "meshes/cube.bin"

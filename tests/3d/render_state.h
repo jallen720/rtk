@@ -160,19 +160,19 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     #include "meshes/cube_repeating.h"
     static constexpr uint32 MESH_COUNT = 3;
     MeshData mesh_datas[MESH_COUNT] = {};
-    mesh_datas[0].vertex_buffer.data  = (uint8*)quad_vertexes;
-    mesh_datas[0].vertex_buffer.size  = sizeof(quad_vertexes);
-    mesh_datas[0].vertex_buffer.count = mesh_datas[0].vertex_buffer.size;
-    mesh_datas[0].index_buffer.data   = (uint8*)quad_indexes;
-    mesh_datas[0].index_buffer.size   = sizeof(quad_indexes);
-    mesh_datas[0].index_buffer.count  = mesh_datas[0].index_buffer.size;
+    mesh_datas[0].vertex_buffer = (uint8*)quad_vertexes;
+    mesh_datas[0].vertex_size   = sizeof(Vertex);
+    mesh_datas[0].vertex_count  = CTK_ARRAY_SIZE(quad_vertexes);
+    mesh_datas[0].index_buffer  = (uint8*)quad_indexes;
+    mesh_datas[0].index_size    = sizeof(uint32);
+    mesh_datas[0].index_count   = CTK_ARRAY_SIZE(quad_indexes);
 
-    mesh_datas[1].vertex_buffer.data  = (uint8*)cube_vertexes;
-    mesh_datas[1].vertex_buffer.size  = sizeof(cube_vertexes);
-    mesh_datas[1].vertex_buffer.count = mesh_datas[1].vertex_buffer.size;
-    mesh_datas[1].index_buffer.data   = (uint8*)cube_indexes;
-    mesh_datas[1].index_buffer.size   = sizeof(cube_indexes);
-    mesh_datas[1].index_buffer.count  = mesh_datas[1].index_buffer.size;
+    mesh_datas[1].vertex_buffer = (uint8*)cube_vertexes;
+    mesh_datas[1].vertex_size   = sizeof(Vertex);
+    mesh_datas[1].vertex_count  = CTK_ARRAY_SIZE(cube_vertexes);
+    mesh_datas[1].index_buffer  = (uint8*)cube_indexes;
+    mesh_datas[1].index_size    = sizeof(uint32);
+    mesh_datas[1].index_count   = CTK_ARRAY_SIZE(cube_indexes);
 
     // mesh_datas[2].vertex_buffer.data  = (uint8*)cube_repeating_vertexes;
     // mesh_datas[2].vertex_buffer.size  = sizeof(cube_repeating_vertexes);
@@ -192,10 +192,10 @@ LoadMeshData(&mesh_datas[2], &free_list->allocator, "meshes/cube.gltf");
     {
         MeshInfo mesh_info =
         {
-            .vertex_size  = sizeof(Vertex),
-            .index_size   = sizeof(uint32),
-            .vertex_count = mesh_data->vertex_buffer.count / sizeof(Vertex),
-            .index_count  = mesh_data->index_buffer.count,
+            .vertex_size  = mesh_data->vertex_size,
+            .vertex_count = mesh_data->vertex_count,
+            .index_size   = mesh_data->index_size,
+            .index_count  = mesh_data->index_count,
         };
         Push(&g_render_state.meshes, CreateMesh(g_render_state.mesh_group, &mesh_info));
     }

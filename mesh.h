@@ -3,20 +3,30 @@
 struct MeshHnd      { uint32 index; };
 struct MeshGroupHnd { uint32 index; };
 
+struct MeshData
+{
+    uint8* vertex_buffer;
+    uint32 vertex_size;
+    uint32 vertex_count;
+    uint8* index_buffer;
+    uint32 index_size;
+    uint32 index_count;
+};
+
 struct MeshInfo
 {
     uint32 vertex_size;
-    uint32 index_size;
     uint32 vertex_count;
+    uint32 index_size;
     uint32 index_count;
 };
 
 struct Mesh
 {
-    uint32 vertex_size;
-    uint32 index_size;
     uint32 vertex_buffer_offset;
+    uint32 vertex_buffer_index_offset;
     uint32 index_buffer_offset;
+    uint32 index_buffer_index_offset;
     uint32 index_count;
 };
 
@@ -31,21 +41,18 @@ struct MeshGroup
     Array<Mesh>           meshes;
     VkMemoryPropertyFlags mem_properties;
 
-    uint32    vertex_buffer_size;
-    uint32    index_buffer_size;
     BufferHnd vertex_buffer;
+    uint32    vertex_buffer_size;
+    uint32    vertex_count;
+
     BufferHnd index_buffer;
+    uint32    index_buffer_size;
+    uint32    index_count;
 };
 
 struct MeshModuleInfo
 {
     uint32 max_mesh_groups;
-};
-
-struct MeshData
-{
-    Array<uint8> vertex_buffer;
-    Array<uint8> index_buffer;
 };
 
 static Array<MeshGroup> g_mesh_groups;
@@ -95,18 +102,19 @@ static void ValidateMeshIndex(MeshGroup* mesh_group, uint32 mesh_group_index, ui
     }
 }
 
-static void ValidateMeshDataLoad(MeshGroup* mesh_group, uint32 mesh_group_index, MeshData* mesh_data)
+static void ValidateMeshDataLoad(MeshGroup* mesh_group, uint32 mesh_group_index, uint32 vertex_buffer_size,
+                                 uint32 index_buffer_size)
 {
-    if (mesh_data->vertex_buffer.size >= mesh_group->vertex_buffer_size)
+    if (vertex_buffer_size >= mesh_group->vertex_buffer_size)
     {
         CTK_FATAL("can't load mesh data: vertex buffer size of %u exceeds mesh group %u's vertex buffer size of %u",
-                  mesh_data->vertex_buffer.size, mesh_group_index, mesh_group->vertex_buffer_size);
+                  vertex_buffer_size, mesh_group_index, mesh_group->vertex_buffer_size);
 
     }
-    if (mesh_data->index_buffer.size >= mesh_group->index_buffer_size)
+    if (index_buffer_size >= mesh_group->index_buffer_size)
     {
         CTK_FATAL("can't load mesh data: index buffer size of %u exceeds mesh group %u's index buffer size of %u",
-                  mesh_data->index_buffer.size, mesh_group_index, mesh_group->index_buffer_size);
+                  index_buffer_size, mesh_group_index, mesh_group->index_buffer_size);
 
     }
 }
@@ -145,14 +153,16 @@ static MeshHnd CreateMesh(MeshGroupHnd mesh_group_hnd, MeshInfo* info)
 
     MeshHnd mesh_hnd = { .index = CreateMeshHndIndex(mesh_group_hnd, mesh_group->meshes.count) };
     Mesh* mesh = Push(&mesh_group->meshes);
-    mesh->vertex_size          = info->vertex_size;
-    mesh->index_size           = info->index_size;
-    mesh->vertex_buffer_offset = mesh_group->vertex_buffer_size;
-    mesh->index_buffer_offset  = mesh_group->index_buffer_size;
-    mesh->index_count          = info->index_count;
+    mesh->vertex_buffer_offset       = mesh_group->vertex_buffer_size;
+    mesh->vertex_buffer_index_offset = mesh_group->vertex_count;
+    mesh->index_buffer_offset        = mesh_group->index_buffer_size;
+    mesh->index_buffer_index_offset  = mesh_group->index_count;
+    mesh->index_count                = info->index_count;
 
     mesh_group->vertex_buffer_size += info->vertex_count * info->vertex_size;
+    mesh_group->vertex_count       += info->vertex_count;
     mesh_group->index_buffer_size  += info->index_count  * info->index_size;
+    mesh_group->index_count        += info->index_count;
 
     return mesh_hnd;
 }
@@ -188,7 +198,10 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
-    ValidateMeshDataLoad(mesh_group, mesh_group_index, mesh_data);
+
+    uint32 vertex_buffer_size = mesh_data->vertex_size * mesh_data->vertex_count;
+    uint32 index_buffer_size  = mesh_data->index_size * mesh_data->index_count;
+    ValidateMeshDataLoad(mesh_group, mesh_group_index, vertex_buffer_size, index_buffer_size);
 
     uint32 mesh_index = GetMeshIndex(mesh_hnd);
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
@@ -197,8 +210,8 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     static constexpr uint32 FRAME_INDEX = 0;
     HostBufferWrite vertex_buffer_write =
     {
-        .size       = mesh_data->vertex_buffer.size,
-        .src_data   = mesh_data->vertex_buffer.data,
+        .size       = vertex_buffer_size,
+        .src_data   = mesh_data->vertex_buffer,
         .src_offset = 0,
         .dst_hnd    = mesh_group->vertex_buffer,
         .dst_offset = mesh->vertex_buffer_offset,
@@ -206,8 +219,8 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     WriteHostBuffer(&vertex_buffer_write, FRAME_INDEX);
     HostBufferWrite index_buffer_write =
     {
-        .size       = mesh_data->index_buffer.size,
-        .src_data   = mesh_data->index_buffer.data,
+        .size       = index_buffer_size,
+        .src_data   = mesh_data->index_buffer,
         .src_offset = 0,
         .dst_hnd    = mesh_group->index_buffer,
         .dst_offset = mesh->index_buffer_offset,
@@ -222,7 +235,10 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
-    ValidateMeshDataLoad(mesh_group, mesh_group_index, mesh_data);
+
+    uint32 vertex_buffer_size = mesh_data->vertex_size * mesh_data->vertex_count;
+    uint32 index_buffer_size  = mesh_data->index_size * mesh_data->index_count;
+    ValidateMeshDataLoad(mesh_group, mesh_group_index, vertex_buffer_size, index_buffer_size);
 
     uint32 mesh_index = GetMeshIndex(mesh_hnd);
     ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
@@ -233,16 +249,16 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
 
     HostBufferAppend vertex_staging =
     {
-        .size       = mesh_data->vertex_buffer.size,
-        .src_data   = mesh_data->vertex_buffer.data,
+        .size       = vertex_buffer_size,
+        .src_data   = mesh_data->vertex_buffer,
         .src_offset = 0,
         .dst_hnd    = staging_buffer_hnd,
     };
     AppendHostBuffer(&vertex_staging, FRAME_INDEX);
     HostBufferAppend index_staging =
     {
-        .size       = mesh_data->index_buffer.size,
-        .src_data   = mesh_data->index_buffer.data,
+        .size       = index_buffer_size,
+        .src_data   = mesh_data->index_buffer,
         .src_offset = 0,
         .dst_hnd    = staging_buffer_hnd,
     };
@@ -251,7 +267,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     BeginTempCommandBuffer();
         DeviceBufferWrite vertex_buffer_write =
         {
-            .size       = mesh_data->vertex_buffer.size,
+            .size       = vertex_buffer_size,
             .src_hnd    = staging_buffer_hnd,
             .src_offset = 0,
             .dst_hnd    = mesh_group->vertex_buffer,
@@ -260,9 +276,9 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
         WriteDeviceBufferCmd(&vertex_buffer_write, FRAME_INDEX);
         DeviceBufferWrite index_buffer_write =
         {
-            .size       = mesh_data->index_buffer.size,
+            .size       = index_buffer_size,
             .src_hnd    = staging_buffer_hnd,
-            .src_offset = mesh_data->vertex_buffer.size,
+            .src_offset = vertex_buffer_size,
             .dst_hnd    = mesh_group->index_buffer,
             .dst_offset = mesh->index_buffer_offset,
         };

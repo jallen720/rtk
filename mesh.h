@@ -311,28 +311,26 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     PrintGLTF(&gltf, 1);
     CTK_ASSERT(gltf.meshes.count == 1);
     GLTFMesh* mesh = GetPtr(&gltf.meshes, 0);
-    uint32 vertex_size = 0;
-    uint32 index_size  = 0;
     CTK_ITER(accessor, &gltf.accessors)
     {
         GLTFTarget target = GetPtr(&gltf.buffer_views, accessor->buffer_view)->target;
         if (target == GLTFTarget::ARRAY_BUFFER)
         {
-            vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
+            mesh_data->vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
                            GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
         }
         else
         {
-            if (index_size != 0)
+            if (mesh_data->index_size != 0)
             {
                 CTK_FATAL("found multiple ELEMENT_ARRAY_BUFFER buffer views");
             }
-            index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
+            mesh_data->index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
                          GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
         }
     }
-    PrintLine("vertex size: %u", vertex_size);
-    PrintLine("index  size: %u", index_size);
+    PrintLine("vertex size: %u", mesh_data->vertex_size);
+    PrintLine("index  size: %u", mesh_data->index_size);
     // exit(0);
     // InitArray(&mesh_data->vertex_buffer, allocator, mesh->);
 }

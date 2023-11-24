@@ -346,7 +346,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     mesh_data->index_buffer  = Allocate<uint8>(allocator, mesh_data->index_size  * mesh_data->index_count);
 
     // Write attributes from buffer to vertex buffer interleaved.
-    uint32 prev_attribute_size = 0;
+    uint32 attribute_offset = 0;
     CTK_ITER(attribute, &primitive->attributes)
     {
         GLTFAccessor*   accessor    = GetPtr(&gltf.accessors,    attribute->accessor);
@@ -355,7 +355,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
 
         uint32 buffer_offset        = buffer_view->offset + accessor->offset;
         uint32 buffer_view_offset   = 0;
-        uint32 vertex_buffer_offset = prev_attribute_size;
+        uint32 vertex_buffer_offset = attribute_offset;
         uint32 attribute_size       = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
                                       GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
         while (buffer_view_offset < buffer_view->size)
@@ -367,12 +367,12 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
             vertex_buffer_offset += mesh_data->vertex_size;
         }
 
-        prev_attribute_size = attribute_size;
+        attribute_offset += attribute_size;
     }
 
-    // Write indexes from buffer to index buffer. Done this way as we're force index size to 4. If we stored indexes in
-    // the same size as they are in the GLTF buffer, we could just memcpy() the entire buffer_view for indexes to the
-    // index buffer.
+    // Write indexes from buffer to index buffer. This is done with offsets because index size is 4. If indexes were
+    // stored in the same size as they are in the GLTF buffer, we could just memcpy() the entire buffer_view for indexes
+    // to the index buffer.
     GLTFBufferView* buffer_view = GetPtr(&gltf.buffer_views, indexes_accessor->buffer_view);
     GLTFBuffer*     buffer      = GetPtr(&gltf.buffers,      buffer_view->buffer);
 

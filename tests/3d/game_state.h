@@ -56,7 +56,7 @@ static void InitView()
 {
     game_state.view =
     {
-        .position     = { 32 * 1.5f, 32 * 1.5f, -32 },
+        .position     = { (CUBE_SIZE / 2) * 1.5f, (CUBE_SIZE / 2) * 1.5f, -(CUBE_SIZE / 2) },
         .rotation     = { 0, 0, 0 },
         .vertical_fov = 90.0f,
         .z_near       = 0.1f,

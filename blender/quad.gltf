@@ -15,12 +15,12 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"Cube"
+			"name":"Quad"
 		}
 	],
 	"meshes":[
 		{
-			"name":"Cube",
+			"name":"Quad",
 			"primitives":[
 				{
 					"attributes":{
@@ -36,56 +36,56 @@
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":24,
+			"count":4,
 			"max":[
 				1,
-				1,
-				0
+				0,
+				1
 			],
 			"min":[
 				0,
 				0,
-				-1
+				0
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":24,
+			"count":4,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":2,
 			"componentType":5123,
-			"count":36,
+			"count":6,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":288,
+			"byteLength":48,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":192,
-			"byteOffset":288,
+			"byteLength":32,
+			"byteOffset":48,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":72,
-			"byteOffset":480,
+			"byteLength":12,
+			"byteOffset":80,
 			"target":34963
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":552,
-			"uri":"cube.bin"
+			"byteLength":92,
+			"uri":"quad.bin"
 		}
 	]
 }

@@ -42,7 +42,7 @@ static void Run()
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
 #endif
-    context_info.render_thread_count = 6;
+    context_info.render_thread_count = 4;
 
     InitDeviceFeatures(&context_info.enabled_features);
     context_info.enabled_features.vulkan_1_0.geometryShader                            = VK_TRUE;

@@ -386,7 +386,7 @@ static void PrintAccessorValues(GLTF* gltf, GLTFAccessor* accessor, const char* 
         }
         ++attribute_index;
 
-        buffer_view_offset   += attribute_size;
+        buffer_view_offset += attribute_size;
     }
 }
 

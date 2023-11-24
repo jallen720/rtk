@@ -303,6 +303,93 @@ static Mesh* GetMesh(MeshHnd mesh_hnd)
     return GetMesh(mesh_group, mesh_index);
 }
 
+static void PrintAccessorValues(GLTF* gltf, GLTFAccessor* accessor, const char* name)
+{
+    GLTFBufferView* buffer_view = GetPtr(&gltf->buffer_views, accessor->buffer_view);
+    GLTFBuffer*     buffer      = GetPtr(&gltf->buffers,      buffer_view->buffer);
+
+    uint32 buffer_offset      = buffer_view->offset + accessor->offset;
+    uint32 buffer_view_offset = 0;
+    uint32 component_count    = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type];
+    uint32 attribute_size     = component_count * GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
+    uint32 attribute_index    = 0;
+    PrintLine("%s: ", name);
+    while (buffer_view_offset < buffer_view->size)
+    {
+        Print("    [%4u] ", attribute_index);
+        if (accessor->component_type == GLTFComponentType::FLOAT)
+        {
+            auto vector = (float32*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8.3f,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::SIGNED_BYTE)
+        {
+            auto vector = (sint8*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8i,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::SIGNED_SHORT)
+        {
+            auto vector = (sint16*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8i,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::SIGNED_INT)
+        {
+            auto vector = (sint32*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8i,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::UNSIGNED_BYTE)
+        {
+            auto vector = (uint8*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8u,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::UNSIGNED_SHORT)
+        {
+            auto vector = (uint16*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8u,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::UNSIGNED_INT)
+        {
+            auto vector = (uint32*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8u,", vector[i]);
+            }
+            PrintLine();
+        }
+        else
+        {
+            CTK_FATAL("unhandle GLTFComponentType: %u", (uint32)accessor->component_type);
+        }
+        ++attribute_index;
+
+        buffer_view_offset   += attribute_size;
+    }
+}
+
 static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const char* path)
 {
     GLTF gltf = {};
@@ -368,6 +455,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         }
 
         attribute_offset += attribute_size;
+        PrintAccessorValues(&gltf, accessor, GetGLTFAttributeTypeName(attribute->type));
     }
 
     // Write indexes from buffer to index buffer. This is done with offsets because index size is 4. If indexes were
@@ -389,4 +477,5 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         buffer_view_offset  += index_size;
         index_buffer_offset += mesh_data->index_size;
     }
+    PrintAccessorValues(&gltf, indexes_accessor, "INDEXES");
 }

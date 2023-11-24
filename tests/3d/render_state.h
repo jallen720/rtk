@@ -352,7 +352,7 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
             .width    = (float32)swapchain_extent.width,
             .height   = (float32)swapchain_extent.height,
             .minDepth = 0,
-            .maxDepth = 1
+            .maxDepth = 1,
         },
     };
     Shader* shaders[] =

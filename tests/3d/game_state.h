@@ -147,7 +147,7 @@ static void UpdateView()
         .z = Get(&matrix, 2, 0),
     };
     view->position = view->position + (forward * translation.z);
-    view->position = view->position + (right * translation.x);
+    view->position = view->position + (right   * translation.x);
     view->position.y += translation.y;
 
     // Rotation

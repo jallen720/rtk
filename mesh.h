@@ -349,7 +349,6 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     uint32 prev_attribute_size = 0;
     CTK_ITER(attribute, &primitive->attributes)
     {
-
         GLTFAccessor*   accessor    = GetPtr(&gltf.accessors,    attribute->accessor);
         GLTFBufferView* buffer_view = GetPtr(&gltf.buffer_views, accessor->buffer_view);
         GLTFBuffer*     buffer      = GetPtr(&gltf.buffers,      buffer_view->buffer);

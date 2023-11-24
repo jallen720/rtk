@@ -200,7 +200,8 @@ static Matrix GetViewProjectionMatrix()
         .y = Get(&view_model_matrix, 1, 2),
         .z = Get(&view_model_matrix, 2, 2),
     };
-    Matrix view_matrix = LookAt(view->position, view->position + forward, { 0.0f, -1.0f, 0.0f });
+    static constexpr Vec3<float32> UP = { 0.0f, -1.0f, 0.0f }; // Vulkan has -Y as up.
+    Matrix view_matrix = LookAt(view->position, view->position + forward, UP);
 
     // Projection Matrix
     VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;

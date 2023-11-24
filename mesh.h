@@ -443,15 +443,29 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         uint32 buffer_offset        = buffer_view->offset + accessor->offset;
         uint32 buffer_view_offset   = 0;
         uint32 vertex_buffer_offset = attribute_offset;
-        uint32 attribute_size       = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
-                                      GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
-        while (buffer_view_offset < buffer_view->size)
+        uint32 component_count      = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type];
+        uint32 attribute_size       = component_count * GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
+        if (component_count >= 3)
         {
-            memcpy(&mesh_data->vertex_buffer[vertex_buffer_offset],
-                   &buffer->data[buffer_offset + buffer_view_offset],
-                   attribute_size);
-            buffer_view_offset   += attribute_size;
-            vertex_buffer_offset += mesh_data->vertex_size;
+            while (buffer_view_offset < buffer_view->size)
+            {
+                auto vector = (float*)&buffer->data[buffer_offset + buffer_view_offset];
+                vector[2] *= -1;
+                memcpy(&mesh_data->vertex_buffer[vertex_buffer_offset], vector, attribute_size);
+                buffer_view_offset   += attribute_size;
+                vertex_buffer_offset += mesh_data->vertex_size;
+            }
+        }
+        else
+        {
+            while (buffer_view_offset < buffer_view->size)
+            {
+                memcpy(&mesh_data->vertex_buffer[vertex_buffer_offset],
+                       &buffer->data[buffer_offset + buffer_view_offset],
+                       attribute_size);
+                buffer_view_offset   += attribute_size;
+                vertex_buffer_offset += mesh_data->vertex_size;
+            }
         }
 
         attribute_offset += attribute_size;
@@ -467,8 +481,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     uint32 buffer_offset       = buffer_view->offset + indexes_accessor->offset;
     uint32 buffer_view_offset  = 0;
     uint32 index_buffer_offset = 0;
-    uint32 index_size          = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accessor->type] *
-                                 GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accessor->component_type];
+    uint32 index_size          = GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accessor->component_type];
     while (buffer_view_offset < buffer_view->size)
     {
         memcpy(&mesh_data->index_buffer[index_buffer_offset],

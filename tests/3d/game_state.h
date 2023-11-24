@@ -105,9 +105,8 @@ static void InitEntities()
             .rotate_axis      = (uint8)RandomRange(0u, 3u),
             .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
         };
-        entity_data->texture_indexes[entity_index] =
-            TextureIndex(entity_index);
-            // CycleTextureIndex(entity_index);
+        entity_data->texture_indexes[entity_index] = TextureIndex(entity_index);
+        // entity_data->texture_indexes[entity_index] = CycleTextureIndex(entity_index);
     }
 }
 

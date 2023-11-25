@@ -27,6 +27,7 @@ struct EntityData
     Transform transforms[MAX_ENTITIES];
     Entity    entities[MAX_ENTITIES];
     uint32    texture_indexes[MAX_ENTITIES];
+    uint32    sampler_indexes[MAX_ENTITIES];
     uint32    count;
 };
 
@@ -82,9 +83,9 @@ static uint32 TextureIndex(uint32 entity_index)
     return (entity_index / (MAX_ENTITIES / TEXTURE_COUNT)) % TEXTURE_COUNT;
 }
 
-static uint32 CycleTextureIndex(uint32 entity_index)
+static uint32 SamplerIndex(uint32 entity_index)
 {
-    return entity_index % TEXTURE_COUNT;
+    return (TextureIndex(entity_index) + 1) % 3 == 0;
 }
 
 static void InitEntities()
@@ -106,7 +107,7 @@ static void InitEntities()
             .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
         };
         entity_data->texture_indexes[entity_index] = TextureIndex(entity_index);
-        // entity_data->texture_indexes[entity_index] = CycleTextureIndex(entity_index);
+        entity_data->sampler_indexes[entity_index] = SamplerIndex(entity_index);
     }
 }
 
@@ -231,8 +232,9 @@ static void UpdateMVPMatrixesThread(void* data)
         model_matrix = RotateZ(model_matrix, entity_transform->rotation.z);
         // model_matrix = Scale(model_matrix, entity_transform->scale);
 
-        frame_entity_buffer->mvp_matrixes[i] = view_projection_matrix * model_matrix;
+        frame_entity_buffer->mvp_matrixes[i]    = view_projection_matrix * model_matrix;
         frame_entity_buffer->texture_indexes[i] = entity_data->texture_indexes[i];
+        frame_entity_buffer->sampler_indexes[i] = entity_data->sampler_indexes[i];
     }
 }
 

@@ -2,8 +2,9 @@
 ////////////////////////////////////////////////////////////
 struct EntityBuffer
 {
-    Matrix mvp_matrixes[MAX_ENTITIES];
+    Matrix mvp_matrixes   [MAX_ENTITIES];
     uint32 texture_indexes[MAX_ENTITIES];
+    uint32 sampler_indexes[MAX_ENTITIES];
 };
 
 struct RenderCommandState
@@ -25,7 +26,7 @@ struct RenderState
     BufferHnd        staging_buffer;
     BufferHnd        entity_buffer;
     Array<ImageHnd>  textures;
-    VkSampler        texture_sampler;
+    Array<VkSampler> samplers;
     MeshGroupHnd     mesh_group;
     Array<MeshHnd>   meshes;
 
@@ -39,20 +40,14 @@ struct RenderState
     Pipeline         pipeline;
 };
 
-struct Vertex
-{
-    Vec3<float32> position;
-    Vec2<float32> uv;
-};
-
 static constexpr const char* TEXTURE_IMAGE_PATHS[] =
 {
     "images/axis_cube.png",
     "images/axis_cube.png",
+    "images/icosphere_triangle.png",
     "images/axis_cube.png",
-    "images/dirt_block.png",
-    "images/dirt_block.png",
-    "images/dirt_block.png",
+    "images/axis_cube.png",
+    "images/icosphere_triangle.png",
 };
 static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
 static_assert(TEXTURE_COUNT == MAX_TEXTURES);
@@ -90,7 +85,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     // Staging Buffer
     BufferInfo staging_buffer_info =
     {
-        .size             = Megabyte32<4>(),
+        .size             = Megabyte32<8>(),
         .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame        = false,
         .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -158,22 +153,6 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     static constexpr uint32 MESH_COUNT = 3;
     MeshData mesh_datas[MESH_COUNT] = {};
 
-    // #include "meshes/cube.h"
-    // mesh_datas[0].vertex_buffer = (uint8*)cube_vertexes;
-    // mesh_datas[0].vertex_size   = sizeof(Vertex);
-    // mesh_datas[0].vertex_count  = CTK_ARRAY_SIZE(cube_vertexes);
-    // mesh_datas[0].index_buffer  = (uint8*)cube_indexes;
-    // mesh_datas[0].index_size    = sizeof(uint32);
-    // mesh_datas[0].index_count   = CTK_ARRAY_SIZE(cube_indexes);
-
-    // #include "meshes/quad.h"
-    // mesh_datas[1].vertex_buffer = (uint8*)quad_vertexes;
-    // mesh_datas[1].vertex_size   = sizeof(Vertex);
-    // mesh_datas[1].vertex_count  = CTK_ARRAY_SIZE(quad_vertexes);
-    // mesh_datas[1].index_buffer  = (uint8*)quad_indexes;
-    // mesh_datas[1].index_size    = sizeof(uint32);
-    // mesh_datas[1].index_count   = CTK_ARRAY_SIZE(quad_indexes);
-
     Swizzle position_swizzle = { 0, 2, 1 };
     AttributeSwizzles attribute_swizzles = { .POSITION = &position_swizzle };
     LoadMeshData(&mesh_datas[0], &free_list->allocator, "blender/cube.gltf",      &attribute_swizzles);
@@ -220,31 +199,59 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     }
 }
 
-static void CreateSampler()
+static void CreateSamplers(Stack* perm_stack)
 {
-    VkSamplerCreateInfo texture_sampler_info =
+    VkResult res = VK_SUCCESS;
+    VkDevice device = GetDevice();
+    VkSamplerCreateInfo sampler_infos[MAX_SAMPLERS] =
     {
-        .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .pNext                   = NULL,
-        .flags                   = 0,
-        .magFilter               = VK_FILTER_NEAREST,
-        .minFilter               = VK_FILTER_NEAREST,
-        .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
-        .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-        .mipLodBias              = 0.0f,
-        .anisotropyEnable        = VK_FALSE,
-        .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
-        .compareEnable           = VK_FALSE,
-        .compareOp               = VK_COMPARE_OP_ALWAYS,
-        .minLod                  = 0.0f,
-        .maxLod                  = 0.0f,
-        .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-        .unnormalizedCoordinates = VK_FALSE,
+        {
+            .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            .pNext                   = NULL,
+            .flags                   = 0,
+            .magFilter               = VK_FILTER_NEAREST,
+            .minFilter               = VK_FILTER_NEAREST,
+            .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+            .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .mipLodBias              = 0.0f,
+            .anisotropyEnable        = VK_FALSE,
+            .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+            .compareEnable           = VK_FALSE,
+            .compareOp               = VK_COMPARE_OP_ALWAYS,
+            .minLod                  = 0.0f,
+            .maxLod                  = 0.0f,
+            .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+            .unnormalizedCoordinates = VK_FALSE,
+        },
+        {
+            .sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+            .pNext                   = NULL,
+            .flags                   = 0,
+            .magFilter               = VK_FILTER_LINEAR,
+            .minFilter               = VK_FILTER_LINEAR,
+            .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+            .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+            .mipLodBias              = 0.0f,
+            .anisotropyEnable        = VK_FALSE,
+            .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+            .compareEnable           = VK_FALSE,
+            .compareOp               = VK_COMPARE_OP_ALWAYS,
+            .minLod                  = 0.0f,
+            .maxLod                  = 0.0f,
+            .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+            .unnormalizedCoordinates = VK_FALSE,
+        },
     };
-    VkResult res = vkCreateSampler(GetDevice(), &texture_sampler_info, NULL, &g_render_state.texture_sampler);
-    Validate(res, "vkCreateSampler() failed");
+    InitArray(&g_render_state.samplers, &perm_stack->allocator, MAX_SAMPLERS);
+    for (uint32 i = 0; i < MAX_SAMPLERS; ++i)
+    {
+        res = vkCreateSampler(device, &sampler_infos[i], NULL, Push(&g_render_state.samplers));
+        Validate(res, "vkCreateSampler() failed");
+    }
 }
 
 static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
@@ -279,8 +286,8 @@ static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
             {
                 .type     = VK_DESCRIPTOR_TYPE_SAMPLER,
                 .stages   = VK_SHADER_STAGE_FRAGMENT_BIT,
-                .count    = 1,
-                .samplers = &g_render_state.texture_sampler,
+                .count    = g_render_state.samplers.count,
+                .samplers = g_render_state.samplers.data,
             },
         };
         g_render_state.textures_descriptor_set =
@@ -440,7 +447,7 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     CreateResources(perm_stack, temp_stack, free_list);
 
     // Assets
-    CreateSampler();
+    CreateSamplers(perm_stack);
     CreateDescriptorSets(perm_stack, temp_stack);
     InitRenderTargets(perm_stack, temp_stack, free_list);
     InitShaders(temp_stack);

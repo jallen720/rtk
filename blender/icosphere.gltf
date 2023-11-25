@@ -36,7 +36,7 @@
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":63,
+			"count":115,
 			"max":[
 				0.9755289554595947,
 				1,
@@ -44,7 +44,7 @@
 			],
 			"min":[
 				0.02447107434272766,
-				2.9802322387695312,
+				2.9802322387695312e-08,
 				0
 			],
 			"type":"VEC3"
@@ -52,7 +52,7 @@
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":63,
+			"count":115,
 			"type":"VEC2"
 		},
 		{
@@ -65,26 +65,26 @@
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":756,
+			"byteLength":1380,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":504,
-			"byteOffset":756,
+			"byteLength":920,
+			"byteOffset":1380,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":480,
-			"byteOffset":1260,
+			"byteOffset":2300,
 			"target":34963
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":1740,
+			"byteLength":2780,
 			"uri":"icosphere.bin"
 		}
 	]

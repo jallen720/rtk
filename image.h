@@ -61,6 +61,10 @@ static void LoadImageData(ImageData* image_data, const char* path)
     {
         CTK_FATAL("failed to load image data from path '%s'", path);
     }
+    if (image_data->channel_count != 4)
+    {
+        CTK_FATAL("image data from path '%s' has %u channels but 4 are required", path, image_data->channel_count);
+    }
 
     image_data->size = image_data->width * image_data->height * image_data->channel_count;
 }

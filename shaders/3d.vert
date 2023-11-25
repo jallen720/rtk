@@ -12,8 +12,9 @@ layout(location = 1) out flat uint out_entity_index;
 
 layout(set = 0, binding = 0, std430) uniform EntityBuffer
 {
-    mat4 mvp_matrixes[MAX_ENTITIES];
+    mat4 mvp_matrixes   [MAX_ENTITIES];
     uint texture_indexes[MAX_ENTITIES];
+    uint sampler_indexes[MAX_ENTITIES];
 }
 entity_buffer;
 

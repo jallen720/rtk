@@ -12,16 +12,21 @@ layout(location = 0) out vec4 out_color;
 
 layout(set = 0, binding = 0, std430) uniform EntityBuffer
 {
-    mat4 mvp_matrixes[MAX_ENTITIES];
+    mat4 mvp_matrixes   [MAX_ENTITIES];
     uint texture_indexes[MAX_ENTITIES];
+    uint sampler_indexes[MAX_ENTITIES];
 }
 entity;
 
 layout(set = 1, binding = 0) uniform texture2D textures[MAX_TEXTURES];
-layout(set = 1, binding = 1) uniform sampler texture_sampler;
+layout(set = 1, binding = 1) uniform sampler   samplers[MAX_SAMPLERS];
 
 void main()
 {
-    uint texture_index = entity.texture_indexes[in_entity_index];
-    out_color = texture(sampler2D(textures[nonuniformEXT(texture_index)], texture_sampler), in_vert_uv);
+    out_color =
+        texture(
+            sampler2D(
+                textures[nonuniformEXT(entity.texture_indexes[in_entity_index])],
+                samplers[nonuniformEXT(entity.sampler_indexes[in_entity_index])]),
+            in_vert_uv);
 }

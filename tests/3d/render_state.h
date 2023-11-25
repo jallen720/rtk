@@ -174,13 +174,11 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     // mesh_datas[1].index_size    = sizeof(uint32);
     // mesh_datas[1].index_count   = CTK_ARRAY_SIZE(quad_indexes);
 
-Swizzle swizzle = {};
-swizzle.attribute_type = GLTFAttributeType::POSITION;
-swizzle.count = 3;
-swizzle.components = { 0, 2, 1 };
-    LoadMeshData(&mesh_datas[0], &free_list->allocator, "blender/cube.gltf", &swizzle);
-    LoadMeshData(&mesh_datas[1], &free_list->allocator, "blender/quad.gltf", &swizzle);
-    LoadMeshData(&mesh_datas[2], &free_list->allocator, "blender/icosphere.gltf", &swizzle);
+    Swizzle position_swizzle = { 0, 2, 1 };
+    AttributeSwizzles attribute_swizzles = { .POSITION = &position_swizzle };
+    LoadMeshData(&mesh_datas[0], &free_list->allocator, "blender/cube.gltf",      &attribute_swizzles);
+    LoadMeshData(&mesh_datas[1], &free_list->allocator, "blender/quad.gltf",      &attribute_swizzles);
+    LoadMeshData(&mesh_datas[2], &free_list->allocator, "blender/icosphere.gltf", &attribute_swizzles);
 
     InitArray(&g_render_state.meshes, &perm_stack->allocator, CTK_ARRAY_SIZE(mesh_datas));
     InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });

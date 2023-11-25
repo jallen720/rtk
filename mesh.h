@@ -390,26 +390,47 @@ static void PrintAccessorValues(GLTF* gltf, GLTFAccessor* accessor, const char* 
     }
 }
 
-union SwizzleComponents
+union Swizzle
 {
     struct { uint8 x, y, z, w; };
     uint8 array[4];
 };
 
-struct Swizzle
+union AttributeSwizzles
 {
-    GLTFAttributeType attribute_type;
-    uint8             count;
-    SwizzleComponents components;
+    struct
+    {
+        Swizzle* POSITION;
+        Swizzle* NORMAL;
+        Swizzle* TANGENT;
+        Swizzle* TEXCOORD_0;
+        Swizzle* TEXCOORD_1;
+        Swizzle* TEXCOORD_2;
+        Swizzle* TEXCOORD_3;
+        Swizzle* COLOR_0;
+        Swizzle* COLOR_1;
+        Swizzle* COLOR_2;
+        Swizzle* COLOR_3;
+        Swizzle* JOINTS_0;
+        Swizzle* JOINTS_1;
+        Swizzle* JOINTS_2;
+        Swizzle* JOINTS_3;
+        Swizzle* WEIGHTS_0;
+        Swizzle* WEIGHTS_1;
+        Swizzle* WEIGHTS_2;
+        Swizzle* WEIGHTS_3;
+    };
+    Swizzle* array[(uint32)GLTFAttributeType::COUNT];
 };
 
-static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const char* path, Swizzle* swizzle = NULL)
+static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const char* path,
+                         AttributeSwizzles* attribute_swizzles = NULL)
 {
     GLTF gltf = {};
     LoadGLTF(&gltf, allocator, path);
 
-    PrintLine("%s:", path);
-    PrintGLTF(&gltf, 1);
+// PrintLine("%s:", path);
+// PrintGLTF(&gltf, 1);
 
     CTK_ASSERT(gltf.meshes.count == 1);
     GLTFMesh* mesh = GetPtr(&gltf.meshes, 0);
@@ -437,10 +458,10 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     //                         GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accessor->component_type];
     mesh_data->index_size = 4;
 
-    PrintLine("vertex size:  %u", mesh_data->vertex_size);
-    PrintLine("vertex count: %u", mesh_data->vertex_count);
-    PrintLine("index  size:  %u", mesh_data->index_size);
-    PrintLine("index  count: %u", mesh_data->index_count);
+// PrintLine("vertex size:  %u", mesh_data->vertex_size);
+// PrintLine("vertex count: %u", mesh_data->vertex_count);
+// PrintLine("index  size:  %u", mesh_data->index_size);
+// PrintLine("index  count: %u", mesh_data->index_count);
 
     mesh_data->vertex_buffer = Allocate<uint8>(allocator, mesh_data->vertex_size * mesh_data->vertex_count);
     mesh_data->index_buffer  = Allocate<uint8>(allocator, mesh_data->index_size  * mesh_data->index_count);
@@ -459,23 +480,18 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         uint32 component_count      = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type];
         uint32 component_size       = GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
         uint32 attribute_size       = component_count * component_size;
-        if (swizzle != NULL && attribute->type == swizzle->attribute_type)
+        Swizzle* swizzle            = attribute_swizzles != NULL
+                                    ? attribute_swizzles->array[(uint32)attribute->type]
+                                    : NULL;
+        if (swizzle != NULL)
         {
-            if (swizzle->count > component_count)
-            {
-                CTK_FATAL("swizzle for attribute %s is invalid: component count of %u is > attribute component count "
-                          "of %u",
-                          GetGLTFAttributeTypeName(swizzle->attribute_type),
-                          swizzle->count,
-                          component_count);
-            }
             while (buffer_view_offset < buffer_view->size)
             {
                 uint8* src = &buffer->data[buffer_offset + buffer_view_offset];
                 uint8* dst = &mesh_data->vertex_buffer[vertex_buffer_offset];
                 for (uint32 component_index = 0; component_index < component_count; ++component_index)
                 {
-                    memcpy(&dst[swizzle->components.array[component_index] * component_size],
+                    memcpy(&dst[swizzle->array[component_index] * component_size],
                            &src[component_index * component_size],
                            component_size);
                 }
@@ -496,7 +512,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         }
 
         attribute_offset += attribute_size;
-        PrintAccessorValues(&gltf, accessor, GetGLTFAttributeTypeName(attribute->type));
+// PrintAccessorValues(&gltf, accessor, GetGLTFAttributeTypeName(attribute->type));
     }
 
     // Write indexes from buffer to index buffer. This is done with offsets because index size is 4. If indexes were
@@ -517,5 +533,5 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         buffer_view_offset  += index_size;
         index_buffer_offset += mesh_data->index_size;
     }
-    PrintAccessorValues(&gltf, indexes_accessor, "INDEXES");
+// PrintAccessorValues(&gltf, indexes_accessor, "INDEXES");
 }

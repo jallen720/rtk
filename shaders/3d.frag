@@ -4,7 +4,7 @@
 #extension GL_EXT_scalar_block_layout     : require
 #extension GL_EXT_nonuniform_qualifier    : require
 
-#include "../tests/3d/defs.h"
+#include "../tests/defs.h"
 
 layout(location = 0) in vec2 in_vert_uv;
 layout(location = 1) in flat uint in_entity_index;

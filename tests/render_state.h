@@ -1,5 +1,12 @@
 /// Data
 ////////////////////////////////////////////////////////////
+template<typename StateType>
+struct Job
+{
+    Array<StateType> states;
+    Array<TaskHnd>   tasks;
+};
+
 struct EntityBuffer
 {
     Matrix mvp_matrixes   [MAX_ENTITIES];
@@ -58,6 +65,13 @@ static RenderState g_render_state;
 
 /// Utils
 ////////////////////////////////////////////////////////////
+template<typename StateType>
+static void InitThreadPoolJob(Job<StateType>* job, Stack* perm_stack, uint32 thread_count)
+{
+    InitArrayFull(&job->states, &perm_stack->allocator, thread_count);
+    InitArrayFull(&job->tasks,  &perm_stack->allocator, thread_count);
+}
+
 static void InitRenderJob(Stack* perm_stack)
 {
     uint32 render_thread_count = GetRenderThreadCount();

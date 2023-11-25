@@ -1,5 +1,12 @@
 /// Data
 ////////////////////////////////////////////////////////////
+struct Mouse
+{
+    Vec2<sint32> position;
+    Vec2<sint32> delta;
+    Vec2<sint32> last_position;
+};
+
 struct View
 {
     Vec3<float32> position;
@@ -109,6 +116,13 @@ static void InitEntities()
         entity_data->texture_indexes[entity_index] = TextureIndex(entity_index);
         entity_data->sampler_indexes[entity_index] = SamplerIndex(entity_index);
     }
+}
+
+static void UpdateMouse(Mouse* mouse)
+{
+    mouse->position = GetMousePosition();
+    mouse->delta = mouse->position - mouse->last_position;
+    mouse->last_position = mouse->position;
 }
 
 static void UpdateView()

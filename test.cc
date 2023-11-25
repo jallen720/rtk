@@ -61,9 +61,6 @@ sint32 main()
 // LogResourceGroups();
     InitGameState(perm_stack, thread_pool->size);
 
-// LoadMeshData<uint32>(NULL, &free_list->allocator, "meshes/cube.gltf");
-// exit(0);
-
     // Run game.
     bool recreate_swapchain = false;
     for (;;)

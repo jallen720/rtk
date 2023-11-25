@@ -50,7 +50,9 @@ static constexpr const char* TEXTURE_IMAGE_PATHS[] =
     "images/axis_cube.png",
     "images/axis_cube.png",
     "images/axis_cube.png",
-    "images/axis_cube.png",
+    "images/dirt_block.png",
+    "images/dirt_block.png",
+    "images/dirt_block.png",
 };
 static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);
 static_assert(TEXTURE_COUNT == MAX_TEXTURES);
@@ -153,28 +155,32 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     }
 
     // Meshes
-    static constexpr uint32 MESH_COUNT = 4;
+    static constexpr uint32 MESH_COUNT = 3;
     MeshData mesh_datas[MESH_COUNT] = {};
 
-    #include "meshes/cube.h"
-    mesh_datas[0].vertex_buffer = (uint8*)cube_vertexes;
-    mesh_datas[0].vertex_size   = sizeof(Vertex);
-    mesh_datas[0].vertex_count  = CTK_ARRAY_SIZE(cube_vertexes);
-    mesh_datas[0].index_buffer  = (uint8*)cube_indexes;
-    mesh_datas[0].index_size    = sizeof(uint32);
-    mesh_datas[0].index_count   = CTK_ARRAY_SIZE(cube_indexes);
+    // #include "meshes/cube.h"
+    // mesh_datas[0].vertex_buffer = (uint8*)cube_vertexes;
+    // mesh_datas[0].vertex_size   = sizeof(Vertex);
+    // mesh_datas[0].vertex_count  = CTK_ARRAY_SIZE(cube_vertexes);
+    // mesh_datas[0].index_buffer  = (uint8*)cube_indexes;
+    // mesh_datas[0].index_size    = sizeof(uint32);
+    // mesh_datas[0].index_count   = CTK_ARRAY_SIZE(cube_indexes);
 
-    LoadMeshData(&mesh_datas[1], &free_list->allocator, "blender/cube.gltf");
+    // #include "meshes/quad.h"
+    // mesh_datas[1].vertex_buffer = (uint8*)quad_vertexes;
+    // mesh_datas[1].vertex_size   = sizeof(Vertex);
+    // mesh_datas[1].vertex_count  = CTK_ARRAY_SIZE(quad_vertexes);
+    // mesh_datas[1].index_buffer  = (uint8*)quad_indexes;
+    // mesh_datas[1].index_size    = sizeof(uint32);
+    // mesh_datas[1].index_count   = CTK_ARRAY_SIZE(quad_indexes);
 
-    #include "meshes/quad.h"
-    mesh_datas[2].vertex_buffer = (uint8*)quad_vertexes;
-    mesh_datas[2].vertex_size   = sizeof(Vertex);
-    mesh_datas[2].vertex_count  = CTK_ARRAY_SIZE(quad_vertexes);
-    mesh_datas[2].index_buffer  = (uint8*)quad_indexes;
-    mesh_datas[2].index_size    = sizeof(uint32);
-    mesh_datas[2].index_count   = CTK_ARRAY_SIZE(quad_indexes);
-
-    LoadMeshData(&mesh_datas[3], &free_list->allocator, "blender/quad.gltf");
+Swizzle swizzle = {};
+swizzle.attribute_type = GLTFAttributeType::POSITION;
+swizzle.count = 3;
+swizzle.components = { 0, 2, 1 };
+    LoadMeshData(&mesh_datas[0], &free_list->allocator, "blender/cube.gltf", &swizzle);
+    LoadMeshData(&mesh_datas[1], &free_list->allocator, "blender/quad.gltf", &swizzle);
+    LoadMeshData(&mesh_datas[2], &free_list->allocator, "blender/icosphere.gltf", &swizzle);
 
     InitArray(&g_render_state.meshes, &perm_stack->allocator, CTK_ARRAY_SIZE(mesh_datas));
     InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });

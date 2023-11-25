@@ -390,7 +390,20 @@ static void PrintAccessorValues(GLTF* gltf, GLTFAccessor* accessor, const char* 
     }
 }
 
-static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const char* path)
+union SwizzleComponents
+{
+    struct { uint8 x, y, z, w; };
+    uint8 array[4];
+};
+
+struct Swizzle
+{
+    GLTFAttributeType attribute_type;
+    uint8             count;
+    SwizzleComponents components;
+};
+
+static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const char* path, Swizzle* swizzle = NULL)
 {
     GLTF gltf = {};
     LoadGLTF(&gltf, allocator, path);
@@ -444,14 +457,28 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         uint32 buffer_view_offset   = 0;
         uint32 vertex_buffer_offset = attribute_offset;
         uint32 component_count      = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type];
-        uint32 attribute_size       = component_count * GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
-        if (component_count >= 3)
+        uint32 component_size       = GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
+        uint32 attribute_size       = component_count * component_size;
+        if (swizzle != NULL && attribute->type == swizzle->attribute_type)
         {
+            if (swizzle->count > component_count)
+            {
+                CTK_FATAL("swizzle for attribute %s is invalid: component count of %u is > attribute component count "
+                          "of %u",
+                          GetGLTFAttributeTypeName(swizzle->attribute_type),
+                          swizzle->count,
+                          component_count);
+            }
             while (buffer_view_offset < buffer_view->size)
             {
-                auto vector = (float*)&buffer->data[buffer_offset + buffer_view_offset];
-                vector[2] *= -1;
-                memcpy(&mesh_data->vertex_buffer[vertex_buffer_offset], vector, attribute_size);
+                uint8* src = &buffer->data[buffer_offset + buffer_view_offset];
+                uint8* dst = &mesh_data->vertex_buffer[vertex_buffer_offset];
+                for (uint32 component_index = 0; component_index < component_count; ++component_index)
+                {
+                    memcpy(&dst[swizzle->components.array[component_index] * component_size],
+                           &src[component_index * component_size],
+                           component_size);
+                }
                 buffer_view_offset   += attribute_size;
                 vertex_buffer_offset += mesh_data->vertex_size;
             }

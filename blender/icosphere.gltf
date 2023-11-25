@@ -15,12 +15,12 @@
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"Quad"
+			"name":"Icosphere"
 		}
 	],
 	"meshes":[
 		{
-			"name":"Quad",
+			"name":"Icosphere",
 			"primitives":[
 				{
 					"attributes":{
@@ -36,15 +36,15 @@
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":4,
+			"count":63,
 			"max":[
+				0.9755289554595947,
 				1,
-				0,
 				1
 			],
 			"min":[
-				0,
-				0,
+				0.02447107434272766,
+				2.9802322387695312,
 				0
 			],
 			"type":"VEC3"
@@ -52,40 +52,40 @@
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":4,
+			"count":63,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":2,
 			"componentType":5123,
-			"count":6,
+			"count":240,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":48,
+			"byteLength":756,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":32,
-			"byteOffset":48,
+			"byteLength":504,
+			"byteOffset":756,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":12,
-			"byteOffset":80,
+			"byteLength":480,
+			"byteOffset":1260,
 			"target":34963
 		}
 	],
 	"buffers":[
 		{
-			"byteLength":92,
-			"uri":"quad.bin"
+			"byteLength":1740,
+			"uri":"icosphere.bin"
 		}
 	]
 }

@@ -488,6 +488,7 @@ static void UpdateMVPMatrixesThread(void* data)
         // model_matrix = Scale    (model_matrix, entity_transform->scale);
 
         state->frame_entity_buffer->mvp_matrixes[i] = state->view_projection_matrix * model_matrix;
+        // state->frame_entity_buffer->mvp_matrixes[i] = Mul(&state->view_projection_matrix, &model_matrix);
     }
 }
 
@@ -562,9 +563,9 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool, View* view, Transform* tr
     Job<MVPMatrixState>* job = &g_render_state.mvp_matrix_job;
     Matrix view_projection_matrix = GetViewProjectionMatrix(view);
     auto frame_entity_buffer = GetHostMemory<EntityBuffer>(g_render_state.entity_buffer, GetFrameIndex());
-    uint32 thread_count = thread_pool->size;
 
     // Initialize thread states and submit tasks.
+    uint32 thread_count = job->states.count;
     for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
     {
         MVPMatrixState* state = GetPtr(&job->states, thread_index);
@@ -573,25 +574,26 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool, View* view, Transform* tr
         state->frame_entity_buffer    = frame_entity_buffer;
         state->transforms             = transforms;
 
-        Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, UpdateMVPMatrixesThread));
+        UpdateMVPMatrixesThread((void*)state);
+        // Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, UpdateMVPMatrixesThread));
     }
 
-    // Wait for tasks to complete.
-    CTK_ITER(task, &job->tasks)
-    {
-        Wait(thread_pool, *task);
-    }
+    // // Wait for tasks to complete.
+    // CTK_ITER(task, &job->tasks)
+    // {
+    //     Wait(thread_pool, *task);
+    // }
 }
 
 static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
 {
     Job<RenderCommandState>* job = &g_render_state.render_command_job;
 
-    uint32 render_thread_count = GetRenderThreadCount();
-    for (uint32 thread_index = 0; thread_index < render_thread_count; ++thread_index)
+    uint32 thread_count = job->states.count;
+    for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
     {
         RenderCommandState* state = GetPtr(&job->states, thread_index);
-        state->batch_range  = GetBatchRange(thread_index, render_thread_count, entity_count);
+        state->batch_range  = GetBatchRange(thread_index, thread_count, entity_count);
         state->thread_index = thread_index;
         state->mesh         = Get(&g_render_state.meshes, thread_index % g_render_state.meshes.count);
         state->temp_stack   = GetPtr(&g_render_state.render_thread_temp_stacks, thread_index);

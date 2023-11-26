@@ -16,8 +16,8 @@ struct EntityBuffer
 
 struct RenderCommandState
 {
-    uint32     thread_index;
     BatchRange batch_range;
+    uint32     thread_index;
     MeshHnd    mesh;
     Stack*     temp_stack;
 };
@@ -477,9 +477,9 @@ static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
     for (uint32 thread_index = 0; thread_index < render_thread_count; ++thread_index)
     {
         RenderCommandState* state = GetPtr(&job->states, thread_index);
+        state->batch_range  = GetBatchRange(thread_index, render_thread_count, entity_count);
         state->thread_index = thread_index;
         state->mesh         = Get(&g_render_state.meshes, thread_index % g_render_state.meshes.count);
-        state->batch_range  = GetBatchRange(thread_index, render_thread_count, entity_count);
         state->temp_stack   = GetPtr(&g_render_state.render_thread_temp_stacks, thread_index);
 
         Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));

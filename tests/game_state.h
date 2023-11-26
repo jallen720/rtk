@@ -120,8 +120,8 @@ static void InitEntities()
 
 static void UpdateMouse(Mouse* mouse)
 {
-    mouse->position = GetMousePosition();
-    mouse->delta = mouse->position - mouse->last_position;
+    mouse->position      = GetMousePosition();
+    mouse->delta         = mouse->position - mouse->last_position;
     mouse->last_position = mouse->position;
 }
 

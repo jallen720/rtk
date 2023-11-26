@@ -57,9 +57,9 @@ sint32 main()
 // LogPhysicalDevice(GetPhysicalDevice());
 
     // Initialize other test state.
-    InitRenderState(perm_stack, temp_stack, free_list);
+    InitRenderState(perm_stack, temp_stack, free_list, thread_pool->size);
 // LogResourceGroups();
-    InitGameState(perm_stack, thread_pool->size);
+    InitGameState(perm_stack);
 
     // Run game.
     bool recreate_swapchain = false;
@@ -111,8 +111,9 @@ sint32 main()
             recreate_swapchain = true;
         }
 
-        UpdateMVPMatrixes(thread_pool);
-        RecordRenderCommands(thread_pool, GetEntityCount());
+        EntityData* entity_data = GetEntityData();
+        UpdateMVPMatrixes(thread_pool, GetView(), entity_data->transforms, entity_data->count);
+        RecordRenderCommands(thread_pool, entity_data->count);
         VkResult submit_render_commands_res = SubmitRenderCommands(GetRenderTarget());
         recreate_swapchain = submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR ||
                              submit_render_commands_res == VK_SUBOPTIMAL_KHR;

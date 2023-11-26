@@ -7,22 +7,6 @@ struct Mouse
     Vec2<sint32> last_position;
 };
 
-struct View
-{
-    Vec3<float32> position;
-    Vec3<float32> rotation;
-    float32       vertical_fov;
-    float32       z_near;
-    float32       z_far;
-    float32       max_x_angle;
-};
-
-struct Transform
-{
-    Vec3<float32> position;
-    Vec3<float32> rotation;
-};
-
 struct Entity
 {
     uint8 rotate_axis;
@@ -31,27 +15,18 @@ struct Entity
 
 struct EntityData
 {
-    Transform transforms[MAX_ENTITIES];
-    Entity    entities[MAX_ENTITIES];
+    Transform transforms     [MAX_ENTITIES];
     uint32    texture_indexes[MAX_ENTITIES];
     uint32    sampler_indexes[MAX_ENTITIES];
+    Entity    entities       [MAX_ENTITIES];
     uint32    count;
-};
-
-struct MVPMatrixState
-{
-    BatchRange    batch_range;
-    Matrix        view_projection_matrix;
-    EntityBuffer* frame_entity_buffer;
-    EntityData*   entity_data;
 };
 
 struct GameState
 {
-    Job<MVPMatrixState> mvp_matrix_job;
-    Mouse               mouse;
-    View                view;
-    EntityData          entity_data;
+    Mouse      mouse;
+    View       view;
+    EntityData entity_data;
 };
 
 /// Instance
@@ -62,15 +37,6 @@ static GameState game_state;
 ////////////////////////////////////////////////////////////
 static void InitView()
 {
-    game_state.view =
-    {
-        .position     = { (CUBE_SIZE / 2) * 1.5f, (CUBE_SIZE / 2) * 1.5f, -(CUBE_SIZE / 2) },
-        .rotation     = { 0, 0, 0 },
-        .vertical_fov = 90.0f,
-        .z_near       = 0.1f,
-        .z_far        = 1000.0f,
-        .max_x_angle  = 85.0f,
-    };
 }
 
 static uint32 PushEntity(EntityData* entity_data)
@@ -93,29 +59,6 @@ static uint32 TextureIndex(uint32 entity_index)
 static uint32 SamplerIndex(uint32 entity_index)
 {
     return (TextureIndex(entity_index) + 1) % 3 == 0;
-}
-
-static void InitEntities()
-{
-    EntityData* entity_data = &game_state.entity_data;
-    for (uint32 x = 0; x < CUBE_SIZE; ++x)
-    for (uint32 y = 0; y < CUBE_SIZE; ++y)
-    for (uint32 z = 0; z < CUBE_SIZE; ++z)
-    {
-        uint32 entity_index = PushEntity(&game_state.entity_data);
-        entity_data->transforms[entity_index] =
-        {
-            .position = { x * 1.5f, y * 1.5f, z * 1.5f },
-            .rotation = { 0, 0, 0 },
-        };
-        entity_data->entities[entity_index] =
-        {
-            .rotate_axis      = (uint8)RandomRange(0u, 3u),
-            .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
-        };
-        entity_data->texture_indexes[entity_index] = TextureIndex(entity_index);
-        entity_data->sampler_indexes[entity_index] = SamplerIndex(entity_index);
-    }
 }
 
 static void UpdateMouse(Mouse* mouse)
@@ -200,65 +143,48 @@ static void UpdateEntities()
     // }
 }
 
-static Matrix GetViewProjectionMatrix()
-{
-    View* view = &game_state.view;
-
-    // View Matrix
-    Matrix view_model_matrix = ID_MATRIX;
-    view_model_matrix = RotateX(view_model_matrix, view->rotation.x);
-    view_model_matrix = RotateY(view_model_matrix, view->rotation.y);
-    view_model_matrix = RotateZ(view_model_matrix, view->rotation.z);
-    Vec3<float32> forward =
-    {
-        .x = Get(&view_model_matrix, 0, 2),
-        .y = Get(&view_model_matrix, 1, 2),
-        .z = Get(&view_model_matrix, 2, 2),
-    };
-    static constexpr Vec3<float32> UP = { 0.0f, -1.0f, 0.0f }; // Vulkan has -Y as up.
-    Matrix view_matrix = LookAt(view->position, view->position + forward, UP);
-
-    // Projection Matrix
-    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
-    float32 swapchain_aspect_ratio = (float32)swapchain_extent.width / swapchain_extent.height;
-    Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, swapchain_aspect_ratio,
-                                                    view->z_near, view->z_far);
-
-    return projection_matrix * view_matrix;
-}
-
-static void UpdateMVPMatrixesThread(void* data)
-{
-    auto state = (MVPMatrixState*)data;
-    BatchRange batch_range = state->batch_range;
-    Matrix view_projection_matrix = state->view_projection_matrix;
-    EntityBuffer* frame_entity_buffer = state->frame_entity_buffer;
-    EntityData* entity_data = state->entity_data;
-
-    // Update entity MVP matrixes.
-    for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
-    {
-        Transform* entity_transform = &game_state.entity_data.transforms[i];
-        Matrix model_matrix = ID_MATRIX;
-        model_matrix = Translate(model_matrix, entity_transform->position);
-        model_matrix = RotateX(model_matrix, entity_transform->rotation.x);
-        model_matrix = RotateY(model_matrix, entity_transform->rotation.y);
-        model_matrix = RotateZ(model_matrix, entity_transform->rotation.z);
-        // model_matrix = Scale(model_matrix, entity_transform->scale);
-
-        frame_entity_buffer->mvp_matrixes[i]    = view_projection_matrix * model_matrix;
-        frame_entity_buffer->texture_indexes[i] = entity_data->texture_indexes[i];
-        frame_entity_buffer->sampler_indexes[i] = entity_data->sampler_indexes[i];
-    }
-}
-
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitGameState(Stack* perm_stack, uint32 job_task_count)
+static void InitGameState(Stack* perm_stack)
 {
-    InitThreadPoolJob(&game_state.mvp_matrix_job, perm_stack, job_task_count);
-    InitView();
-    InitEntities();
+    // View
+    game_state.view =
+    {
+        .position     = { (CUBE_SIZE / 2) * 1.5f, (CUBE_SIZE / 2) * 1.5f, -(CUBE_SIZE / 2) },
+        .rotation     = { 0, 0, 0 },
+        .vertical_fov = 90.0f,
+        .z_near       = 0.1f,
+        .z_far        = 1000.0f,
+        .max_x_angle  = 85.0f,
+    };
+
+    // Entities
+    EntityData* entity_data = &game_state.entity_data;
+    for (uint32 x = 0; x < CUBE_SIZE; ++x)
+    for (uint32 y = 0; y < CUBE_SIZE; ++y)
+    for (uint32 z = 0; z < CUBE_SIZE; ++z)
+    {
+        uint32 entity_index = PushEntity(&game_state.entity_data);
+        entity_data->transforms[entity_index] =
+        {
+            .position = { x * 1.5f, y * 1.5f, z * 1.5f },
+            .rotation = { 0, 0, 0 },
+        };
+        entity_data->entities[entity_index] =
+        {
+            .rotate_axis      = (uint8)RandomRange(0u, 3u),
+            .rotate_direction = (sint8)(RandomRange(0u, 2u) ? -1 : 1),
+        };
+        entity_data->texture_indexes[entity_index] = TextureIndex(entity_index);
+        entity_data->sampler_indexes[entity_index] = SamplerIndex(entity_index);
+    }
+
+    // Set texture & sampler indexes for all frames. Move to update step if these could change during update.
+    for (uint32 frame_index = 0; frame_index < GetFrameCount(); ++frame_index)
+    {
+        SetTextureIndexes(entity_data->texture_indexes, entity_data->count, frame_index);
+        SetSamplerIndexes(entity_data->sampler_indexes, entity_data->count, frame_index);
+    }
 }
 
 static void UpdateGame()
@@ -275,33 +201,12 @@ static void UpdateGame()
     UpdateEntities();
 }
 
-static void UpdateMVPMatrixes(ThreadPool* thread_pool)
+static View* GetView()
 {
-    Job<MVPMatrixState>* job = &game_state.mvp_matrix_job;
-    Matrix view_projection_matrix = GetViewProjectionMatrix();
-    auto frame_entity_buffer = GetHostMemory<EntityBuffer>(GetEntityBuffer(), GetFrameIndex());
-    uint32 thread_count = thread_pool->size;
-
-    // Initialize thread states and submit tasks.
-    for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
-    {
-        MVPMatrixState* state = GetPtr(&job->states, thread_index);
-        state->batch_range            = GetBatchRange(thread_index, thread_count, game_state.entity_data.count);
-        state->view_projection_matrix = view_projection_matrix;
-        state->frame_entity_buffer    = frame_entity_buffer;
-        state->entity_data            = &game_state.entity_data;
-
-        Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, UpdateMVPMatrixesThread));
-    }
-
-    // Wait for tasks to complete.
-    CTK_ITER(task, &job->tasks)
-    {
-        Wait(thread_pool, *task);
-    }
+    return &game_state.view;
 }
 
-static uint32 GetEntityCount()
+static EntityData* GetEntityData()
 {
-    return game_state.entity_data.count;
+    return &game_state.entity_data;
 }

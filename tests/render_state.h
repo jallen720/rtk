@@ -7,11 +7,35 @@ struct Job
     Array<TaskHnd>   tasks;
 };
 
+struct Transform
+{
+    Vec3<float32> position;
+    Vec3<float32> rotation;
+};
+
+struct View
+{
+    Vec3<float32> position;
+    Vec3<float32> rotation;
+    float32       vertical_fov;
+    float32       z_near;
+    float32       z_far;
+    float32       max_x_angle;
+};
+
 struct EntityBuffer
 {
     Matrix mvp_matrixes   [MAX_ENTITIES];
     uint32 texture_indexes[MAX_ENTITIES];
     uint32 sampler_indexes[MAX_ENTITIES];
+};
+
+struct MVPMatrixState
+{
+    BatchRange    batch_range;
+    Matrix        view_projection_matrix;
+    EntityBuffer* frame_entity_buffer;
+    Transform*    transforms;
 };
 
 struct RenderCommandState
@@ -26,6 +50,7 @@ struct RenderState
 {
     // Render Job
     Job<RenderCommandState> render_command_job;
+    Job<MVPMatrixState>     mvp_matrix_job;
     Array<Stack>            render_thread_temp_stacks;
 
     // Resources
@@ -66,18 +91,18 @@ static RenderState g_render_state;
 /// Utils
 ////////////////////////////////////////////////////////////
 template<typename StateType>
-static void InitThreadPoolJob(Job<StateType>* job, Stack* perm_stack, uint32 thread_count)
+static void InitThreadPoolJob(Job<StateType>* job, const Allocator* allocator, uint32 thread_count)
 {
-    InitArrayFull(&job->states, &perm_stack->allocator, thread_count);
-    InitArrayFull(&job->tasks,  &perm_stack->allocator, thread_count);
+    InitArrayFull(&job->states, allocator, thread_count);
+    InitArrayFull(&job->tasks,  allocator, thread_count);
 }
 
-static void InitRenderJob(Stack* perm_stack)
+static void InitRenderCommandJob(Stack* perm_stack)
 {
     uint32 render_thread_count = GetRenderThreadCount();
+    InitThreadPoolJob(&g_render_state.render_command_job, &perm_stack->allocator, render_thread_count);
 
-    InitThreadPoolJob(&g_render_state.render_command_job, perm_stack, render_thread_count);
-
+    // Initialize temp stacks for render_command_job threads.
     InitArray(&g_render_state.render_thread_temp_stacks, &perm_stack->allocator, render_thread_count);
     for (uint32 i = 0; i < render_thread_count; ++i)
     {
@@ -421,6 +446,51 @@ static void RecordRenderCommandsThread(void* data)
     EndRenderCommands(command_buffer);
 }
 
+static Matrix GetViewProjectionMatrix(View* view)
+{
+    // View Matrix
+    Matrix view_model_matrix = ID_MATRIX;
+    view_model_matrix = RotateX(view_model_matrix, view->rotation.x);
+    view_model_matrix = RotateY(view_model_matrix, view->rotation.y);
+    view_model_matrix = RotateZ(view_model_matrix, view->rotation.z);
+    Vec3<float32> forward =
+    {
+        .x = Get(&view_model_matrix, 0, 2),
+        .y = Get(&view_model_matrix, 1, 2),
+        .z = Get(&view_model_matrix, 2, 2),
+    };
+    static constexpr Vec3<float32> UP = { 0.0f, -1.0f, 0.0f }; // Vulkan has -Y as up.
+    Matrix view_matrix = LookAt(view->position, view->position + forward, UP);
+
+    // Projection Matrix
+    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
+    float32 swapchain_aspect_ratio = (float32)swapchain_extent.width / swapchain_extent.height;
+    Matrix projection_matrix = GetPerspectiveMatrix(view->vertical_fov, swapchain_aspect_ratio,
+                                                    view->z_near, view->z_far);
+
+    return projection_matrix * view_matrix;
+}
+
+static void UpdateMVPMatrixesThread(void* data)
+{
+    auto state = (MVPMatrixState*)data;
+    BatchRange batch_range = state->batch_range;
+
+    // Update entity MVP matrixes.
+    for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
+    {
+        Transform* entity_transform = &state->transforms[i];
+        Matrix model_matrix = ID_MATRIX;
+        model_matrix = Translate(model_matrix, entity_transform->position);
+        model_matrix = RotateX  (model_matrix, entity_transform->rotation.x);
+        model_matrix = RotateY  (model_matrix, entity_transform->rotation.y);
+        model_matrix = RotateZ  (model_matrix, entity_transform->rotation.z);
+        // model_matrix = Scale    (model_matrix, entity_transform->scale);
+
+        state->frame_entity_buffer->mvp_matrixes[i] = state->view_projection_matrix * model_matrix;
+    }
+}
+
 static void UpdateAllPipelineViewports(FreeList* free_list)
 {
     VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
@@ -453,9 +523,11 @@ static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
+static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list,
+                            uint32 mvp_matrix_job_thread_count)
 {
-    InitRenderJob(perm_stack);
+    InitRenderCommandJob(perm_stack);
+    InitThreadPoolJob(&g_render_state.mvp_matrix_job, &perm_stack->allocator, mvp_matrix_job_thread_count);
 
     // Resources
     CreateResources(perm_stack, temp_stack, free_list);
@@ -467,6 +539,48 @@ static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free
     InitShaders(temp_stack);
     InitVertexLayout(perm_stack);
     InitPipelines(temp_stack, free_list);
+}
+
+static void SetTextureIndexes(uint32* texture_indexes, uint32 entity_count, uint32 frame_index)
+{
+    CTK_ASSERT(entity_count <= MAX_ENTITIES);
+    CTK_ASSERT(frame_index < GetFrameCount());
+    EntityBuffer* frame_entity_buffer = GetHostMemory<EntityBuffer>(g_render_state.entity_buffer, frame_index);
+    memcpy(frame_entity_buffer->texture_indexes, texture_indexes, sizeof(uint32) * entity_count);
+}
+
+static void SetSamplerIndexes(uint32* sampler_indexes, uint32 entity_count, uint32 frame_index)
+{
+    CTK_ASSERT(entity_count <= MAX_ENTITIES);
+    CTK_ASSERT(frame_index < GetFrameCount());
+    EntityBuffer* frame_entity_buffer = GetHostMemory<EntityBuffer>(g_render_state.entity_buffer, frame_index);
+    memcpy(frame_entity_buffer->sampler_indexes, sampler_indexes, sizeof(uint32) * entity_count);
+}
+
+static void UpdateMVPMatrixes(ThreadPool* thread_pool, View* view, Transform* transforms, uint32 entity_count)
+{
+    Job<MVPMatrixState>* job = &g_render_state.mvp_matrix_job;
+    Matrix view_projection_matrix = GetViewProjectionMatrix(view);
+    auto frame_entity_buffer = GetHostMemory<EntityBuffer>(g_render_state.entity_buffer, GetFrameIndex());
+    uint32 thread_count = thread_pool->size;
+
+    // Initialize thread states and submit tasks.
+    for (uint32 thread_index = 0; thread_index < thread_count; ++thread_index)
+    {
+        MVPMatrixState* state = GetPtr(&job->states, thread_index);
+        state->batch_range            = GetBatchRange(thread_index, thread_count, entity_count);
+        state->view_projection_matrix = view_projection_matrix;
+        state->frame_entity_buffer    = frame_entity_buffer;
+        state->transforms             = transforms;
+
+        Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, UpdateMVPMatrixesThread));
+    }
+
+    // Wait for tasks to complete.
+    CTK_ITER(task, &job->tasks)
+    {
+        Wait(thread_pool, *task);
+    }
 }
 
 static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
@@ -495,9 +609,4 @@ static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
 static RenderTarget* GetRenderTarget()
 {
     return &g_render_state.render_target;
-}
-
-static BufferHnd GetEntityBuffer()
-{
-    return g_render_state.entity_buffer;
 }

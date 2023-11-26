@@ -70,6 +70,11 @@ sint32 main()
         {
             break; // Quit event closed window.
         }
+        else if (!WindowIsActive())
+        {
+            Sleep(1);
+            continue;
+        }
 
         UpdateGame();
         if (!WindowIsOpen())
@@ -77,14 +82,8 @@ sint32 main()
             break; // Game controls closed window.
         }
 
-        if (!WindowIsActive())
-        {
-            Sleep(1);
-            continue;
-        }
-
-        // When window is re-focused after being minimized, surface extent is 0,0 for 1 frame, so skip rendering until
-        // next frame.
+        // When window is re-focused after being minimized, surface extent is 0,0 for a short period of time. Skip
+        // rendering until surface extent > 0,0.
         VkSurfaceCapabilitiesKHR surface_capabilities = {};
         GetSurfaceCapabilities(&surface_capabilities);
         VkExtent2D current_surface_extent = surface_capabilities.currentExtent;

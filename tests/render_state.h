@@ -475,6 +475,7 @@ static void UpdateMVPMatrixesThread(void* data)
 {
     auto state = (MVPMatrixState*)data;
     BatchRange batch_range = state->batch_range;
+    Matrix view_projection_matrix = state->view_projection_matrix;
 
     // Update entity MVP matrixes.
     for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
@@ -487,10 +488,41 @@ static void UpdateMVPMatrixesThread(void* data)
         model_matrix = RotateZ  (model_matrix, entity_transform->rotation.z);
         // model_matrix = Scale    (model_matrix, entity_transform->scale);
 
-        state->frame_entity_buffer->mvp_matrixes[i] = state->view_projection_matrix * model_matrix;
-        // state->frame_entity_buffer->mvp_matrixes[i] = Mul(&state->view_projection_matrix, &model_matrix);
+        // if (batch_range.start == 27 || batch_range.start == 81 || batch_range.start == 135 || batch_range.start == 189)
+        // {
+        //     PrintLine("fix for %u", i);
+            // state->frame_entity_buffer->mvp_matrixes[i] = view_projection_matrix * model_matrix;
+        // }
+        // else
+        // {
+        //     PrintLine("no fix for %u", i);
+            state->frame_entity_buffer->mvp_matrixes[i] = state->view_projection_matrix * model_matrix;
+        // }
     }
 }
+
+// static void UpdateMVPMatrixesThread(void* data)
+// {
+//     auto state = (MVPMatrixState*)data;
+//     BatchRange batch_range = state->batch_range;
+//     Matrix view_projection_matrix = state->view_projection_matrix;
+//     EntityBuffer* frame_entity_buffer = state->frame_entity_buffer;
+//     Transform* transforms = state->transforms;
+
+//     // Update entity MVP matrixes.
+//     for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
+//     {
+//         Transform* entity_transform = &transforms[i];
+//         Matrix model_matrix = ID_MATRIX;
+//         model_matrix = Translate(model_matrix, entity_transform->position);
+//         model_matrix = RotateX(model_matrix, entity_transform->rotation.x);
+//         model_matrix = RotateY(model_matrix, entity_transform->rotation.y);
+//         model_matrix = RotateZ(model_matrix, entity_transform->rotation.z);
+//         // model_matrix = Scale(model_matrix, entity_transform->scale);
+
+//         frame_entity_buffer->mvp_matrixes[i]    = view_projection_matrix * model_matrix;
+//     }
+// }
 
 static void UpdateAllPipelineViewports(FreeList* free_list)
 {

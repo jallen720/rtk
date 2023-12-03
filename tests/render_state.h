@@ -491,29 +491,6 @@ static void UpdateMVPMatrixesThread(void* data)
     }
 }
 
-// static void UpdateMVPMatrixesThread(void* data)
-// {
-//     auto state = (MVPMatrixState*)data;
-//     BatchRange batch_range = state->batch_range;
-//     Matrix view_projection_matrix = state->view_projection_matrix;
-//     EntityBuffer* frame_entity_buffer = state->frame_entity_buffer;
-//     Transform* transforms = state->transforms;
-
-//     // Update entity MVP matrixes.
-//     for (uint32 i = batch_range.start; i < batch_range.start + batch_range.size; ++i)
-//     {
-//         Transform* entity_transform = &transforms[i];
-//         Matrix model_matrix = ID_MATRIX;
-//         model_matrix = Translate(model_matrix, entity_transform->position);
-//         model_matrix = RotateX(model_matrix, entity_transform->rotation.x);
-//         model_matrix = RotateY(model_matrix, entity_transform->rotation.y);
-//         model_matrix = RotateZ(model_matrix, entity_transform->rotation.z);
-//         // model_matrix = Scale(model_matrix, entity_transform->scale);
-
-//         frame_entity_buffer->mvp_matrixes[i]    = view_projection_matrix * model_matrix;
-//     }
-// }
-
 static void UpdateAllPipelineViewports(FreeList* free_list)
 {
     VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;

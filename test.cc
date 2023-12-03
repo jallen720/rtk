@@ -10,7 +10,7 @@ using namespace RTK;
 
 sint32 main()
 {
-    Stack*    perm_stack = CreateStack   (&win32_allocator,       Megabyte32<8>());
+    Stack*    perm_stack = CreateStack   (&std_allocator,         Megabyte32<8>());
     Stack*    temp_stack = CreateStack   (&perm_stack->allocator, Megabyte32<1>());
     FreeList* free_list  = CreateFreeList(&perm_stack->allocator, Kilobyte32<16>(), { .max_range_count = 256 });
 

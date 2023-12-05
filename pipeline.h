@@ -7,12 +7,12 @@ static constexpr VkColorComponentFlags COLOR_COMPONENT_RGBA = VK_COLOR_COMPONENT
 
 #include "rtk/pipeline_defaults.h"
 
-enum AttributeType
+enum struct AttributeType
 {
-    ATTRIBUTE_TYPE_UINT32,
-    ATTRIBUTE_TYPE_SINT32,
-    ATTRIBUTE_TYPE_FLOAT32,
-    ATTRIBUTE_TYPE_COUNT,
+    UINT32,
+    SINT32,
+    FLOAT32,
+    COUNT,
 };
 
 struct VertexLayout
@@ -173,12 +173,12 @@ static void PushAttribute(VertexLayout* layout, uint32 field_count, AttributeTyp
 
     CTK_ASSERT(layout->bindings.count > 0);
     CTK_ASSERT(field_count >= 1 && field_count <= 4);
-    CTK_ASSERT(attribute_type < ATTRIBUTE_TYPE_COUNT);
+    CTK_ASSERT(attribute_type < AttributeType::COUNT);
 
     uint32 current_binding_index = layout->bindings.count - 1;
     VkVertexInputBindingDescription* current_binding = GetPtr(&layout->bindings, current_binding_index);
 
-    uint32 format_index = ((field_count - 1) * (uint32)ATTRIBUTE_TYPE_COUNT) + (uint32)attribute_type;
+    uint32 format_index = ((field_count - 1) * (uint32)AttributeType::COUNT) + (uint32)attribute_type;
     Push(&layout->attributes,
     {
         .location = layout->attribute_location,

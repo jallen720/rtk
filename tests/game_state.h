@@ -74,16 +74,16 @@ static void UpdateView()
 
     // Translation Input
     static constexpr float32 BASE_TRANSLATION_SPEED = 0.01f;
-    float32 mod = KeyDown(KEY_SHIFT) ? 32.0f : 4.0f;
+    float32 mod = KeyDown(Key::SHIFT) ? 32.0f : 4.0f;
     float32 translation_speed = BASE_TRANSLATION_SPEED * mod;
     Vec3<float32> translation = {};
 
-    if (KeyDown(KEY_W)) { translation.z += translation_speed; }
-    if (KeyDown(KEY_S)) { translation.z -= translation_speed; }
-    if (KeyDown(KEY_D)) { translation.x += translation_speed; }
-    if (KeyDown(KEY_A)) { translation.x -= translation_speed; }
-    if (KeyDown(KEY_E)) { translation.y += translation_speed; }
-    if (KeyDown(KEY_Q)) { translation.y -= translation_speed; }
+    if (KeyDown(Key::W)) { translation.z += translation_speed; }
+    if (KeyDown(Key::S)) { translation.z -= translation_speed; }
+    if (KeyDown(Key::D)) { translation.x += translation_speed; }
+    if (KeyDown(Key::A)) { translation.x -= translation_speed; }
+    if (KeyDown(Key::E)) { translation.y += translation_speed; }
+    if (KeyDown(Key::Q)) { translation.y -= translation_speed; }
 
     // Local Translation
     Matrix matrix = ID_MATRIX;
@@ -190,7 +190,7 @@ static void InitGameState(Stack* perm_stack)
 static void UpdateGame()
 {
     // If window will close, skip all other controls.
-    if (KeyDown(KEY_ESCAPE))
+    if (KeyDown(Key::ESCAPE))
     {
         CloseWindow();
         return;

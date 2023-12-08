@@ -99,7 +99,6 @@ sint32 main()
             // Swapchain image acquisition failed, recreate swapchain, skip rendering and move to next iteration to
             // retry acquiring swapchain image.
 
-            recreate_swapchain = true;
             RecreateSwapchain(temp_stack, free_list);
             continue;
         }

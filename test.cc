@@ -114,10 +114,10 @@ sint32 main()
         UpdateMVPMatrixes(thread_pool, GetView(), entity_data->transforms, entity_data->count);
         RecordRenderCommands(thread_pool, entity_data->count);
         VkResult submit_render_commands_res = SubmitRenderCommands(GetRenderTarget());
-        recreate_swapchain = submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR ||
-                             submit_render_commands_res == VK_SUBOPTIMAL_KHR;
 
-        if (recreate_swapchain)
+        if (recreate_swapchain ||
+            submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR ||
+            submit_render_commands_res == VK_SUBOPTIMAL_KHR)
         {
             RecreateSwapchain(temp_stack, free_list);
             recreate_swapchain = false;

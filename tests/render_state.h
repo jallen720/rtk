@@ -352,15 +352,19 @@ static void InitShaders(Stack* temp_stack)
 
 static void InitVertexLayout(Stack* perm_stack)
 {
-    VertexLayout* vertex_layout = &g_render_state.vertex_layout;
-
-    // Init pipeline vertex layout.
-    InitArray(&vertex_layout->bindings, &perm_stack->allocator, 1);
-    PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
-
-    InitArray(&vertex_layout->attributes, &perm_stack->allocator, 2);
-    PushAttribute(vertex_layout, 3, AttributeType::FLOAT32); // Position
-    PushAttribute(vertex_layout, 2, AttributeType::FLOAT32); // UV
+    AttributeInfo attribute_infos[] =
+    {
+        { .component_count = 3, .type = AttributeType::FLOAT32 }, // Position
+        { .component_count = 2, .type = AttributeType::FLOAT32 }, // UV
+    };
+    BindingInfo binding_infos[]
+    {
+        {
+            .input_rate      = VK_VERTEX_INPUT_RATE_VERTEX,
+            .attribute_infos = CTK_WRAP_ARRAY(attribute_infos),
+        },
+    };
+    InitVertexLayout(&g_render_state.vertex_layout, &perm_stack->allocator, CTK_WRAP_ARRAY(binding_infos));
 }
 
 static void InitPipelines(Stack* temp_stack, FreeList* free_list)

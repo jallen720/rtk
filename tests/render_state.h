@@ -208,14 +208,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, &mesh_group_info);
     CTK_ITER_PTR(mesh_data, mesh_datas, CTK_ARRAY_SIZE(mesh_datas))
     {
-        MeshInfo mesh_info =
-        {
-            .vertex_size  = mesh_data->vertex_size,
-            .vertex_count = mesh_data->vertex_count,
-            .index_size   = mesh_data->index_size,
-            .index_count  = mesh_data->index_count,
-        };
-        Push(&g_render_state.meshes, CreateMesh(g_render_state.mesh_group, &mesh_info));
+        Push(&g_render_state.meshes, CreateMesh(g_render_state.mesh_group, &mesh_data->info));
     }
 
     InitMeshGroup(g_render_state.mesh_group, g_render_state.res_group);
@@ -295,7 +288,7 @@ static void CreateSamplers(Stack* perm_stack)
 
 static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
 {
-    InitDescriptorSetModule(&perm_stack->allocator, 16);
+    InitDescriptorSetModule(&perm_stack->allocator, { .max_descriptor_sets = 16 });
 
     // Entity
     {
@@ -365,7 +358,7 @@ static void InitVertexLayout(Stack* perm_stack)
     InitArray(&vertex_layout->bindings, &perm_stack->allocator, 1);
     PushBinding(vertex_layout, VK_VERTEX_INPUT_RATE_VERTEX);
 
-    InitArray(&vertex_layout->attributes, &perm_stack->allocator, 4);
+    InitArray(&vertex_layout->attributes, &perm_stack->allocator, 2);
     PushAttribute(vertex_layout, 3, AttributeType::FLOAT32); // Position
     PushAttribute(vertex_layout, 2, AttributeType::FLOAT32); // UV
 }

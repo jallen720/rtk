@@ -3,22 +3,19 @@
 struct MeshHnd      { uint32 index; };
 struct MeshGroupHnd { uint32 index; };
 
-struct MeshData
-{
-    uint8* vertex_buffer;
-    uint32 vertex_size;
-    uint32 vertex_count;
-    uint8* index_buffer;
-    uint32 index_size;
-    uint32 index_count;
-};
-
 struct MeshInfo
 {
     uint32 vertex_size;
     uint32 vertex_count;
     uint32 index_size;
     uint32 index_count;
+};
+
+struct MeshData
+{
+    uint8*   vertex_buffer;
+    uint8*   index_buffer;
+    MeshInfo info;
 };
 
 struct Mesh
@@ -199,8 +196,8 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
 
-    uint32 vertex_buffer_size = mesh_data->vertex_size * mesh_data->vertex_count;
-    uint32 index_buffer_size  = mesh_data->index_size  * mesh_data->index_count;
+    uint32 vertex_buffer_size = mesh_data->info.vertex_size * mesh_data->info.vertex_count;
+    uint32 index_buffer_size  = mesh_data->info.index_size  * mesh_data->info.index_count;
     ValidateMeshDataLoad(mesh_group, mesh_group_index, vertex_buffer_size, index_buffer_size);
 
     uint32 mesh_index = GetMeshIndex(mesh_hnd);
@@ -236,8 +233,8 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
 
-    uint32 vertex_buffer_size = mesh_data->vertex_size * mesh_data->vertex_count;
-    uint32 index_buffer_size  = mesh_data->index_size * mesh_data->index_count;
+    uint32 vertex_buffer_size = mesh_data->info.vertex_size * mesh_data->info.vertex_count;
+    uint32 index_buffer_size  = mesh_data->info.index_size  * mesh_data->info.index_count;
     ValidateMeshDataLoad(mesh_group, mesh_group_index, vertex_buffer_size, index_buffer_size);
 
     uint32 mesh_index = GetMeshIndex(mesh_hnd);
@@ -441,30 +438,30 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
 
     // https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview:
     // All attribute accessors for a given primitive MUST have the same count.
-    // So get mesh_data->vertex_count from first accessor's count.
+    // So get mesh_data->info.vertex_count from first accessor's count.
     GLTFAccessor* indexes_accessor = GetPtr(&gltf.accessors, primitive->indexes_accessor);
-    mesh_data->vertex_count = GetPtr(&gltf.accessors, GetPtr(&primitive->attributes, 0)->accessor)->count;
-    mesh_data->index_count  = indexes_accessor->count;
+    mesh_data->info.vertex_count = GetPtr(&gltf.accessors, GetPtr(&primitive->attributes, 0)->accessor)->count;
+    mesh_data->info.index_count  = indexes_accessor->count;
 
     // Get vertex size from attribute accessors, and index size from index accessor.
     CTK_ITER(attribute, &primitive->attributes)
     {
         GLTFAccessor* accessor = GetPtr(&gltf.accessors, attribute->accessor);
-        mesh_data->vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
+        mesh_data->info.vertex_size += GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type] *
                                   GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
     }
     // Force index size to be 4.
-    // mesh_data->index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accessor->type] *
+    // mesh_data->info.index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accessor->type] *
     //                         GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accessor->component_type];
-    mesh_data->index_size = 4;
+    mesh_data->info.index_size = 4;
 
-// PrintLine("vertex size:  %u", mesh_data->vertex_size);
-// PrintLine("vertex count: %u", mesh_data->vertex_count);
-// PrintLine("index  size:  %u", mesh_data->index_size);
-// PrintLine("index  count: %u", mesh_data->index_count);
+// PrintLine("vertex size:  %u", mesh_data->info.vertex_size);
+// PrintLine("vertex count: %u", mesh_data->info.vertex_count);
+// PrintLine("index  size:  %u", mesh_data->info.index_size);
+// PrintLine("index  count: %u", mesh_data->info.index_count);
 
-    mesh_data->vertex_buffer = Allocate<uint8>(allocator, mesh_data->vertex_size * mesh_data->vertex_count);
-    mesh_data->index_buffer  = Allocate<uint8>(allocator, mesh_data->index_size  * mesh_data->index_count);
+    mesh_data->vertex_buffer = Allocate<uint8>(allocator, mesh_data->info.vertex_size * mesh_data->info.vertex_count);
+    mesh_data->index_buffer  = Allocate<uint8>(allocator, mesh_data->info.index_size  * mesh_data->info.index_count);
 
     // Write attributes from buffer to vertex buffer interleaved.
     uint32 attribute_offset = 0;
@@ -496,7 +493,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
                            component_size);
                 }
                 buffer_view_offset   += attribute_size;
-                vertex_buffer_offset += mesh_data->vertex_size;
+                vertex_buffer_offset += mesh_data->info.vertex_size;
             }
         }
         else
@@ -507,7 +504,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
                        &buffer->data[buffer_offset + buffer_view_offset],
                        attribute_size);
                 buffer_view_offset   += attribute_size;
-                vertex_buffer_offset += mesh_data->vertex_size;
+                vertex_buffer_offset += mesh_data->info.vertex_size;
             }
         }
 
@@ -531,7 +528,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
                &buffer->data[buffer_offset + buffer_view_offset],
                index_size);
         buffer_view_offset  += index_size;
-        index_buffer_offset += mesh_data->index_size;
+        index_buffer_offset += mesh_data->info.index_size;
     }
 // PrintAccessorValues(&gltf, indexes_accessor, "INDEXES");
 }

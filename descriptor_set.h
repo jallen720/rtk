@@ -21,7 +21,7 @@ struct DescriptorData
     };
 };
 
-static struct DescriptorState
+struct DescriptorState
 {
     Array<DescriptorData>* data_bindings;
     VkDescriptorSetLayout* layouts;
@@ -30,19 +30,25 @@ static struct DescriptorState
     uint32                 max_sets;
     uint32                 set_count;
     uint32                 frame_count;
-}
-g_desc_state;
+};
+
+struct DescriptorSetModuleInfo
+{
+    uint32 max_descriptor_sets;
+};
+
+static DescriptorState g_desc_state;
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitDescriptorSetModule(const Allocator* allocator, uint32 max_sets)
+static void InitDescriptorSetModule(const Allocator* allocator, DescriptorSetModuleInfo info)
 {
     uint32 frame_count = GetFrameCount();
-    g_desc_state.data_bindings = Allocate<Array<DescriptorData>>(allocator, max_sets);
-    g_desc_state.layouts       = Allocate<VkDescriptorSetLayout>(allocator, max_sets);
-    g_desc_state.sets          = Allocate<VkDescriptorSet>(allocator, max_sets * frame_count);
+    g_desc_state.data_bindings = Allocate<Array<DescriptorData>>(allocator, info.max_descriptor_sets);
+    g_desc_state.layouts       = Allocate<VkDescriptorSetLayout>(allocator, info.max_descriptor_sets);
+    g_desc_state.sets          = Allocate<VkDescriptorSet>(allocator, info.max_descriptor_sets * frame_count);
     g_desc_state.pool          = VK_NULL_HANDLE;
-    g_desc_state.max_sets      = max_sets;
+    g_desc_state.max_sets      = info.max_descriptor_sets;
     g_desc_state.set_count     = 0;
     g_desc_state.frame_count   = frame_count;
 }

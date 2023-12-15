@@ -78,19 +78,17 @@ static void InitScissors(Pipeline* pipeline)
     for (uint32 i = 0; i < pipeline->viewports.count; ++i)
     {
         VkViewport* viewport = GetPtr(&pipeline->viewports, i);
-        Push(&pipeline->scissors,
+        VkRect2D* scissor = Push(&pipeline->scissors);
+        scissor->offset =
         {
-            .offset =
-            {
-                .x = (sint32)viewport->x,
-                .y = (sint32)viewport->y,
-            },
-            .extent =
-            {
-                .width  = (uint32)viewport->width,
-                .height = (uint32)viewport->height,
-            }
-        });
+            .x = (sint32)viewport->x,
+            .y = (sint32)viewport->y,
+        };
+        scissor->extent =
+        {
+            .width  = (uint32)viewport->width,
+            .height = (uint32)viewport->height,
+        };
     }
 }
 

@@ -35,10 +35,6 @@ static GameState game_state;
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static void InitView()
-{
-}
-
 static uint32 PushEntity(EntityData* entity_data)
 {
     if (entity_data->count == MAX_ENTITIES)

@@ -5,6 +5,12 @@ static constexpr VkColorComponentFlags COLOR_COMPONENT_RGBA = VK_COLOR_COMPONENT
                                                               VK_COLOR_COMPONENT_B_BIT |
                                                               VK_COLOR_COMPONENT_A_BIT;
 
+struct Shader
+{
+    VkShaderModule        module;
+    VkShaderStageFlagBits stage;
+};
+
 #include "rtk/pipeline_defaults.h"
 
 enum struct AttributeType
@@ -36,7 +42,7 @@ struct VertexLayout
 
 struct PipelineInfo
 {
-    Array<Shader*>    shaders;
+    Array<Shader>     shaders;
     Array<VkViewport> viewports;
     VertexLayout*     vertex_layout;
     bool              depth_testing;
@@ -153,6 +159,27 @@ static void CreatePipeline(Pipeline* pipeline)
 
 /// Interface
 ////////////////////////////////////////////////////////////
+static VkShaderModule LoadShaderModule(Stack* temp_stack, const char* path)
+{
+    Stack frame = CreateFrame(temp_stack);
+
+    Array<uint32> bytecode = {};
+    ReadFile(&bytecode, &frame.allocator, path);
+    VkShaderModuleCreateInfo info =
+    {
+        .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext    = NULL,
+        .flags    = 0,
+        .codeSize = ByteSize(&bytecode),
+        .pCode    = bytecode.data,
+    };
+    VkShaderModule shader_module = VK_NULL_HANDLE;
+    VkResult res = vkCreateShaderModule(GetDevice(), &info, NULL, &shader_module);
+    Validate(res, "vkCreateShaderModule() failed");
+
+    return shader_module;
+}
+
 static void InitVertexLayout(VertexLayout* layout, const Allocator* allocator, Array<BindingInfo> binding_infos)
 {
     InitArray(&layout->bindings, allocator, binding_infos.size);
@@ -230,7 +257,7 @@ static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_l
     InitArray(&pipeline->shader_stage_create_infos, &free_list->allocator, info->shaders.count);
     for (uint32 i = 0; i < info->shaders.count; ++i)
     {
-        Push(&pipeline->shader_stage_create_infos, DefaultShaderStageCreateInfo(Get(&info->shaders, i)));
+        Push(&pipeline->shader_stage_create_infos, DefaultShaderStageCreateInfo(GetPtr(&info->shaders, i)));
     }
 
     // Viewports/Scissors

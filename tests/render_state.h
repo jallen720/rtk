@@ -66,8 +66,8 @@ struct RenderState
     DescriptorSetHnd entity_descriptor_set;
     DescriptorSetHnd textures_descriptor_set;
     RenderTarget     render_target;
-    Shader           vert_shader;
-    Shader           frag_shader;
+    VkShaderModule   vert_shader;
+    VkShaderModule   frag_shader;
     VertexLayout     vertex_layout;
     Pipeline         pipeline;
 };
@@ -346,8 +346,8 @@ static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* fr
 
 static void InitShaders(Stack* temp_stack)
 {
-    InitShader(&g_render_state.vert_shader, temp_stack, "shaders/bin/3d.vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    InitShader(&g_render_state.frag_shader, temp_stack, "shaders/bin/3d.frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    g_render_state.vert_shader = LoadShaderModule(temp_stack, "shaders/bin/3d.vert.spv");
+    g_render_state.frag_shader = LoadShaderModule(temp_stack, "shaders/bin/3d.frag.spv");
 }
 
 static void InitVertexLayout(Stack* perm_stack)
@@ -402,10 +402,16 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
             .maxDepth = 1,
         },
     };
-    Shader* shaders[] =
+    Shader shaders[] =
     {
-        &g_render_state.vert_shader,
-        &g_render_state.frag_shader,
+        {
+            .module = g_render_state.vert_shader,
+            .stage  = VK_SHADER_STAGE_VERTEX_BIT,
+        },
+        {
+            .module = g_render_state.frag_shader,
+            .stage  = VK_SHADER_STAGE_FRAGMENT_BIT,
+        },
     };
     PipelineInfo pipeline_info =
     {

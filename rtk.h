@@ -26,7 +26,7 @@ namespace RTK
 #include "rtk/context.h"
 
 // Resources
-#include "rtk/resource.h"
+#include "rtk/resource_2.h"
 #include "rtk/buffer.h"
 #include "rtk/image.h"
 

@@ -325,13 +325,13 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
 static void InitResourceGroup(ResourceGroupHnd res_group_hnd, Stack* temp_stack)
 {
     ValidateResourceGroup(res_group_hnd, "can't initialize resources");
+    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
 
     Stack frame = CreateFrame(temp_stack);
 
     VkDevice device = GetDevice();
     PhysicalDevice* physical_device = GetPhysicalDevice();
     QueueFamilies* queue_families = &physical_device->queue_families;
-    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
     VkResult res = VK_SUCCESS;
 
     // Initialize resource state and sort into arrays per memory type.

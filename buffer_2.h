@@ -49,20 +49,6 @@ static void ValidateBuffer(BufferHnd hnd, const char* action)
     }
 }
 
-static void ValidateBufferMemory(BufferMemoryHnd hnd, const char* action)
-{
-    uint32 res_group_index = GetResourceGroupIndex(hnd.index);
-    ValidateResourceGroup(res_group_index, action);
-
-    ResourceGroup* res_group = GetResourceGroup(res_group_index);
-    uint32 buffer_mem_index = GetBufferMemoryIndex(hnd);
-    if (buffer_mem_index >= res_group->buffer_count)
-    {
-        CTK_FATAL("%s: buffer memory index %u exceeds buffer memory count of %u",
-                  action, buffer_mem_index, res_group->buffer_count);
-    }
-}
-
 /// Interface
 ////////////////////////////////////////////////////////////
 static void WriteHostBuffer(HostBufferWrite* write, uint32 frame_index)

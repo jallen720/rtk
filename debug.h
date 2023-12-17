@@ -350,28 +350,41 @@ static void PrintMemoryRequirements(VkMemoryRequirements* mem_requirements, uint
 ////////////////////////////////////////////////////////////
 static void PrintMemoryPropertyFlags(VkMemoryPropertyFlags mem_property_flags, uint32 tabs = 0)
 {
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_HOST_CACHED_BIT);
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT);
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_PROTECTED_BIT);
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD);
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD);
-    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV);
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_HOST_CACHED_BIT)
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT)
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_PROTECTED_BIT)
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_DEVICE_COHERENT_BIT_AMD)
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_DEVICE_UNCACHED_BIT_AMD)
+    RTK_CHECK_PRINT_FLAG(mem_property_flags, VK_MEMORY_PROPERTY_RDMA_CAPABLE_BIT_NV)
 }
 
 static void PrintBufferUsageFlags(VkBufferUsageFlags buffer_usage_flags, uint32 tabs = 0)
 {
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT);
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT);
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_TRANSFER_SRC_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_TRANSFER_DST_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_INDEX_BUFFER_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_usage_flags, VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT)
+}
+
+static void PrintBufferCreateFlags(VkBufferCreateFlags buffer_create_flags, uint32 tabs = 0)
+{
+    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_SPARSE_BINDING_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_SPARSE_RESIDENCY_BIT)
+    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_SPARSE_ALIASED_BIT)
+    // Provided by VK_VERSION_1_1
+    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_PROTECTED_BIT)
+    // Provided by VK_VERSION_1_2
+    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT)
+    // Provided by VK_EXT_descriptor_buffer
+    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
 }
 
 static void PrintImageUsageFlags(VkImageUsageFlags image_usage_flags, uint32 tabs = 0)

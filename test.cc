@@ -1,3 +1,5 @@
+#define USE_WIP
+
 #include "ctk3/ctk.h"
 
 #define RTK_ENABLE_VALIDATION
@@ -7,8 +9,11 @@ using namespace CTK;
 using namespace RTK;
 
 #include "rtk/tests/defs.h"
+
+#ifndef USE_WIP
 #include "rtk/tests/render_state.h"
 #include "rtk/tests/game_state.h"
+#endif
 
 sint32 main()
 {
@@ -58,44 +63,45 @@ sint32 main()
     InitContext(perm_stack, temp_stack, free_list, &context_info);
 // LogPhysicalDevice(GetPhysicalDevice());
 
-//     InitResourceModule(&perm_stack->allocator, { .max_resource_groups = 1 });
-//     ResourceGroupInfo res_group_info =
-//     {
-//         .max_buffer_mems = 1,
-//         .max_image_mems  = 1,
-//         .max_buffers     = 1,
-//         .max_images      = 1,
-//     };
-//     ResourceGroupHnd res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
-//     BufferMemoryInfo host_buffer_mem_info =
-//     {
-//         .size           = Megabyte32<1>(),
-//         .flags          = 0,
-//         .usage          = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-//         .mem_properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-//     };
-//     BufferMemoryHnd host_buffer_mem = CreateBufferMemory(res_group, &host_buffer_mem_info);
-//     ImageMemoryInfo texture_mem_info =
-//     {
-//         .size           = Megabyte32<1>(),
-//         .flags          = 0,
-//         .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-//         .format         = GetSwapchain()->surface_format.format,
-//         .tiling         = VK_IMAGE_TILING_OPTIMAL,
-//         .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-//     };
-//     ImageMemoryHnd image_mem = CreateImageMemory(res_group, &texture_mem_info);
-//     AllocateResourceMemory(res_group);
+#ifdef USE_WIP
+    InitResourceModule(&perm_stack->allocator, { .max_resource_groups = 1 });
+    ResourceGroupInfo res_group_info =
+    {
+        .max_buffer_mems = 1,
+        .max_image_mems  = 1,
+        .max_buffers     = 1,
+        .max_images      = 1,
+    };
+    ResourceGroupHnd res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
+    BufferMemoryInfo host_buffer_mem_info =
+    {
+        .size       = Megabyte32<1>(),
+        .flags      = 0,
+        .usage      = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        .properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    };
+    BufferMemoryHnd host_buffer_mem = CreateBufferMemory(res_group, &host_buffer_mem_info);
+    ImageMemoryInfo texture_mem_info =
+    {
+        .size       = Megabyte32<1>(),
+        .flags      = 0,
+        .usage      = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .format     = GetSwapchain()->surface_format.format,
+        .tiling     = VK_IMAGE_TILING_OPTIMAL,
+    };
+    ImageMemoryHnd image_mem = CreateImageMemory(res_group, &texture_mem_info);
+    AllocateResourceMemory(res_group);
 
-//     BufferInfo buffer_info =
-//     {
-//         .size = 256,
-//         .alignment = USE_MIN_OFFSET_ALIGNMENT,
-//         .per_frame = false,
-//     };
-//     BufferHnd buffer = CreateBuffer(res_group, host_buffer_mem, &buffer_info);
-// LogResourceGroups();
-
+    BufferInfo buffer_info =
+    {
+        .size = 256,
+        .alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame = false,
+    };
+    BufferHnd buffer = CreateBuffer(res_group, host_buffer_mem, &buffer_info);
+LogResourceGroups();
+#else
     // Initialize other test state.
     InitRenderState(perm_stack, temp_stack, free_list, thread_pool->size);
 // LogResourceGroups();
@@ -163,4 +169,5 @@ sint32 main()
             recreate_swapchain = false;
         }
     }
+#endif
 }

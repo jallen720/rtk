@@ -32,20 +32,6 @@ static void ValidateImage(ImageHnd hnd, const char* action)
     }
 }
 
-static void ValidateImageMemory(ImageMemoryHnd hnd, const char* action)
-{
-    uint32 res_group_index = GetResourceGroupIndex(hnd.index);
-    ValidateResourceGroup(res_group_index, action);
-
-    ResourceGroup* res_group = GetResourceGroup(res_group_index);
-    uint32 image_mem_index = GetImageMemoryIndex(hnd);
-    if (image_mem_index >= res_group->image_count)
-    {
-        CTK_FATAL("%s: image memory index %u exceeds image memory count of %u",
-                  action, image_mem_index, res_group->image_count);
-    }
-}
-
 /// Interface
 ////////////////////////////////////////////////////////////
 static void LoadImageData(ImageData* image_data, const char* path)

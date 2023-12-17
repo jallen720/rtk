@@ -69,18 +69,10 @@ sint32 main()
     {
         .max_buffer_mems = 1,
         .max_image_mems  = 1,
-        .max_buffers     = 1,
+        .max_buffers     = 2,
         .max_images      = 1,
     };
     ResourceGroupHnd res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
-    BufferMemoryInfo host_buffer_mem_info =
-    {
-        .size       = Megabyte32<1>(),
-        .flags      = 0,
-        .usage      = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        .properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    };
-    BufferMemoryHnd host_buffer_mem = CreateBufferMemory(res_group, &host_buffer_mem_info);
     ImageMemoryInfo texture_mem_info =
     {
         .size       = Megabyte32<1>(),
@@ -91,15 +83,24 @@ sint32 main()
         .tiling     = VK_IMAGE_TILING_OPTIMAL,
     };
     ImageMemoryHnd image_mem = CreateImageMemory(res_group, &texture_mem_info);
+    BufferMemoryInfo host_buffer_mem_info =
+    {
+        .size       = Megabyte32<1>(),
+        .flags      = 0,
+        .usage      = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    BufferMemoryHnd host_buffer_mem = CreateBufferMemory(res_group, &host_buffer_mem_info);
     AllocateResourceMemory(res_group);
 
     BufferInfo buffer_info =
     {
-        .size = 256,
-        .alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .per_frame = false,
+        .size      = 256,
+        .alignment = 1024,
+        .per_frame = true,
     };
-    BufferHnd buffer = CreateBuffer(res_group, host_buffer_mem, &buffer_info);
+    CreateBuffer(res_group, host_buffer_mem, &buffer_info);
+    CreateBuffer(res_group, host_buffer_mem, &buffer_info);
 LogResourceGroups();
 #else
     // Initialize other test state.

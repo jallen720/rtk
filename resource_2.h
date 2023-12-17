@@ -628,7 +628,7 @@ static void AllocateResourceMemory(ResourceGroupHnd res_group_hnd)
     }
 }
 
-static BufferHnd CreateBuffer(ResourceGroupHnd res_group_hnd, BufferMemoryHnd buffer_mem_hnd, BufferInfo* info)
+static BufferHnd CreateBuffer(ResourceGroupHnd res_group_hnd, BufferMemoryHnd buffer_mem_hnd, BufferInfo* create_info)
 {
     ValidateResourceGroup(res_group_hnd, "can't create buffer");
     ValidateBufferMemory(buffer_mem_hnd, "can't create buffer");
@@ -641,41 +641,67 @@ static BufferHnd CreateBuffer(ResourceGroupHnd res_group_hnd, BufferMemoryHnd bu
 
     BufferMemoryInfo* buffer_mem_info = GetBufferMemoryInfo(res_group, buffer_mem_hnd.index);
 
-    // Figure out minimum offset alignment if requested.
+    uint32 buffer_index = res_group->buffer_count;
+    ++res_group->buffer_count;
+    BufferHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, buffer_index) };
+    BufferInfo* buffer_info = GetBufferInfo(res_group, buffer_index);
+    *buffer_info = *create_info;
+
+    // Figure out minimum alignment if requested.
     // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
-    if (info->alignment == USE_MIN_OFFSET_ALIGNMENT)
+    if (buffer_info->alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
         VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
-        info->alignment = 4;
+        buffer_info->alignment = 4;
 
         // Uniform
         if ((buffer_mem_info->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
-            info->alignment < physical_device_limits->minUniformBufferOffsetAlignment)
+            buffer_info->alignment < physical_device_limits->minUniformBufferOffsetAlignment)
         {
-            info->alignment = physical_device_limits->minUniformBufferOffsetAlignment;
+            buffer_info->alignment = physical_device_limits->minUniformBufferOffsetAlignment;
         }
 
         // Storage
         if ((buffer_mem_info->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
-            info->alignment < physical_device_limits->minStorageBufferOffsetAlignment)
+            buffer_info->alignment < physical_device_limits->minStorageBufferOffsetAlignment)
         {
-            info->alignment = physical_device_limits->minStorageBufferOffsetAlignment;
+            buffer_info->alignment = physical_device_limits->minStorageBufferOffsetAlignment;
         }
 
         // Texel
         VkBufferUsageFlags texel_usage_flags = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
                                                VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
         if ((buffer_mem_info->usage & texel_usage_flags) &&
-            info->alignment < physical_device_limits->minTexelBufferOffsetAlignment)
+            buffer_info->alignment < physical_device_limits->minTexelBufferOffsetAlignment)
         {
-            info->alignment = physical_device_limits->minTexelBufferOffsetAlignment;
+            buffer_info->alignment = physical_device_limits->minTexelBufferOffsetAlignment;
         }
     }
 
-    uint32 buffer_index = res_group->buffer_count;
-    ++res_group->buffer_count;
-    BufferHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, buffer_index) };
-    *GetBufferInfo(res_group, buffer_index) = *info;
+    // Set buffer state.
+    BufferState* buffer_state = GetBufferState(res_group, buffer_index);
+    if (buffer_info->per_frame)
+    {
+        buffer_state->frame_stride = res_group->max_buffers;
+        buffer_state->frame_count  = res_group->frame_count;
+    }
+    else
+    {
+        buffer_state->frame_stride = 0;
+        buffer_state->frame_count  = 1;
+    }
+    buffer_state->buffer_mem_index = buffer_mem_hnd.index;
+
+    // Set buffer frame state.
+    BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_hnd.index);
+    for (uint32 frame_index = 0; frame_index < buffer_state->frame_count; ++frame_index)
+    {
+        BufferFrameState* buffer_frame_state = GetBufferFrameState(res_group, buffer_index, frame_index);
+        VkDeviceSize mem_relative_index = buffer_mem_state->offset + buffer_mem_state->index;
+        buffer_mem_state->index = Align(mem_relative_index, buffer_info->alignment) - buffer_mem_state->offset;
+        buffer_frame_state->offset = buffer_mem_state->index;
+        buffer_mem_state->index += buffer_info->size;
+    }
 
     return hnd;
 }

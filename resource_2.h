@@ -597,33 +597,6 @@ static void AllocateResourceMemory(ResourceGroupHnd res_group_hnd)
         {
             vkMapMemory(device, res_mem->device, 0, res_mem->size, 0, (void**)&res_mem->host);
         }
-
-        // // If memory type is used by any buffers, create buffer to for sub-allocation and bind memory.
-        // if (res_mem->buffer_usage != 0)
-        // {
-        //     VkBufferCreateInfo create_info = {};
-        //     create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-        //     create_info.pNext = NULL;
-        //     create_info.flags = 0;
-        //     create_info.size  = res_mem->size;
-        //     create_info.usage = res_mem->buffer_usage;
-        //     if (queue_families->graphics != queue_families->present)
-        //     {
-        //         create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-        //         create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
-        //         create_info.pQueueFamilyIndices   = (uint32*)queue_families;
-        //     }
-        //     else
-        //     {
-        //         create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
-        //         create_info.queueFamilyIndexCount = 0;
-        //         create_info.pQueueFamilyIndices   = NULL;
-        //     }
-        //     res = vkCreateBuffer(device, &create_info, NULL, &res_mem->buffer);
-        //     Validate(res, "vkCreateBuffer() failed");
-        //     res = vkBindBufferMemory(device, res_mem->buffer, res_mem->device, 0);
-        //     Validate(res, "vkBindBufferMemory() failed");
-        // }
     }
 }
 

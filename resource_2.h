@@ -80,7 +80,6 @@ struct ImageMemoryInfo
 
 struct ImageMemoryState
 {
-    VkDeviceSize size;
     VkDeviceSize offset;
     VkDeviceSize index;
     uint32       res_mem_index;
@@ -150,17 +149,19 @@ struct ResourceGroup
 
     uint32             max_buffer_mems;
     uint32             buffer_mem_count;
+    BufferMemoryInfo*  buffer_mem_infos;
     BufferMemoryState* buffer_mem_states;
+
+    uint32             max_image_mems;
+    uint32             image_mem_count;
+    ImageMemoryInfo*   image_mem_infos;
+    ImageMemoryState*  image_mem_states;
 
     uint32             max_buffers;
     uint32             buffer_count;
     BufferInfo*        buffer_infos;        // size: max_buffers
     BufferState*       buffer_states;       // size: max_buffers
     BufferFrameState*  buffer_frame_states; // size: max_buffers * frame_count
-
-    uint32             max_image_mems;
-    uint32             image_mem_count;
-    ImageMemoryState*  image_mem_states;
 
     uint32             max_images;
     uint32             image_count;
@@ -228,24 +229,24 @@ static uint32 GetCapableMemoryTypeIndex(VkMemoryRequirements* mem_requirements, 
 {
     // Reference: https://registry.khronos.org/vulkan/specs/1.3/html/vkspec.html#memory-device
     VkPhysicalDeviceMemoryProperties* device_mem_properties = &GetPhysicalDevice()->mem_properties;
-    for (uint32 i = 0; i < device_mem_properties->memoryTypeCount; ++i)
+    for (uint32 mem_type_index = 0; mem_type_index < device_mem_properties->memoryTypeCount; ++mem_type_index)
     {
         // Memory type at index must be supported for resource.
-        if ((mem_requirements->memoryTypeBits & (1 << i)) == 0)
+        if ((mem_requirements->memoryTypeBits & (1 << mem_type_index)) == 0)
         {
             continue;
         }
 
         // Memory type at index must support all resource memory properties.
-        if ((device_mem_properties->memoryTypes[i].propertyFlags & mem_properties) != mem_properties)
+        if ((device_mem_properties->memoryTypes[mem_type_index].propertyFlags & mem_properties) != mem_properties)
         {
             continue;
         }
 
-        return i;
+        return mem_type_index;
     }
 
-    CTK_FATAL("failed to find memory type that satisfies memory requirements");
+    CTK_FATAL("failed to find memory type that satisfies requested memory requirements & properties");
 }
 
 static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize size, VkAllocationCallbacks* allocators)
@@ -281,6 +282,11 @@ static uint32 GetBufferMemoryIndex(BufferMemoryHnd hnd)
 static ResourceGroup* GetResourceGroup(BufferMemoryHnd hnd)
 {
     return GetResourceGroup(GetResourceGroupIndex(hnd.index));
+}
+
+static BufferMemoryInfo* GetBufferMemoryInfo(ResourceGroup* res_group, uint32 buffer_mem_index)
+{
+    return &res_group->buffer_mem_infos[buffer_mem_index];
 }
 
 static BufferMemoryState* GetBufferMemoryState(ResourceGroup* res_group, uint32 buffer_mem_index)
@@ -339,6 +345,11 @@ static ResourceGroup* GetResourceGroup(ImageMemoryHnd hnd)
     return GetResourceGroup(GetResourceGroupIndex(hnd.index));
 }
 
+static ImageMemoryInfo* GetImageMemoryInfo(ResourceGroup* res_group, uint32 image_mem_index)
+{
+    return &res_group->image_mem_infos[image_mem_index];
+}
+
 static ImageMemoryState* GetImageMemoryState(ResourceGroup* res_group, uint32 image_mem_index)
 {
     return &res_group->image_mem_states[image_mem_index];
@@ -392,13 +403,24 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
     uint32 frame_count = GetFrameCount();
     res_group->frame_count = frame_count;
 
+    // Resource Memory Data
     res_group->max_buffer_mems  = info->max_buffer_mems;
     res_group->buffer_mem_count = 0;
     if (res_group->max_buffer_mems > 0)
     {
+        res_group->buffer_mem_infos  = Allocate<BufferMemoryInfo> (allocator, info->max_buffer_mems);
         res_group->buffer_mem_states = Allocate<BufferMemoryState>(allocator, info->max_buffer_mems);
     }
 
+    res_group->max_image_mems  = info->max_image_mems;
+    res_group->image_mem_count = 0;
+    if (res_group->max_image_mems > 0)
+    {
+        res_group->image_mem_infos  = Allocate<ImageMemoryInfo> (allocator, info->max_image_mems);
+        res_group->image_mem_states = Allocate<ImageMemoryState>(allocator, info->max_image_mems);
+    }
+
+    // Resource Data
     res_group->max_buffers  = info->max_buffers;
     res_group->buffer_count = 0;
     if (res_group->max_buffers > 0)
@@ -408,27 +430,20 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
         res_group->buffer_frame_states = Allocate<BufferFrameState>(allocator, info->max_buffers * frame_count);
     }
 
-    // res_group->max_image_mems  = info->max_image_mems;
-    // res_group->image_mem_count = 0;
-    // if (res_group->max_image_mems > 0)
-    // {
-    //     res_group->image_mem_states = Allocate<ImageMemoryState>(allocator, info->max_image_mems);
-    // }
-
-    // res_group->max_images  = info->max_images;
-    // res_group->image_count = 0;
-    // if (res_group->max_images > 0)
-    // {
-    //     res_group->image_infos        = Allocate<ImageInfo>      (allocator, info->max_images);
-    //     res_group->image_view_infos   = Allocate<ImageViewInfo>  (allocator, info->max_images);
-    //     res_group->image_states       = Allocate<ImageState>     (allocator, info->max_images);
-    //     res_group->image_frame_states = Allocate<ImageFrameState>(allocator, info->max_images * frame_count);
-    // }
+    res_group->max_images  = info->max_images;
+    res_group->image_count = 0;
+    if (res_group->max_images > 0)
+    {
+        res_group->image_infos        = Allocate<ImageInfo>      (allocator, info->max_images);
+        res_group->image_view_infos   = Allocate<ImageViewInfo>  (allocator, info->max_images);
+        res_group->image_states       = Allocate<ImageState>     (allocator, info->max_images);
+        res_group->image_frame_states = Allocate<ImageFrameState>(allocator, info->max_images * frame_count);
+    }
 
     return hnd;
 }
 
-static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, BufferMemoryInfo* info)
+static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, BufferMemoryInfo* create_info)
 {
     VkDevice device = GetDevice();
     QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
@@ -445,97 +460,114 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
     BufferMemoryHnd hnd = { .index = buffer_mem_index };
     res_group->buffer_mem_count += 1;
 
+    BufferMemoryInfo* buffer_mem_info = GetBufferMemoryInfo(res_group, buffer_mem_index);
+    *buffer_mem_info = *create_info;
+
     // Create dummy buffer to get memory requirements.
-    VkBufferCreateInfo create_info = {};
-    create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    create_info.pNext = NULL;
-    create_info.flags = 0;
-    create_info.size  = info->size;
-    create_info.usage = info->usage;
+    VkBufferCreateInfo buffer_create_info = {};
+    buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_create_info.pNext = NULL;
+    buffer_create_info.flags = 0;
+    buffer_create_info.size  = create_info->size;
+    buffer_create_info.usage = create_info->usage;
     if (queue_families->graphics != queue_families->present)
     {
-        create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-        create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
-        create_info.pQueueFamilyIndices   = (uint32*)queue_families;
+        buffer_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+        buffer_create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
+        buffer_create_info.pQueueFamilyIndices   = (uint32*)queue_families;
     }
     else
     {
-        create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
-        create_info.queueFamilyIndexCount = 0;
-        create_info.pQueueFamilyIndices   = NULL;
+        buffer_create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
+        buffer_create_info.queueFamilyIndexCount = 0;
+        buffer_create_info.pQueueFamilyIndices   = NULL;
     }
-    VkBuffer temp = VK_NULL_HANDLE;
-    res = vkCreateBuffer(device, &create_info, NULL, &temp);
+    VkBuffer mem_buffer = VK_NULL_HANDLE;
+    res = vkCreateBuffer(device, &buffer_create_info, NULL, &mem_buffer);
     Validate(res, "vkCreateBuffer() failed");
     VkMemoryRequirements mem_requirements = {};
-    vkGetBufferMemoryRequirements(device, temp, &mem_requirements);
-    vkDestroyBuffer(device, temp, NULL);
+    vkGetBufferMemoryRequirements(device, mem_buffer, &mem_requirements);
+    buffer_mem_info->size = mem_requirements.size;
 
-    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, info->mem_properties);
-    GetBufferMemoryState(res_group, buffer_mem_index)->res_mem_index = res_mem_index;
-    res_group->res_mems[res_mem_index].size += mem_requirements.size;
+    // Store buffer, offset into resource memory, and resource memory index in buffer memory state.
+    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, create_info->mem_properties);
+    ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
+    BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
+    buffer_mem_state->buffer        = mem_buffer;
+    buffer_mem_state->offset        = res_mem->size;
+    buffer_mem_state->res_mem_index = res_mem_index;
+
+    // Increase resource memory size by buffer memory size.
+    res_mem->size += buffer_mem_info->size;
 
     return hnd;
 }
 
-// static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMemoryInfo* info)
-// {
-//     VkDevice device = GetDevice();
-//     QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
-//     VkResult res = VK_SUCCESS;
+static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMemoryInfo* create_info)
+{
+    VkDevice device = GetDevice();
+    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
+    VkResult res = VK_SUCCESS;
 
-//     ValidateResourceGroup(res_group_hnd, "can't create image memory type");
-//     ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
-//     if (res_group->image_mem_count >= res_group->max_image_mems)
-//     {
-//         CTK_FATAL("can't create image memory type: already at max of %u", res_group->max_image_mems);
-//     }
+    ValidateResourceGroup(res_group_hnd, "can't create image memory type");
+    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
+    if (res_group->image_mem_count >= res_group->max_image_mems)
+    {
+        CTK_FATAL("can't create image memory type: already at max of %u", res_group->max_image_mems);
+    }
 
-//     uint32 image_mem_index = res_group->image_mem_count;
-//     ImageMemoryHnd hnd = { .index = image_mem_index };
-//     res_group->image_mem_count += 1;
+    uint32 image_mem_index = res_group->image_mem_count;
+    ImageMemoryHnd hnd = { .index = image_mem_index };
+    res_group->image_mem_count += 1;
 
-//     // Create dummy image to get memory requirements.
-//     VkImageCreateInfo create_info = {};
-//     create_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-//     create_info.pNext         = NULL;
-//     create_info.flags         = info->flags;
-//     create_info.imageType     = VK_IMAGE_TYPE_1D;
-//     create_info.format        = info->format;
-//     create_info.extent        = { 1, 1, 1 };
-//     create_info.mipLevels     = 1;
-//     create_info.arrayLayers   = 1;
-//     create_info.samples       = VK_SAMPLE_COUNT_1_BIT;
-//     create_info.tiling        = info->tiling;
-//     create_info.usage         = info->usage;
-//     create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-//     if (queue_families->graphics != queue_families->present)
-//     {
-//         create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-//         create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
-//         create_info.pQueueFamilyIndices   = (uint32*)queue_families;
-//     }
-//     else
-//     {
-//         create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
-//         create_info.queueFamilyIndexCount = 0;
-//         create_info.pQueueFamilyIndices   = NULL;
-//     }
-//     VkImage temp = VK_NULL_HANDLE;
-//     res = vkCreateImage(device, &create_info, NULL, &temp);
-//     Validate(res, "vkCreateImage() failed");
-//     VkMemoryRequirements mem_requirements = {};
-//     vkGetImageMemoryRequirements(device, temp, &mem_requirements);
-//     vkDestroyImage(device, temp, NULL);
+    ImageMemoryInfo* image_mem_info = GetImageMemoryInfo(res_group, image_mem_index);
+    *image_mem_info = *create_info;
 
-//     uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, info->mem_properties);
-//     GetImageMemoryState(res_group, image_mem_index)->res_mem_index = res_mem_index;
-//     ResourceMemory* res_mem = &res_group->res_mems[res_mem_index];
-//     res_mem->size        += Max(mem_requirements.size, info->size);
-//     res_mem->image_usage |= info->usage;
+    // Create dummy image to get memory requirements.
+    VkImageCreateInfo image_create_info = {};
+    image_create_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.pNext         = NULL;
+    image_create_info.flags         = create_info->flags;
+    image_create_info.imageType     = VK_IMAGE_TYPE_1D;
+    image_create_info.format        = create_info->format;
+    image_create_info.extent        = { 1, 1, 1 };
+    image_create_info.mipLevels     = 1;
+    image_create_info.arrayLayers   = 1;
+    image_create_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.tiling        = create_info->tiling;
+    image_create_info.usage         = create_info->usage;
+    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    if (queue_families->graphics != queue_families->present)
+    {
+        image_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+        image_create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
+        image_create_info.pQueueFamilyIndices   = (uint32*)queue_families;
+    }
+    else
+    {
+        image_create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
+        image_create_info.queueFamilyIndexCount = 0;
+        image_create_info.pQueueFamilyIndices   = NULL;
+    }
+    VkImage temp = VK_NULL_HANDLE;
+    res = vkCreateImage(device, &image_create_info, NULL, &temp);
+    Validate(res, "vkCreateImage() failed");
+    VkMemoryRequirements mem_requirements = {};
+    vkGetImageMemoryRequirements(device, temp, &mem_requirements);
+    vkDestroyImage(device, temp, NULL);
 
-//     return hnd;
-// }
+    // Store offset into resource memory and resource memory index in image memory state.
+    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, create_info->mem_properties);
+    ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
+    ImageMemoryState* image_mem_state = GetImageMemoryState(res_group, image_mem_index);
+    image_mem_state->offset        = res_mem->size;
+    image_mem_state->res_mem_index = res_mem_index;
+
+    // Increase resource memory size by image memory size.
+    res_mem->size += image_mem_info->size;
+
+    return hnd;
+}
 
 static void AllocateResourceMemory(ResourceGroupHnd res_group_hnd)
 {
@@ -608,7 +640,10 @@ static void LogResourceGroups()
              buffer_mem_index += 1)
         {
             BufferMemoryState* state = GetBufferMemoryState(res_group, buffer_mem_index);
-            PrintLine("    buffer mem type %u:", buffer_mem_index);
+            PrintLine("    buffer memory %u:", buffer_mem_index);
+            PrintLine("        buffer:        0x%p", state->buffer);
+            PrintLine("        offset:        %u", state->offset);
+            PrintLine("        index:         %u", state->index);
             PrintLine("        res_mem_index: %u", state->res_mem_index);
         }
 
@@ -616,7 +651,9 @@ static void LogResourceGroups()
              image_mem_index += 1)
         {
             ImageMemoryState* state = GetImageMemoryState(res_group, image_mem_index);
-            PrintLine("    image mem type %u:", image_mem_index);
+            PrintLine("    image memory %u:", image_mem_index);
+            PrintLine("        offset:        %u", state->offset);
+            PrintLine("        index:         %u", state->index);
             PrintLine("        res_mem_index: %u", state->res_mem_index);
         }
 
@@ -730,17 +767,17 @@ static void LogResourceGroups()
 
         for (uint32 res_mem_index = 0; res_mem_index < VK_MAX_MEMORY_TYPES; ++res_mem_index)
         {
-            ResourceMemory* mem = GetResourceMemory(res_group, res_mem_index);
-            if (mem->size == 0)
+            ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
+            if (res_mem->size == 0)
             {
                 continue;
             }
-            PrintLine("    memory %u:", res_mem_index);
-            PrintLine("         size:   %llu", mem->size);
-            PrintLine("         device: 0x%p", mem->device);
-            PrintLine("         host:   0x%p", mem->host);
+            PrintLine("    resource memory %u:", res_mem_index);
+            PrintLine("         size:   %llu", res_mem->size);
+            PrintLine("         device: 0x%p", res_mem->device);
+            PrintLine("         host:   0x%p", res_mem->host);
             PrintLine("         properties: ");
-            PrintMemoryPropertyFlags(mem->properties, 3);
+            PrintMemoryPropertyFlags(res_mem->properties, 3);
         }
 
         PrintLine();

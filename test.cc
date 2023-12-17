@@ -62,9 +62,9 @@ sint32 main()
     ResourceGroupInfo res_group_info =
     {
         .max_buffer_mems = 1,
-        // .max_image_mems  = 1,
+        .max_image_mems  = 1,
         .max_buffers     = 1,
-        // .max_images      = 1,
+        .max_images      = 1,
     };
     ResourceGroupHnd res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
     BufferMemoryInfo host_buffer_mem_info =
@@ -75,16 +75,16 @@ sint32 main()
         .mem_properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
     BufferMemoryHnd buffer_mem_type = CreateBufferMemory(res_group, &host_buffer_mem_info);
-    // ImageMemoryInfo texture_mem_info =
-    // {
-    //     .size           = Megabyte32<1>(),
-    //     .flags          = 0,
-    //     .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-    //     .format         = GetSwapchain()->surface_format.format,
-    //     .tiling         = VK_IMAGE_TILING_OPTIMAL,
-    //     .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    // };
-    // ImageMemoryHnd image_mem_type = CreateImageMemory(res_group, &texture_mem_info);
+    ImageMemoryInfo texture_mem_info =
+    {
+        .size           = Megabyte32<1>(),
+        .flags          = 0,
+        .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .format         = GetSwapchain()->surface_format.format,
+        .tiling         = VK_IMAGE_TILING_OPTIMAL,
+        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    ImageMemoryHnd image_mem_type = CreateImageMemory(res_group, &texture_mem_info);
     AllocateResourceMemory(res_group);
 LogResourceGroups();
 

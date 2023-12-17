@@ -171,21 +171,21 @@ static void InitMeshGroup(MeshGroupHnd mesh_group_hnd, ResourceGroupHnd res_grou
 
     BufferInfo vertex_buffer_info =
     {
-        .size             = mesh_group->vertex_buffer_size,
-        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .per_frame        = false,
-        .mem_properties   = mesh_group->mem_properties,
-        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        .size           = mesh_group->vertex_buffer_size,
+        .alignment      = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame      = false,
+        .usage          = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        .mem_properties = mesh_group->mem_properties,
     };
     mesh_group->vertex_buffer = CreateBuffer(res_group_hnd, &vertex_buffer_info);
 
     BufferInfo index_buffer_info =
     {
-        .size             = mesh_group->index_buffer_size,
-        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .per_frame        = false,
-        .mem_properties   = mesh_group->mem_properties,
-        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        .size           = mesh_group->index_buffer_size,
+        .alignment      = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame      = false,
+        .usage          = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        .mem_properties = mesh_group->mem_properties,
     };
     mesh_group->index_buffer = CreateBuffer(res_group_hnd, &index_buffer_info);
 }

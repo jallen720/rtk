@@ -1,5 +1,7 @@
 /// Data
 ////////////////////////////////////////////////////////////
+static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
+
 struct BufferMemoryHnd  { uint32 index; };
 struct ImageMemoryHnd   { uint32 index; };
 struct BufferHnd        { uint32 index; };
@@ -32,11 +34,9 @@ struct BufferMemoryState
 
 struct BufferInfo
 {
-    VkDeviceSize          size;
-    VkDeviceSize          alignment;
-    bool                  per_frame;
-    VkBufferUsageFlags    usage;
-    VkMemoryPropertyFlags mem_properties;
+    VkDeviceSize size;
+    VkDeviceSize alignment;
+    bool         per_frame;
 };
 
 struct BufferState
@@ -598,6 +598,78 @@ static void AllocateResourceMemory(ResourceGroupHnd res_group_hnd)
             vkMapMemory(device, res_mem->device, 0, res_mem->size, 0, (void**)&res_mem->host);
         }
     }
+}
+
+static BufferHnd CreateBuffer(ResourceGroupHnd res_group_hnd, BufferMemoryHnd buffer_mem_hnd, BufferInfo* info)
+{
+    ValidateResourceGroup(res_group_hnd, "can't create buffer");
+    ValidateBufferMemory(buffer_mem_hnd, "can't create buffer");
+
+    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
+    if (res_group->buffer_count >= res_group->max_buffers)
+    {
+        CTK_FATAL("can't create buffer: already at max of %u", res_group->max_buffers);
+    }
+
+    // Figure out minimum offset alignment if requested.
+    // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
+    if (info->alignment == USE_MIN_OFFSET_ALIGNMENT)
+    {
+        VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
+        info->alignment = 4;
+
+        // Uniform
+        if ((info->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
+            info->alignment < physical_device_limits->minUniformBufferOffsetAlignment)
+        {
+            info->alignment = physical_device_limits->minUniformBufferOffsetAlignment;
+        }
+
+        // Storage
+        if ((info->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
+            info->alignment < physical_device_limits->minStorageBufferOffsetAlignment)
+        {
+            info->alignment = physical_device_limits->minStorageBufferOffsetAlignment;
+        }
+
+        // Texel
+        if ((info->usage & (VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT)) &&
+            info->alignment < physical_device_limits->minTexelBufferOffsetAlignment)
+        {
+            info->alignment = physical_device_limits->minTexelBufferOffsetAlignment;
+        }
+    }
+
+    uint32 buffer_index = res_group->buffer_count;
+    ++res_group->buffer_count;
+    BufferHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, buffer_index) };
+    *GetBufferInfo(res_group, buffer_index) = *info;
+
+    return hnd;
+}
+
+static ImageHnd CreateImage(ResourceGroupHnd res_group_hnd,
+                            ImageMemoryHnd   image_mem_hnd,
+                            ImageInfo*       image_info,
+                            ImageViewInfo*   view_info)
+{
+    ValidateResourceGroup(res_group_hnd, "can't create image");
+    ValidateImageMemory(image_mem_hnd, "can't create image");
+
+    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
+    if (res_group->image_count >= res_group->max_images)
+    {
+        CTK_FATAL("can't create image: already at max of %u", res_group->max_images);
+    }
+
+    // Copy info.
+    uint32 image_index = res_group->image_count;
+    ++res_group->image_count;
+    ImageHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, image_index) };
+    *GetImageInfo(res_group, image_index) = *image_info;
+    *GetImageViewInfo(res_group, image_index) = *view_info;
+
+    return hnd;
 }
 
 /// Debug

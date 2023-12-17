@@ -74,7 +74,7 @@ sint32 main()
         .usage          = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         .mem_properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    BufferMemoryHnd buffer_mem_type = CreateBufferMemory(res_group, &host_buffer_mem_info);
+    BufferMemoryHnd buffer_mem = CreateBufferMemory(res_group, &host_buffer_mem_info);
     ImageMemoryInfo texture_mem_info =
     {
         .size           = Megabyte32<1>(),
@@ -84,7 +84,7 @@ sint32 main()
         .tiling         = VK_IMAGE_TILING_OPTIMAL,
         .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    ImageMemoryHnd image_mem_type = CreateImageMemory(res_group, &texture_mem_info);
+    ImageMemoryHnd image_mem = CreateImageMemory(res_group, &texture_mem_info);
     AllocateResourceMemory(res_group);
 LogResourceGroups();
 

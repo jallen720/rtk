@@ -10,10 +10,12 @@ using namespace RTK;
 
 #include "rtk/tests/defs.h"
 
-// #ifndef USE_WIP
+#ifdef USE_WIP
+#include "rtk/tests/render_state_2.h"
+#else
 #include "rtk/tests/render_state.h"
+#endif
 #include "rtk/tests/game_state.h"
-// #endif
 
 sint32 main()
 {

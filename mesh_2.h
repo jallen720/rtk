@@ -417,9 +417,6 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     GLTF gltf = {};
     LoadGLTF(&gltf, allocator, path);
 
-// PrintLine("%s:", path);
-// PrintGLTF(&gltf, 1);
-
     CTK_ASSERT(gltf.meshes.count == 1);
     GLTFMesh* mesh = GetPtr(&gltf.meshes, 0);
 
@@ -445,11 +442,6 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     // mesh_data->info.index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accessor->type] *
     //                         GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accessor->component_type];
     mesh_data->info.index_size = 4;
-
-// PrintLine("vertex size:  %u", mesh_data->info.vertex_size);
-// PrintLine("vertex count: %u", mesh_data->info.vertex_count);
-// PrintLine("index  size:  %u", mesh_data->info.index_size);
-// PrintLine("index  count: %u", mesh_data->info.index_count);
 
     mesh_data->vertex_buffer = Allocate<uint8>(allocator, mesh_data->info.vertex_size * mesh_data->info.vertex_count);
     mesh_data->index_buffer  = Allocate<uint8>(allocator, mesh_data->info.index_size  * mesh_data->info.index_count);
@@ -500,7 +492,6 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         }
 
         attribute_offset += attribute_size;
-// PrintAccessorValues(&gltf, accessor, GetGLTFAttributeTypeName(attribute->type));
     }
 
     // Write indexes from buffer to index buffer. This is done with offsets because index size is 4. If indexes were
@@ -521,7 +512,6 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         buffer_view_offset  += index_size;
         index_buffer_offset += mesh_data->info.index_size;
     }
-// PrintAccessorValues(&gltf, indexes_accessor, "INDEXES");
 }
 
 static void DestroyMeshData(MeshData* mesh_data, const Allocator* allocator)

@@ -17,7 +17,7 @@ struct ImageData
     uint8* data;
 };
 
-/// Utils
+/// Interface
 ////////////////////////////////////////////////////////////
 static void ValidateImage(ImageHnd hnd, const char* action)
 {
@@ -32,8 +32,6 @@ static void ValidateImage(ImageHnd hnd, const char* action)
     }
 }
 
-/// Interface
-////////////////////////////////////////////////////////////
 static void LoadImageData(ImageData* image_data, const char* path)
 {
     image_data->data = stbi_load(path, &image_data->width, &image_data->height, &image_data->channel_count, 0);

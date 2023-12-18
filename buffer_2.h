@@ -34,7 +34,7 @@ struct DeviceBufferAppend
     BufferHnd    dst_hnd;
 };
 
-/// Utils
+/// Interface
 ////////////////////////////////////////////////////////////
 static void ValidateBuffer(BufferHnd hnd, const char* action)
 {
@@ -49,8 +49,6 @@ static void ValidateBuffer(BufferHnd hnd, const char* action)
     }
 }
 
-/// Interface
-////////////////////////////////////////////////////////////
 static void WriteHostBuffer(HostBufferWrite* write, uint32 frame_index)
 {
     ValidateBuffer(write->dst_hnd, "can't write to destination host buffer");

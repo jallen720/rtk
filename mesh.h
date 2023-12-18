@@ -27,6 +27,27 @@ struct Mesh
     uint32 index_count;
 };
 
+#ifdef USE_WIP
+struct MeshGroupInfo
+{
+    uint32 max_meshes;
+    uint32 vertex_buffer_size;
+    uint32 index_buffer_size;
+};
+
+struct MeshGroup
+{
+    Array<Mesh> meshes;
+
+    BufferHnd   vertex_buffer;
+    uint32      vertex_buffer_size;
+    uint32      vertex_count;
+
+    BufferHnd   index_buffer;
+    uint32      index_buffer_size;
+    uint32      index_count;
+};
+#else
 struct MeshGroupInfo
 {
     uint32                max_meshes;
@@ -46,6 +67,7 @@ struct MeshGroup
     uint32    index_buffer_size;
     uint32    index_count;
 };
+#endif
 
 struct MeshModuleInfo
 {
@@ -123,6 +145,39 @@ static void InitMeshModule(const Allocator* allocator, MeshModuleInfo info)
     InitArray(&g_mesh_groups, allocator, info.max_mesh_groups);
 };
 
+#ifdef USE_WIP
+static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, BufferMemory buffer_mem, MeshGroupInfo* info)
+{
+    if (g_mesh_groups.count >= g_mesh_groups.size)
+    {
+        CTK_FATAL("can't create mesh group: already at max of %u", g_mesh_groups.size);
+    }
+
+    MeshGroupHnd hnd = { .index = g_mesh_groups.count };
+
+    MeshGroup* mesh_group = Push(&g_mesh_groups);
+    InitArray(&mesh_group->meshes, allocator, info->max_meshes);
+    mesh_group->mem_properties     = info->mem_properties;
+    mesh_group->vertex_buffer_size = info->vertex_buffer_size;
+    mesh_group->index_buffer_size  = info->index_buffer_size;
+    BufferInfo vertex_buffer_info =
+    {
+        .size      = info->vertex_buffer_size,
+        .alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame = false;
+    };
+    mesh_group->vertex_buffer = CreateBuffer(buffer_mem, &vertex_buffer_info);
+    BufferInfo index_buffer_info =
+    {
+        .size      = info->index_buffer_size,
+        .alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame = false;
+    };
+    mesh_group->index_buffer = CreateBuffer(buffer_mem, &index_buffer_info);
+
+    return hnd;
+}
+#else
 static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, MeshGroupInfo* info)
 {
     if (g_mesh_groups.count >= g_mesh_groups.size)
@@ -137,57 +192,32 @@ static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, MeshGroupInfo* i
 
     return hnd;
 }
+#endif
 
 static MeshHnd CreateMesh(MeshGroupHnd mesh_group_hnd, MeshInfo* info)
 {
     ValidateMeshGroupIndex(mesh_group_hnd.index, "can't create mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_hnd.index);
-
     if (mesh_group->meshes.count >= mesh_group->meshes.size)
     {
         CTK_FATAL("can't create mesh: already at max of %u", mesh_group->meshes.size);
     }
 
     MeshHnd mesh_hnd = { .index = CreateMeshHndIndex(mesh_group_hnd, mesh_group->meshes.count) };
+
     Mesh* mesh = Push(&mesh_group->meshes);
-    mesh->vertex_buffer_offset       = mesh_group->vertex_buffer_size;
+    mesh->vertex_buffer_offset       = GetIndex(mesh_group->vertex_buffer);
     mesh->vertex_buffer_index_offset = mesh_group->vertex_count;
-    mesh->index_buffer_offset        = mesh_group->index_buffer_size;
+    mesh->index_buffer_offset        = GetIndex(mesh_group->index_buffer);
     mesh->index_buffer_index_offset  = mesh_group->index_count;
     mesh->index_count                = info->index_count;
 
-    mesh_group->vertex_buffer_size += info->vertex_count * info->vertex_size;
-    mesh_group->vertex_count       += info->vertex_count;
-    mesh_group->index_buffer_size  += info->index_count  * info->index_size;
-    mesh_group->index_count        += info->index_count;
+    SetIndex(mesh_group->vertex_buffer, mesh->vertex_buffer_offset + (info->vertex_size * info.vertex_count));
+    SetIndex(mesh_group->index_buffer,  mesh->index_buffer_offset  + (info->index_size  * info.index_count));
+    mesh_group->vertex_count += info->vertex_count;
+    mesh_group->index_count  += info->index_count;
 
     return mesh_hnd;
-}
-
-static void InitMeshGroup(MeshGroupHnd mesh_group_hnd, ResourceGroupHnd res_group_hnd)
-{
-    ValidateMeshGroupIndex(mesh_group_hnd.index, "can't initialize mesh group");
-    MeshGroup* mesh_group = GetMeshGroup(mesh_group_hnd.index);
-
-    BufferInfo vertex_buffer_info =
-    {
-        .size             = mesh_group->vertex_buffer_size,
-        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .per_frame        = false,
-        .mem_properties   = mesh_group->mem_properties,
-        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-    };
-    mesh_group->vertex_buffer = CreateBuffer(res_group_hnd, &vertex_buffer_info);
-
-    BufferInfo index_buffer_info =
-    {
-        .size             = mesh_group->index_buffer_size,
-        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .per_frame        = false,
-        .mem_properties   = mesh_group->mem_properties,
-        .usage            = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-    };
-    mesh_group->index_buffer = CreateBuffer(res_group_hnd, &index_buffer_info);
 }
 
 static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
@@ -426,9 +456,6 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     GLTF gltf = {};
     LoadGLTF(&gltf, allocator, path);
 
-// PrintLine("%s:", path);
-// PrintGLTF(&gltf, 1);
-
     CTK_ASSERT(gltf.meshes.count == 1);
     GLTFMesh* mesh = GetPtr(&gltf.meshes, 0);
 
@@ -454,11 +481,6 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     // mesh_data->info.index_size = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)indexes_accessor->type] *
     //                         GLTF_COMPONENT_TYPE_SIZES[(uint32)indexes_accessor->component_type];
     mesh_data->info.index_size = 4;
-
-// PrintLine("vertex size:  %u", mesh_data->info.vertex_size);
-// PrintLine("vertex count: %u", mesh_data->info.vertex_count);
-// PrintLine("index  size:  %u", mesh_data->info.index_size);
-// PrintLine("index  count: %u", mesh_data->info.index_count);
 
     mesh_data->vertex_buffer = Allocate<uint8>(allocator, mesh_data->info.vertex_size * mesh_data->info.vertex_count);
     mesh_data->index_buffer  = Allocate<uint8>(allocator, mesh_data->info.index_size  * mesh_data->info.index_count);
@@ -531,4 +553,10 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         index_buffer_offset += mesh_data->info.index_size;
     }
 // PrintAccessorValues(&gltf, indexes_accessor, "INDEXES");
+}
+
+static void DestroyMeshData(MeshData* mesh_data, const Allocator* allocator)
+{
+    Deallocate(allocator, &mesh_data->vertex_buffer);
+    Deallocate(allocator, &mesh_data->index_buffer);
 }

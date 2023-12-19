@@ -460,9 +460,10 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
         uint32 component_count      = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type];
         uint32 component_size       = GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
         uint32 attribute_size       = component_count * component_size;
-        Swizzle* swizzle            = attribute_swizzles != NULL
-                                    ? attribute_swizzles->array[(uint32)attribute->type]
-                                    : NULL;
+
+        Swizzle* swizzle = attribute_swizzles != NULL
+                         ? attribute_swizzles->array[(uint32)attribute->type]
+                         : NULL;
         if (swizzle != NULL)
         {
             while (buffer_view_offset < buffer_view->size)

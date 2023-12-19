@@ -28,8 +28,8 @@ struct BufferMemoryState
 {
     VkDeviceSize size;
     VkDeviceSize index;
-    VkDeviceSize res_mem_offset;
-    uint32       res_mem_index;
+    VkDeviceSize dev_mem_offset;
+    uint32       dev_mem_index;
     VkBuffer     buffer;
 };
 
@@ -85,8 +85,8 @@ struct ImageMemoryState
 {
     VkDeviceSize size;
     VkDeviceSize index;
-    VkDeviceSize res_mem_offset;
-    uint32       res_mem_index;
+    VkDeviceSize dev_mem_offset;
+    uint32       dev_mem_index;
 };
 
 struct ImageInfo
@@ -124,7 +124,7 @@ struct ImageFrameState
     VkImageView  view;
 };
 
-struct ResourceMemory
+struct DeviceMemory
 {
     VkDeviceSize          size;
     VkDeviceSize          index;
@@ -168,7 +168,7 @@ struct ResourceGroup
     ImageState*        image_states;        // size: max_images
     ImageFrameState*   image_frame_states;  // size: max_images * frame_count
 
-    ResourceMemory     res_mems[VK_MAX_MEMORY_TYPES];
+    DeviceMemory       dev_mems[VK_MAX_MEMORY_TYPES];
 };
 
 struct ResourceModuleInfo
@@ -200,9 +200,9 @@ static ResourceGroup* GetResourceGroup(uint32 index)
     return &g_res_groups.data[index];
 }
 
-static ResourceMemory* GetResourceMemory(ResourceGroup* res_group, uint32 res_mem_index)
+static DeviceMemory* GetDeviceMemory(ResourceGroup* res_group, uint32 dev_mem_index)
 {
-    return &res_group->res_mems[res_mem_index];
+    return &res_group->dev_mems[dev_mem_index];
 }
 
 static void ValidateResourceGroup(uint32 index, const char* action)
@@ -267,9 +267,9 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
 
 static VkDeviceSize AllocateBufferMemory(BufferMemoryState* buffer_mem_state, BufferState* buffer_state)
 {
-    VkDeviceSize res_mem_relative_index = buffer_mem_state->res_mem_offset + buffer_mem_state->index;
+    VkDeviceSize dev_mem_relative_index = buffer_mem_state->dev_mem_offset + buffer_mem_state->index;
     VkDeviceSize buffer_mem_offset =
-        Align(res_mem_relative_index, buffer_state->alignment) - buffer_mem_state->res_mem_offset;
+        Align(dev_mem_relative_index, buffer_state->alignment) - buffer_mem_state->dev_mem_offset;
     if (buffer_mem_offset + buffer_state->size > buffer_mem_state->size)
     {
         CTK_FATAL("can't allocate %u bytes from buffer memory at %u-byte aligned offset of %u: allocation would exceed "
@@ -284,9 +284,9 @@ static VkDeviceSize AllocateBufferMemory(BufferMemoryState* buffer_mem_state, Bu
 
 static VkDeviceSize AllocateImageMemory(ImageMemoryState* image_mem_state, ImageState* image_state)
 {
-    VkDeviceSize res_mem_relative_index = image_mem_state->res_mem_offset + image_mem_state->index;
+    VkDeviceSize dev_mem_relative_index = image_mem_state->dev_mem_offset + image_mem_state->index;
     VkDeviceSize image_mem_offset =
-        Align(res_mem_relative_index, image_state->alignment) - image_mem_state->res_mem_offset;
+        Align(dev_mem_relative_index, image_state->alignment) - image_mem_state->dev_mem_offset;
     if (image_mem_offset + image_state->size > image_mem_state->size)
     {
         CTK_FATAL("can't allocate %u bytes from image memory at %u-byte aligned offset of %u: allocation would exceed "
@@ -367,10 +367,10 @@ static VkBuffer GetBuffer(ResourceGroup* res_group, uint32 buffer_index)
     return res_group->buffer_mem_states[GetBufferState(res_group, buffer_index)->buffer_mem_index].buffer;
 }
 
-static ResourceMemory* GetBufferResourceMemory(ResourceGroup* res_group, uint32 buffer_index)
+static DeviceMemory* GetBufferDeviceMemory(ResourceGroup* res_group, uint32 buffer_index)
 {
     uint32 buffer_mem_index = GetBufferState(res_group, buffer_index)->buffer_mem_index;
-    return GetResourceMemory(res_group, GetBufferMemoryState(res_group, buffer_mem_index)->res_mem_index);
+    return GetDeviceMemory(res_group, GetBufferMemoryState(res_group, buffer_mem_index)->dev_mem_index);
 }
 
 /// Image Memory Utils
@@ -544,17 +544,17 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
     vkGetBufferMemoryRequirements(device, mem_buffer, &mem_requirements);
 
     // Initialize buffer memory state.
-    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_mem_info->properties);
-    ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
+    uint32 dev_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_mem_info->properties);
+    DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
     BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
     buffer_mem_state->size           = mem_requirements.size;
     buffer_mem_state->index          = 0;
-    buffer_mem_state->res_mem_offset = res_mem->size;
-    buffer_mem_state->res_mem_index  = res_mem_index;
+    buffer_mem_state->dev_mem_offset = dev_mem->size;
+    buffer_mem_state->dev_mem_index  = dev_mem_index;
     buffer_mem_state->buffer         = mem_buffer;
 
     // Increase resource memory size by buffer memory size.
-    res_mem->size += mem_requirements.size;
+    dev_mem->size += mem_requirements.size;
 
     return hnd;
 }
@@ -614,16 +614,16 @@ static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMem
     vkDestroyImage(device, temp, NULL);
 
     // Initialize image memory state.
-    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, image_mem_info->properties);
-    ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
+    uint32 dev_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, image_mem_info->properties);
+    DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
     ImageMemoryState* image_mem_state = GetImageMemoryState(res_group, image_mem_index);
     image_mem_state->size           = image_mem_info->size;
     image_mem_state->index          = 0;
-    image_mem_state->res_mem_offset = res_mem->size;
-    image_mem_state->res_mem_index  = res_mem_index;
+    image_mem_state->dev_mem_offset = dev_mem->size;
+    image_mem_state->dev_mem_index  = dev_mem_index;
 
     // Increase resource memory size by image memory size.
-    res_mem->size += image_mem_info->size;
+    dev_mem->size += image_mem_info->size;
 
     return hnd;
 }
@@ -639,22 +639,22 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
     VkResult res = VK_SUCCESS;
 
     // Allocate allo resource memory and map to host memory if necessary.
-    for (uint32 res_mem_index = 0; res_mem_index < VK_MAX_MEMORY_TYPES; ++res_mem_index)
+    for (uint32 dev_mem_index = 0; dev_mem_index < VK_MAX_MEMORY_TYPES; ++dev_mem_index)
     {
-        ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
-        if (res_mem->size == 0)
+        DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
+        if (dev_mem->size == 0)
         {
             continue;
         }
 
         // Allocate memory.
-        res_mem->properties = physical_device->mem_properties.memoryTypes[res_mem_index].propertyFlags;
-        res_mem->hnd        = AllocateDeviceMemory(res_mem_index, res_mem->size, NULL);
+        dev_mem->properties = physical_device->mem_properties.memoryTypes[dev_mem_index].propertyFlags;
+        dev_mem->hnd        = AllocateDeviceMemory(dev_mem_index, dev_mem->size, NULL);
 
         // Map host visible memory.
-        if (res_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+        if (dev_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         {
-            vkMapMemory(device, res_mem->hnd, 0, res_mem->size, 0, (void**)&res_mem->mapped);
+            vkMapMemory(device, dev_mem->hnd, 0, dev_mem->size, 0, (void**)&dev_mem->mapped);
         }
     }
 
@@ -662,8 +662,8 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
     for (uint32 buffer_mem_index = 0; buffer_mem_index < res_group->buffer_mem_count; buffer_mem_index += 1)
     {
         BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
-        ResourceMemory* res_mem = GetResourceMemory(res_group, buffer_mem_state->res_mem_index);
-        res = vkBindBufferMemory(device, buffer_mem_state->buffer, res_mem->hnd, buffer_mem_state->res_mem_offset);
+        DeviceMemory* dev_mem = GetDeviceMemory(res_group, buffer_mem_state->dev_mem_index);
+        res = vkBindBufferMemory(device, buffer_mem_state->buffer, dev_mem->hnd, buffer_mem_state->dev_mem_offset);
         Validate(res, "vkBindBufferMemory() failed");
     }
 }
@@ -835,9 +835,9 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* image_info,
 
         image_frame_state->image_mem_offset = AllocateImageMemory(image_mem_state, image_state);
 
-        ResourceMemory* res_mem = GetResourceMemory(res_group, image_mem_state->res_mem_index);
-        uint32 res_mem_offset = image_mem_state->res_mem_offset + image_frame_state->image_mem_offset;
-        res = vkBindImageMemory(device, image_frame_state->image, res_mem->hnd, res_mem_offset);
+        DeviceMemory* dev_mem = GetDeviceMemory(res_group, image_mem_state->dev_mem_index);
+        uint32 dev_mem_offset = image_mem_state->dev_mem_offset + image_frame_state->image_mem_offset;
+        res = vkBindImageMemory(device, image_frame_state->image, dev_mem->hnd, dev_mem_offset);
         Validate(res, "vkBindImageMemory() failed");
     }
 
@@ -921,18 +921,18 @@ static void DeallocateResourceGroup(ResourceGroupHnd res_group_hnd)
     // Free resouce memory.
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
-        ResourceMemory* res_mem = GetResourceMemory(res_group, mem_index);
-        if (res_mem->size == 0) { continue; }
+        DeviceMemory* dev_mem = GetDeviceMemory(res_group, mem_index);
+        if (dev_mem->size == 0) { continue; }
 
-        if (res_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
+        if (dev_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         {
-            vkUnmapMemory(device, res_mem->hnd);
+            vkUnmapMemory(device, dev_mem->hnd);
         }
-        vkFreeMemory(device, res_mem->hnd, NULL);
+        vkFreeMemory(device, dev_mem->hnd, NULL);
     }
 
     // Zero resource memory so sizes are set to 0 to prevent usage of freed resource memory.
-    memset(res_group->res_mems, 0, VK_MAX_MEMORY_TYPES * sizeof(ResourceMemory));
+    memset(res_group->dev_mems, 0, VK_MAX_MEMORY_TYPES * sizeof(DeviceMemory));
 
     // Clear resource group.
     res_group->buffer_mem_count = 0;
@@ -968,8 +968,8 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("            state:");
             PrintLine("                size:           %llu", buffer_mem_state->size);
             PrintLine("                index:          %llu", buffer_mem_state->index);
-            PrintLine("                res_mem_offset: %llu", buffer_mem_state->res_mem_offset);
-            PrintLine("                res_mem_index:  %u",   buffer_mem_state->res_mem_index);
+            PrintLine("                dev_mem_offset: %llu", buffer_mem_state->dev_mem_offset);
+            PrintLine("                dev_mem_index:  %u",   buffer_mem_state->dev_mem_index);
             PrintLine("                buffer:         0x%p", buffer_mem_state->buffer);
         }
         for (uint32 image_mem_index = 0; image_mem_index < res_group->image_mem_count;
@@ -991,20 +991,20 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("            state:");
             PrintLine("                size:           %llu", image_mem_state->size);
             PrintLine("                index:          %llu", image_mem_state->index);
-            PrintLine("                res_mem_offset: %llu", image_mem_state->res_mem_offset);
-            PrintLine("                res_mem_index:  %u",   image_mem_state->res_mem_index);
+            PrintLine("                dev_mem_offset: %llu", image_mem_state->dev_mem_offset);
+            PrintLine("                dev_mem_index:  %u",   image_mem_state->dev_mem_index);
         }
-        for (uint32 res_mem_index = 0; res_mem_index < VK_MAX_MEMORY_TYPES; ++res_mem_index)
+        for (uint32 dev_mem_index = 0; dev_mem_index < VK_MAX_MEMORY_TYPES; ++dev_mem_index)
         {
-            ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
-            if (res_mem->size == 0) { continue; }
+            DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
+            if (dev_mem->size == 0) { continue; }
 
-            PrintLine("        resource memory %u:", res_mem_index);
-            PrintLine("             size:   %llu", res_mem->size);
-            PrintLine("             hnd:    0x%p", res_mem->hnd);
-            PrintLine("             mapped: 0x%p", res_mem->mapped);
+            PrintLine("        resource memory %u:", dev_mem_index);
+            PrintLine("             size:   %llu", dev_mem->size);
+            PrintLine("             hnd:    0x%p", dev_mem->hnd);
+            PrintLine("             mapped: 0x%p", dev_mem->mapped);
             PrintLine("             properties: ");
-            PrintMemoryPropertyFlags(res_mem->properties, 4);
+            PrintMemoryPropertyFlags(dev_mem->properties, 4);
         }
 
         PrintLine("    resources:");

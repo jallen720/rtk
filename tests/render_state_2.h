@@ -119,8 +119,10 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     ResourceGroupInfo res_group_info =
     {
-        .max_buffers = 32,
-        .max_images  = 32,
+        .max_buffer_mems = 4,
+        .max_image_mems  = 4,
+        .max_buffers     = 8,
+        .max_images      = 8,
     };
     g_render_state.res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
 
@@ -128,7 +130,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     {
         .size       = Megabyte32<16>(),
         .flags      = 0,
-        .usage      = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .usage      = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         .properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
     g_render_state.host_buffer_mem = CreateBufferMemory(g_render_state.res_group, &host_buffer_mem_info);
@@ -139,7 +141,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
         .usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-        .properties = mesh_group->mem_properties,
+        .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
     g_render_state.device_buffer_mem = CreateBufferMemory(g_render_state.res_group, &device_buffer_mem_info);
     ImageMemoryInfo image_mem_info =
@@ -153,7 +155,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     };
     g_render_state.image_mem = CreateImageMemory(g_render_state.res_group, &image_mem_info);
 
-    AllocateResourceMemory(g_render_state.res_group);
+    AllocateResourceGroup(g_render_state.res_group);
 
     // Staging Buffer
     BufferInfo staging_buffer_info =
@@ -162,8 +164,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = false,
     };
-    g_render_state.staging_buffer = CreateBuffer(g_render_state.res_group, g_render_state.host_buffer_mem,
-                                                 &staging_buffer_info);
+    g_render_state.staging_buffer = CreateBuffer(g_render_state.host_buffer_mem, &staging_buffer_info);
 
     // Entity Buffer
     BufferInfo entity_buffer_info =
@@ -172,8 +173,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = true,
     };
-    g_render_state.entity_buffer = CreateBuffer(g_render_state.res_group, g_render_state.host_buffer_mem,
-                                                &entity_buffer_info);
+    g_render_state.entity_buffer = CreateBuffer(g_render_state.host_buffer_mem, &entity_buffer_info);
 
     // Textures
     InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
@@ -217,32 +217,36 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     }
 
     // Meshes
-    InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
-    MeshGroupInfo mesh_group_info =
-    {
-        .max_meshes         = CTK_ARRAY_SIZE(MESH_PATHS),
-        .vertex_buffer_size = Kilobyte32<4>(),
-        .index_buffer_size  = Kilobyte32<1>(),
-    };
-    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, &mesh_group_info);
-
     static constexpr const char* MESH_PATHS[] =
     {
         "blender/cube.gltf",
         "blender/quad.gltf",
         "blender/icosphere.gltf",
     };
+    static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(MESH_PATHS);
+
+    InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
+
+    MeshGroupInfo mesh_group_info =
+    {
+        .max_meshes         = MESH_COUNT,
+        .vertex_buffer_size = Kilobyte32<8>(),
+        .index_buffer_size  = Kilobyte32<8>(),
+    };
+    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, g_render_state.device_buffer_mem,
+                                                &mesh_group_info);
+
     Swizzle position_swizzle = { 0, 2, 1 };
     AttributeSwizzles attribute_swizzles = { .POSITION = &position_swizzle };
-    InitArray(&g_render_state.meshes, &perm_stack->allocator, CTK_ARRAY_SIZE(mesh_datas));
-    CTK_ITER_PTR(mesh_path, MESH_PATHS, CTK_ARRAY_SIZE(MESH_PATHS))
+    InitArray(&g_render_state.meshes, &perm_stack->allocator, MESH_COUNT);
+    CTK_ITER_PTR(mesh_path, MESH_PATHS, MESH_COUNT)
     {
         MeshData mesh_data = {};
         LoadMeshData(&mesh_data, &free_list->allocator, *mesh_path, &attribute_swizzles);
-        MeshHnd mesh = CreateMesh(g_render_state.mesh_group, &mesh_data->info);
+        MeshHnd mesh = CreateMesh(g_render_state.mesh_group, &mesh_data.info);
         Push(&g_render_state.meshes, mesh);
-        LoadDeviceMesh(mesh, g_render_state.staging_buffer, mesh_data);
-        DestroyMeshData(&mesh_data &free_list->allocator);
+        LoadDeviceMesh(mesh, g_render_state.staging_buffer, &mesh_data);
+        DestroyMeshData(&mesh_data, &free_list->allocator);
     }
 }
 

@@ -128,9 +128,9 @@ struct ResourceMemory
 {
     VkDeviceSize          size;
     VkDeviceSize          index;
-    VkDeviceMemory        device;
-    uint8*                host;
     VkMemoryPropertyFlags properties;
+    VkDeviceMemory        hnd;
+    uint8*                mapped;
 };
 
 struct ResourceGroupInfo
@@ -648,13 +648,13 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
         }
 
         // Allocate memory.
-        res_mem->device     = AllocateDeviceMemory(res_mem_index, res_mem->size, NULL);
         res_mem->properties = physical_device->mem_properties.memoryTypes[res_mem_index].propertyFlags;
+        res_mem->hnd        = AllocateDeviceMemory(res_mem_index, res_mem->size, NULL);
 
         // Map host visible memory.
         if (res_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         {
-            vkMapMemory(device, res_mem->device, 0, res_mem->size, 0, (void**)&res_mem->host);
+            vkMapMemory(device, res_mem->hnd, 0, res_mem->size, 0, (void**)&res_mem->mapped);
         }
     }
 
@@ -663,7 +663,7 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
     {
         BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
         ResourceMemory* res_mem = GetResourceMemory(res_group, buffer_mem_state->res_mem_index);
-        res = vkBindBufferMemory(device, buffer_mem_state->buffer, res_mem->device, buffer_mem_state->res_mem_offset);
+        res = vkBindBufferMemory(device, buffer_mem_state->buffer, res_mem->hnd, buffer_mem_state->res_mem_offset);
         Validate(res, "vkBindBufferMemory() failed");
     }
 }
@@ -837,7 +837,7 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* image_info,
 
         ResourceMemory* res_mem = GetResourceMemory(res_group, image_mem_state->res_mem_index);
         uint32 res_mem_offset = image_mem_state->res_mem_offset + image_frame_state->image_mem_offset;
-        res = vkBindImageMemory(device, image_frame_state->image, res_mem->device, res_mem_offset);
+        res = vkBindImageMemory(device, image_frame_state->image, res_mem->hnd, res_mem_offset);
         Validate(res, "vkBindImageMemory() failed");
     }
 
@@ -926,9 +926,9 @@ static void DeallocateResourceGroup(ResourceGroupHnd res_group_hnd)
 
         if (res_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         {
-            vkUnmapMemory(device, res_mem->device);
+            vkUnmapMemory(device, res_mem->hnd);
         }
-        vkFreeMemory(device, res_mem->device, NULL);
+        vkFreeMemory(device, res_mem->hnd, NULL);
     }
 
     // Zero resource memory so sizes are set to 0 to prevent usage of freed resource memory.
@@ -1001,8 +1001,8 @@ static void LogResourceGroups(uint32 start = 0)
 
             PrintLine("        resource memory %u:", res_mem_index);
             PrintLine("             size:   %llu", res_mem->size);
-            PrintLine("             device: 0x%p", res_mem->device);
-            PrintLine("             host:   0x%p", res_mem->host);
+            PrintLine("             hnd:    0x%p", res_mem->hnd);
+            PrintLine("             mapped: 0x%p", res_mem->mapped);
             PrintLine("             properties: ");
             PrintMemoryPropertyFlags(res_mem->properties, 4);
         }

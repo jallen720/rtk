@@ -143,8 +143,6 @@ struct ResourceGroupInfo
 
 struct ResourceGroup
 {
-    uint32             frame_count;
-
     uint32             max_buffer_mems;
     uint32             buffer_mem_count;
     BufferMemoryInfo*  buffer_mem_infos;
@@ -169,6 +167,7 @@ struct ResourceGroup
     ImageFrameState*   image_frame_states;  // size: max_images * frame_count
 
     DeviceMemory       dev_mems[VK_MAX_MEMORY_TYPES];
+    uint32             frame_count;
 };
 
 struct ResourceModuleInfo
@@ -455,7 +454,6 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
     ResourceGroup* res_group = Push(&g_res_groups);
 
     uint32 frame_count = GetFrameCount();
-    res_group->frame_count = frame_count;
 
     // Resource Memory Data
     res_group->max_buffer_mems  = info->max_buffer_mems;
@@ -493,6 +491,8 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
         res_group->image_states       = Allocate<ImageState>     (allocator, info->max_images);
         res_group->image_frame_states = Allocate<ImageFrameState>(allocator, info->max_images * frame_count);
     }
+
+    res_group->frame_count = frame_count;
 
     return hnd;
 }

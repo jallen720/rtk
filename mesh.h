@@ -165,15 +165,17 @@ static MeshHnd CreateMesh(MeshGroupHnd mesh_group_hnd, MeshInfo* info)
 
     MeshHnd mesh_hnd = { .index = CreateMeshHndIndex(mesh_group_hnd, mesh_group->meshes.count) };
 
+    BufferFrameState* vertex_buffer_frame_state = GetBufferFrameState(mesh_group->vertex_buffer, 0);
+    BufferFrameState* index_buffer_frame_state  = GetBufferFrameState(mesh_group->index_buffer,  0);
     Mesh* mesh = Push(&mesh_group->meshes);
-    mesh->vertex_buffer_offset       = GetIndex(mesh_group->vertex_buffer, 0);
+    mesh->vertex_buffer_offset       = vertex_buffer_frame_state->index;
+    mesh->index_buffer_offset        = index_buffer_frame_state->index;
     mesh->vertex_buffer_index_offset = mesh_group->vertex_count;
-    mesh->index_buffer_offset        = GetIndex(mesh_group->index_buffer, 0);
     mesh->index_buffer_index_offset  = mesh_group->index_count;
     mesh->index_count                = info->index_count;
 
-    SetIndex(mesh_group->vertex_buffer, 0, mesh->vertex_buffer_offset + (info->vertex_count * info->vertex_size));
-    SetIndex(mesh_group->index_buffer,  0, mesh->index_buffer_offset  + (info->index_count  * info->index_size));
+    vertex_buffer_frame_state->index = mesh->vertex_buffer_offset + (info->vertex_count * info->vertex_size);
+    index_buffer_frame_state->index  = mesh->index_buffer_offset  + (info->index_count  * info->index_size);
     mesh_group->vertex_count += info->vertex_count;
     mesh_group->index_count  += info->index_count;
 

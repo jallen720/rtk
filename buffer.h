@@ -172,46 +172,26 @@ static void Clear(BufferHnd hnd)
     }
 }
 
-static BufferInfo* GetInfo(BufferHnd hnd)
+static BufferInfo* GetBufferInfo(BufferHnd hnd)
 {
-    ValidateBuffer(hnd, "can't get buffer");
+    ValidateBuffer(hnd, "can't get buffer info");
     return GetBufferInfo(GetResourceGroup(hnd), GetBufferIndex(hnd));
 }
 
-static VkDeviceSize GetSize(BufferHnd hnd)
+static BufferState* GetBufferState(BufferHnd hnd)
 {
-    ValidateBuffer(hnd, "can't get buffer size");
-    return GetBufferInfo(GetResourceGroup(hnd), GetBufferIndex(hnd))->size;
+    ValidateBuffer(hnd, "can't get buffer state");
+    return GetBufferState(GetResourceGroup(hnd), GetBufferIndex(hnd));
 }
 
-static VkDeviceSize GetBufferMemoryOffset(BufferHnd hnd, uint32 frame_index)
+static BufferFrameState* GetBufferFrameState(BufferHnd hnd, uint32 frame_index)
 {
-    ValidateBuffer(hnd, "can't get buffer offset");
+    ValidateBuffer(hnd, "can't get buffer frame state");
 
     ResourceGroup* res_group = GetResourceGroup(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count);
 
-    return GetBufferFrameState(res_group, GetBufferIndex(hnd), frame_index)->buffer_mem_offset;
-}
-
-static VkDeviceSize GetIndex(BufferHnd hnd, uint32 frame_index)
-{
-    ValidateBuffer(hnd, "can't get buffer index");
-
-    ResourceGroup* res_group = GetResourceGroup(hnd);
-    CTK_ASSERT(frame_index < res_group->frame_count);
-
-    return GetBufferFrameState(res_group, GetBufferIndex(hnd), frame_index)->index;
-}
-
-static void SetIndex(BufferHnd hnd, uint32 frame_index, VkDeviceSize index)
-{
-    ValidateBuffer(hnd, "can't set buffer index");
-
-    ResourceGroup* res_group = GetResourceGroup(hnd);
-    CTK_ASSERT(frame_index < res_group->frame_count);
-
-    GetBufferFrameState(res_group, GetBufferIndex(hnd), frame_index)->index = index;
+    return GetBufferFrameState(res_group, GetBufferIndex(hnd), frame_index);
 }
 
 template<typename Type>

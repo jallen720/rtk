@@ -70,7 +70,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
     // Copy image data from buffer memory to image memory.
     ResourceGroup* res_group = GetResourceGroup(image_hnd);
     uint32 image_index = GetImageIndex(image_hnd);
-    uint32 image_data_buffer_index = GetBufferIndex(staging_buffer_hnd);
+    uint32 staging_buffer_index = GetBufferIndex(staging_buffer_hnd);
     VkImage image = GetImageFrameState(res_group, image_index, frame_index)->image;
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.
@@ -106,7 +106,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
 
         VkBufferImageCopy copy =
         {
-            .bufferOffset      = GetBufferMemoryOffset(staging_buffer_hnd, frame_index),
+            .bufferOffset      = GetBufferFrameState(staging_buffer_hnd, frame_index)->buffer_mem_offset,
             .bufferRowLength   = 0,
             .bufferImageHeight = 0,
             .imageSubresource =
@@ -124,7 +124,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
             },
             .imageExtent = GetImageInfo(res_group, image_index)->extent,
         };
-        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBuffer(res_group, image_data_buffer_index), image,
+        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBuffer(res_group, staging_buffer_index), image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.

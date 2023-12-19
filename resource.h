@@ -26,6 +26,7 @@ struct BufferMemoryInfo
 
 struct BufferMemoryState
 {
+    VkDeviceSize size;
     VkDeviceSize offset;
     VkDeviceSize index;
     uint32       res_mem_index;
@@ -41,9 +42,11 @@ struct BufferInfo
 
 struct BufferState
 {
-    uint32 frame_stride;
-    uint32 frame_count;
-    uint32 buffer_mem_index;
+    VkDeviceSize size;
+    VkDeviceSize alignment;
+    uint32       buffer_mem_index;
+    uint32       frame_stride;
+    uint32       frame_count;
 };
 
 struct BufferFrameState
@@ -80,6 +83,7 @@ struct ImageMemoryInfo
 
 struct ImageMemoryState
 {
+    VkDeviceSize size;
     VkDeviceSize offset;
     VkDeviceSize index;
     uint32       res_mem_index;
@@ -98,11 +102,11 @@ struct ImageInfo
 
 struct ImageState
 {
-    uint32       frame_stride;
-    uint32       frame_count;
-    uint32       image_mem_index;
     VkDeviceSize size;
     VkDeviceSize alignment;
+    uint32       image_mem_index;
+    uint32       frame_stride;
+    uint32       frame_count;
 };
 
 struct ImageViewInfo
@@ -115,9 +119,9 @@ struct ImageViewInfo
 
 struct ImageFrameState
 {
+    VkDeviceSize offset;
     VkImage      image;
     VkImageView  view;
-    VkDeviceSize offset;
 };
 
 struct ResourceMemory
@@ -261,33 +265,31 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
     return mem;
 }
 
-static VkDeviceSize AllocateBufferMemory(BufferMemoryInfo* buffer_mem_info, BufferMemoryState* buffer_mem_state,
-                                         BufferInfo* buffer_info)
+static VkDeviceSize AllocateBufferMemory(BufferMemoryState* buffer_mem_state, BufferState* buffer_state)
 {
     VkDeviceSize res_mem_relative_index = buffer_mem_state->offset + buffer_mem_state->index;
-    VkDeviceSize buffer_mem_offset = Align(res_mem_relative_index, buffer_info->alignment) - buffer_mem_state->offset;
-    if (buffer_mem_offset + buffer_info->size > buffer_mem_info->size)
+    VkDeviceSize buffer_mem_offset = Align(res_mem_relative_index, buffer_state->alignment) - buffer_mem_state->offset;
+    if (buffer_mem_offset + buffer_state->size > buffer_mem_state->size)
     {
         CTK_FATAL("can't allocate %u bytes from buffer memory at %u-byte aligned offset of %u: allocation would exceed "
                   "buffer memory size of %u",
-                  buffer_info->size, buffer_info->alignment, buffer_mem_offset, buffer_mem_info->size);
+                  buffer_state->size, buffer_state->alignment, buffer_mem_offset, buffer_mem_state->size);
     }
 
-    buffer_mem_state->index = buffer_mem_offset + buffer_info->size;
+    buffer_mem_state->index = buffer_mem_offset + buffer_state->size;
     return buffer_mem_offset;
 }
 
 
-static VkDeviceSize AllocateImageMemory(ImageMemoryInfo* image_mem_info, ImageMemoryState* image_mem_state,
-                                        ImageState* image_state)
+static VkDeviceSize AllocateImageMemory(ImageMemoryState* image_mem_state, ImageState* image_state)
 {
     VkDeviceSize res_mem_relative_index = image_mem_state->offset + image_mem_state->index;
     VkDeviceSize image_mem_offset = Align(res_mem_relative_index, image_state->alignment) - image_mem_state->offset;
-    if (image_mem_offset + image_state->size > image_mem_info->size)
+    if (image_mem_offset + image_state->size > image_mem_state->size)
     {
         CTK_FATAL("can't allocate %u bytes from image memory at %u-byte aligned offset of %u: allocation would exceed "
                   "image memory size of %u",
-                  image_state->size, image_state->alignment, image_mem_offset, image_mem_info->size);
+                  image_state->size, image_state->alignment, image_mem_offset, image_mem_state->size);
     }
 
     image_mem_state->index = image_mem_offset + image_state->size;
@@ -493,7 +495,7 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
     return hnd;
 }
 
-static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, BufferMemoryInfo* create_info)
+static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, BufferMemoryInfo* buffer_mem_info)
 {
     ValidateResourceGroup(res_group_hnd, "can't create buffer memory");
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd.index);
@@ -512,16 +514,15 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
     BufferMemoryHnd hnd = { .index = GetResourceHndIndex(res_group_hnd.index, buffer_mem_index) };
 
     // Copy info.
-    BufferMemoryInfo* buffer_mem_info = GetBufferMemoryInfo(res_group, buffer_mem_index);
-    *buffer_mem_info = *create_info;
+    *GetBufferMemoryInfo(res_group, buffer_mem_index) = *buffer_mem_info;
 
     // Create buffer to get memory requirements and for usage by buffer memory.
     VkBufferCreateInfo buffer_create_info = {};
     buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_create_info.pNext = NULL;
     buffer_create_info.flags = 0;
-    buffer_create_info.size  = create_info->size;
-    buffer_create_info.usage = create_info->usage;
+    buffer_create_info.size  = buffer_mem_info->size;
+    buffer_create_info.usage = buffer_mem_info->usage;
     if (queue_families->graphics != queue_families->present)
     {
         buffer_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
@@ -539,24 +540,24 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
     Validate(res, "vkCreateBuffer() failed");
     VkMemoryRequirements mem_requirements = {};
     vkGetBufferMemoryRequirements(device, mem_buffer, &mem_requirements);
-    buffer_mem_info->size = mem_requirements.size;
 
     // Initialize buffer memory state.
-    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, create_info->properties);
+    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_mem_info->properties);
     ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
     BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
+    buffer_mem_state->size          = mem_requirements.size;
     buffer_mem_state->offset        = res_mem->size;
     buffer_mem_state->index         = 0;
     buffer_mem_state->res_mem_index = res_mem_index;
     buffer_mem_state->buffer        = mem_buffer;
 
     // Increase resource memory size by buffer memory size.
-    res_mem->size += buffer_mem_info->size;
+    res_mem->size += mem_requirements.size;
 
     return hnd;
 }
 
-static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMemoryInfo* create_info)
+static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMemoryInfo* image_mem_info)
 {
     ValidateResourceGroup(res_group_hnd, "can't create image memory");
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd.index);
@@ -575,22 +576,21 @@ static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMem
     ImageMemoryHnd hnd = { .index = GetResourceHndIndex(res_group_hnd.index, image_mem_index) };
 
     // Copy info.
-    ImageMemoryInfo* image_mem_info = GetImageMemoryInfo(res_group, image_mem_index);
-    *image_mem_info = *create_info;
+    *GetImageMemoryInfo(res_group, image_mem_index) = *image_mem_info;
 
     // Create dummy image to get memory requirements.
     VkImageCreateInfo image_create_info = {};
     image_create_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_create_info.pNext         = NULL;
-    image_create_info.flags         = create_info->flags;
+    image_create_info.flags         = image_mem_info->flags;
+    image_create_info.format        = image_mem_info->format;
+    image_create_info.tiling        = image_mem_info->tiling;
+    image_create_info.usage         = image_mem_info->usage;
     image_create_info.imageType     = VK_IMAGE_TYPE_1D;
-    image_create_info.format        = create_info->format;
     image_create_info.extent        = { 1, 1, 1 };
     image_create_info.mipLevels     = 1;
     image_create_info.arrayLayers   = 1;
     image_create_info.samples       = VK_SAMPLE_COUNT_1_BIT;
-    image_create_info.tiling        = create_info->tiling;
-    image_create_info.usage         = create_info->usage;
     image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     if (queue_families->graphics != queue_families->present)
     {
@@ -612,9 +612,10 @@ static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMem
     vkDestroyImage(device, temp, NULL);
 
     // Initialize image memory state.
-    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, create_info->properties);
+    uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, image_mem_info->properties);
     ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
     ImageMemoryState* image_mem_state = GetImageMemoryState(res_group, image_mem_index);
+    image_mem_state->size          = image_mem_info->size;
     image_mem_state->offset        = res_mem->size;
     image_mem_state->index         = 0;
     image_mem_state->res_mem_index = res_mem_index;
@@ -665,7 +666,7 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
     }
 }
 
-static BufferHnd CreateBuffer(BufferMemoryHnd buffer_mem_hnd, BufferInfo* info)
+static BufferHnd CreateBuffer(BufferMemoryHnd buffer_mem_hnd, BufferInfo* buffer_info)
 {
     ValidateBufferMemory(buffer_mem_hnd, "can't create buffer");
 
@@ -677,7 +678,6 @@ static BufferHnd CreateBuffer(BufferMemoryHnd buffer_mem_hnd, BufferInfo* info)
     }
 
     uint32 buffer_mem_index = GetResourceIndex(buffer_mem_hnd.index);
-    BufferMemoryInfo* buffer_mem_info = GetBufferMemoryInfo(res_group, buffer_mem_index);
 
     // Create handle.
     uint32 buffer_index = res_group->buffer_count;
@@ -685,42 +685,13 @@ static BufferHnd CreateBuffer(BufferMemoryHnd buffer_mem_hnd, BufferInfo* info)
     BufferHnd hnd = { .index = GetResourceHndIndex(res_group_index, buffer_index) };
 
     // Copy info.
-    BufferInfo* buffer_info = GetBufferInfo(res_group, buffer_index);
-    *buffer_info = *info;
+    *GetBufferInfo(res_group, buffer_index) = *buffer_info;
 
-    // Update buffer info alignment to be minimum alignment for memory usage if requested.
-    // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
-    if (buffer_info->alignment == USE_MIN_OFFSET_ALIGNMENT)
-    {
-        VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
-        buffer_info->alignment = 4;
-
-        // Uniform
-        if ((buffer_mem_info->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
-            buffer_info->alignment < physical_device_limits->minUniformBufferOffsetAlignment)
-        {
-            buffer_info->alignment = physical_device_limits->minUniformBufferOffsetAlignment;
-        }
-
-        // Storage
-        if ((buffer_mem_info->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
-            buffer_info->alignment < physical_device_limits->minStorageBufferOffsetAlignment)
-        {
-            buffer_info->alignment = physical_device_limits->minStorageBufferOffsetAlignment;
-        }
-
-        // Texel
-        VkBufferUsageFlags texel_usage_flags = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
-                                               VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-        if ((buffer_mem_info->usage & texel_usage_flags) &&
-            buffer_info->alignment < physical_device_limits->minTexelBufferOffsetAlignment)
-        {
-            buffer_info->alignment = physical_device_limits->minTexelBufferOffsetAlignment;
-        }
-    }
-
-    // Set buffer state.
+    // Init buffer state.
     BufferState* buffer_state = GetBufferState(res_group, buffer_index);
+    buffer_state->size             = buffer_info->size;
+    buffer_state->alignment        = buffer_info->alignment;
+    buffer_state->buffer_mem_index = buffer_mem_index;
     if (buffer_info->per_frame)
     {
         buffer_state->frame_stride = res_group->max_buffers;
@@ -731,21 +702,52 @@ static BufferHnd CreateBuffer(BufferMemoryHnd buffer_mem_hnd, BufferInfo* info)
         buffer_state->frame_stride = 0;
         buffer_state->frame_count  = 1;
     }
-    buffer_state->buffer_mem_index = buffer_mem_index;
+
+    // Update alignment to be minimum alignment for memory usage if requested.
+    // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
+    BufferMemoryInfo* buffer_mem_info = GetBufferMemoryInfo(res_group, buffer_mem_index);
+    if (buffer_state->alignment == USE_MIN_OFFSET_ALIGNMENT)
+    {
+        VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
+        buffer_state->alignment = 4;
+
+        // Uniform
+        if ((buffer_mem_info->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
+            buffer_state->alignment < physical_device_limits->minUniformBufferOffsetAlignment)
+        {
+            buffer_state->alignment = physical_device_limits->minUniformBufferOffsetAlignment;
+        }
+
+        // Storage
+        if ((buffer_mem_info->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
+            buffer_state->alignment < physical_device_limits->minStorageBufferOffsetAlignment)
+        {
+            buffer_state->alignment = physical_device_limits->minStorageBufferOffsetAlignment;
+        }
+
+        // Texel
+        VkBufferUsageFlags texel_usage_flags = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
+                                               VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+        if ((buffer_mem_info->usage & texel_usage_flags) &&
+            buffer_state->alignment < physical_device_limits->minTexelBufferOffsetAlignment)
+        {
+            buffer_state->alignment = physical_device_limits->minTexelBufferOffsetAlignment;
+        }
+    }
 
     // Init buffer frame states.
     BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
     for (uint32 frame_index = 0; frame_index < buffer_state->frame_count; ++frame_index)
     {
         BufferFrameState* buffer_frame_state = GetBufferFrameState(res_group, buffer_index, frame_index);
-        buffer_frame_state->offset = AllocateBufferMemory(buffer_mem_info, buffer_mem_state, buffer_info);
+        buffer_frame_state->offset = AllocateBufferMemory(buffer_mem_state, buffer_state);
         buffer_frame_state->index  = 0;
     }
 
     return hnd;
 }
 
-static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* info, ImageViewInfo* view_info)
+static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* image_info, ImageViewInfo* image_view_info)
 {
     ValidateImageMemory(image_mem_hnd, "can't create image");
 
@@ -769,37 +771,30 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* info, Image
     ImageHnd hnd = { .index = GetResourceHndIndex(res_group_index, image_index) };
 
     // Copy image/view info.
-    ImageInfo*     image_info      = GetImageInfo    (res_group, image_index);
-    ImageViewInfo* image_view_info = GetImageViewInfo(res_group, image_index);
-    *image_info      = *info;
-    *image_view_info = *view_info;
+    *GetImageInfo    (res_group, image_index) = *image_info;
+    *GetImageViewInfo(res_group, image_index) = *image_view_info;
 
-    // Set image state.
-    ImageState* image_state = GetImageState(res_group, image_index);
+    uint32 image_frame_stride = 0;
+    uint32 image_frame_count  = 1;
     if (image_info->per_frame)
     {
-        image_state->frame_stride = res_group->max_images;
-        image_state->frame_count  = res_group->frame_count;
+        image_frame_stride = res_group->max_images;
+        image_frame_count  = res_group->frame_count;
     }
-    else
-    {
-        image_state->frame_stride = 0;
-        image_state->frame_count  = 1;
-    }
-    image_state->image_mem_index = image_mem_index;
 
+    // Create images for each frame.
     VkImageCreateInfo image_create_info = {};
     image_create_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_create_info.pNext         = NULL;
     image_create_info.flags         = image_mem_info->flags;
-    image_create_info.imageType     = image_info    ->type;
     image_create_info.format        = image_mem_info->format;
+    image_create_info.tiling        = image_mem_info->tiling;
+    image_create_info.usage         = image_mem_info->usage;
+    image_create_info.imageType     = image_info    ->type;
     image_create_info.extent        = image_info    ->extent;
     image_create_info.mipLevels     = image_info    ->mip_levels;
     image_create_info.arrayLayers   = image_info    ->array_layers;
     image_create_info.samples       = image_info    ->samples;
-    image_create_info.tiling        = image_mem_info->tiling;
-    image_create_info.usage         = image_mem_info->usage;
     image_create_info.initialLayout = image_info    ->initial_layout;
     if (queue_families->graphics != queue_families->present)
     {
@@ -813,20 +808,22 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* info, Image
         image_create_info.queueFamilyIndexCount = 0;
         image_create_info.pQueueFamilyIndices   = NULL;
     }
-
-    // Create images for each frame.
-    for (uint32 frame_index = 0; frame_index < image_state->frame_count; ++frame_index)
+    for (uint32 frame_index = 0; frame_index < image_frame_count; ++frame_index)
     {
         ImageFrameState* image_frame_state = GetImageFrameState(res_group, image_index, frame_index);
         res = vkCreateImage(device, &image_create_info, NULL, &image_frame_state->image);
         Validate(res, "vkCreateImage() failed");
     }
 
-    // Set size and alignment based on first image's memory requirements.
+    // Init image state.
     VkMemoryRequirements mem_requirements = {};
     vkGetImageMemoryRequirements(device, GetImageFrameState(res_group, image_index, 0)->image, &mem_requirements);
-    image_state->size      = mem_requirements.size;
-    image_state->alignment = mem_requirements.alignment;
+    ImageState* image_state = GetImageState(res_group, image_index);
+    image_state->size            = mem_requirements.size;
+    image_state->alignment       = mem_requirements.alignment;
+    image_state->image_mem_index = image_mem_index;
+    image_state->frame_stride    = image_frame_stride;
+    image_state->frame_count     = image_frame_count;
 
     // Calculate offset in image memory, update image memory index, then bind to image memory at offset for each frame.
     ImageMemoryState* image_mem_state = GetImageMemoryState(res_group, image_mem_index);
@@ -834,7 +831,7 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* info, Image
     {
         ImageFrameState* image_frame_state = GetImageFrameState(res_group, image_index, frame_index);
 
-        image_frame_state->offset = AllocateImageMemory(image_mem_info, image_mem_state, image_state);
+        image_frame_state->offset = AllocateImageMemory(image_mem_state, image_state);
 
         ResourceMemory* res_mem = GetResourceMemory(res_group, image_mem_state->res_mem_index);
         uint32 res_mem_offset = image_mem_state->offset + image_frame_state->offset;
@@ -967,10 +964,11 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("                properties:");
             PrintMemoryPropertyFlags(buffer_mem_info->properties, 5);
             PrintLine("            state:");
+            PrintLine("                size:          %llu", buffer_mem_state->size);
+            PrintLine("                offset:        %llu", buffer_mem_state->offset);
+            PrintLine("                index:         %llu", buffer_mem_state->index);
+            PrintLine("                res_mem_index: %u",   buffer_mem_state->res_mem_index);
             PrintLine("                buffer:        0x%p", buffer_mem_state->buffer);
-            PrintLine("                offset:        %u", buffer_mem_state->offset);
-            PrintLine("                index:         %u", buffer_mem_state->index);
-            PrintLine("                res_mem_index: %u", buffer_mem_state->res_mem_index);
         }
         for (uint32 image_mem_index = 0; image_mem_index < res_group->image_mem_count;
              image_mem_index += 1)
@@ -989,17 +987,16 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("                format: %s", VkFormatName(image_mem_info->format));
             PrintLine("                tiling: %s", VkImageTilingName(image_mem_info->tiling));
             PrintLine("            state:");
-            PrintLine("                offset:        %u", image_mem_state->offset);
-            PrintLine("                index:         %u", image_mem_state->index);
-            PrintLine("                res_mem_index: %u", image_mem_state->res_mem_index);
+            PrintLine("                size:          %llu", image_mem_state->size);
+            PrintLine("                offset:        %llu", image_mem_state->offset);
+            PrintLine("                index:         %llu", image_mem_state->index);
+            PrintLine("                res_mem_index: %u",   image_mem_state->res_mem_index);
         }
         for (uint32 res_mem_index = 0; res_mem_index < VK_MAX_MEMORY_TYPES; ++res_mem_index)
         {
             ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
-            if (res_mem->size == 0)
-            {
-                continue;
-            }
+            if (res_mem->size == 0) { continue; }
+
             PrintLine("        resource memory %u:", res_mem_index);
             PrintLine("             size:   %llu", res_mem->size);
             PrintLine("             device: 0x%p", res_mem->device);
@@ -1017,11 +1014,13 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("            info:");
             PrintLine("                size:      %llu", info->size);
             PrintLine("                alignment: %llu", info->alignment);
-            PrintLine("                per_frame: %s", info->per_frame ? "true" : "false");
+            PrintLine("                per_frame: %s",   info->per_frame ? "true" : "false");
             PrintLine("            state:");
-            PrintLine("                frame_stride:     %u", state->frame_stride);
-            PrintLine("                frame_count:      %u", state->frame_count);
-            PrintLine("                buffer_mem_index: %u", state->buffer_mem_index);
+            PrintLine("                size:             %llu", state->size);
+            PrintLine("                alignment:        %llu", state->alignment);
+            PrintLine("                buffer_mem_index: %u",   state->buffer_mem_index);
+            PrintLine("                frame_stride:     %u",   state->frame_stride);
+            PrintLine("                frame_count:      %u",   state->frame_count);
             PrintLine("            frame_states:");
             for (uint32 frame_index = 0; frame_index < state->frame_count; ++frame_index)
             {
@@ -1085,19 +1084,19 @@ static void LogResourceGroups(uint32 start = 0)
             }
 
             PrintLine("            state:");
-            PrintLine("                frame_stride:    %u", state->frame_stride);
-            PrintLine("                frame_count:     %u", state->frame_count);
-            PrintLine("                image_mem_index: %u", state->image_mem_index);
             PrintLine("                size:            %llu", state->size);
             PrintLine("                alignment:       %llu", state->alignment);
+            PrintLine("                image_mem_index: %u",   state->image_mem_index);
+            PrintLine("                frame_stride:    %u",   state->frame_stride);
+            PrintLine("                frame_count:     %u",   state->frame_count);
             PrintLine("            frame_states:");
             for (uint32 frame_index = 0; frame_index < state->frame_count; ++frame_index)
             {
                 ImageFrameState* frame_state = GetImageFrameState(res_group, image_index, frame_index);
                 PrintLine("                frame %u:", frame_index);
+                PrintLine("                    offset: %llu", frame_state->offset);
                 PrintLine("                    image:  0x%p", frame_state->image);
                 PrintLine("                    view:   0x%p", frame_state->view);
-                PrintLine("                    offset: %llu", frame_state->offset);
             }
             PrintLine();
         }

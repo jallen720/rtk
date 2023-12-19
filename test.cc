@@ -61,6 +61,7 @@ sint32 main()
     // Initialize other test state.
     InitRenderState(perm_stack, temp_stack, free_list, thread_pool->size);
     InitGameState(perm_stack);
+LogResourceGroups();
 
     // Run game.
     bool recreate_swapchain = false;

@@ -567,7 +567,7 @@ static void SetTextureIndexes(uint32* texture_indexes, uint32 entity_count, uint
 {
     CTK_ASSERT(entity_count <= MAX_ENTITIES);
     CTK_ASSERT(frame_index < GetFrameCount());
-    EntityBuffer* frame_entity_buffer = GetHostMemory<EntityBuffer>(g_render_state.entity_buffer, frame_index);
+    EntityBuffer* frame_entity_buffer = GetMappedMemory<EntityBuffer>(g_render_state.entity_buffer, frame_index);
     memcpy(frame_entity_buffer->texture_indexes, texture_indexes, sizeof(uint32) * entity_count);
 }
 
@@ -575,7 +575,7 @@ static void SetSamplerIndexes(uint32* sampler_indexes, uint32 entity_count, uint
 {
     CTK_ASSERT(entity_count <= MAX_ENTITIES);
     CTK_ASSERT(frame_index < GetFrameCount());
-    EntityBuffer* frame_entity_buffer = GetHostMemory<EntityBuffer>(g_render_state.entity_buffer, frame_index);
+    EntityBuffer* frame_entity_buffer = GetMappedMemory<EntityBuffer>(g_render_state.entity_buffer, frame_index);
     memcpy(frame_entity_buffer->sampler_indexes, sampler_indexes, sizeof(uint32) * entity_count);
 }
 
@@ -583,7 +583,7 @@ static void UpdateMVPMatrixes(ThreadPool* thread_pool, View* view, Transform* tr
 {
     Job<MVPMatrixState>* job = &g_render_state.mvp_matrix_job;
     Matrix view_projection_matrix = GetViewProjectionMatrix(view);
-    auto frame_entity_buffer = GetHostMemory<EntityBuffer>(g_render_state.entity_buffer, GetFrameIndex());
+    auto frame_entity_buffer = GetMappedMemory<EntityBuffer>(g_render_state.entity_buffer, GetFrameIndex());
 
     // Initialize thread states and submit tasks.
     uint32 thread_count = job->states.count;

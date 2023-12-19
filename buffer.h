@@ -65,10 +65,10 @@ static void WriteHostBuffer(HostBufferWrite* write, uint32 frame_index)
                   write->size, write->dst_offset, dst_info->size);
     }
 
-    ResourceMemory* buffer_mem = GetBufferResourceMemory(res_group, dst_index);
-    CTK_ASSERT(buffer_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    ResourceMemory* res_mem = GetBufferResourceMemory(res_group, dst_index);
+    CTK_ASSERT(res_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    uint8* dst = &buffer_mem->host[dst_frame_state->buffer_mem_offset + write->dst_offset];
+    uint8* dst = &res_mem->host[dst_frame_state->buffer_mem_offset + write->dst_offset];
     uint8* src = &((uint8*)write->src_data)[write->src_offset];
     memcpy(dst, src, write->size);
 }
@@ -89,10 +89,10 @@ static void AppendHostBuffer(HostBufferAppend* append, uint32 frame_index)
                   append->size, dst_frame_state->index, dst_info->size);
     }
 
-    ResourceMemory* buffer_mem = GetBufferResourceMemory(res_group, dst_index);
-    CTK_ASSERT(buffer_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    ResourceMemory* res_mem = GetBufferResourceMemory(res_group, dst_index);
+    CTK_ASSERT(res_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    uint8* dst = &buffer_mem->host[dst_frame_state->buffer_mem_offset + dst_frame_state->index];
+    uint8* dst = &res_mem->host[dst_frame_state->buffer_mem_offset + dst_frame_state->index];
     uint8* src = &((uint8*)append->src_data)[append->src_offset];
     memcpy(dst, src, append->size);
     dst_frame_state->index += append->size;
@@ -195,7 +195,7 @@ static BufferFrameState* GetBufferFrameState(BufferHnd hnd, uint32 frame_index)
 }
 
 template<typename Type>
-static Type* GetHostMemory(BufferHnd hnd, uint32 frame_index)
+static Type* GetMappedMemory(BufferHnd hnd, uint32 frame_index)
 {
     ValidateBuffer(hnd, "can't get buffer mapped memory");
 
@@ -203,10 +203,10 @@ static Type* GetHostMemory(BufferHnd hnd, uint32 frame_index)
     CTK_ASSERT(frame_index < res_group->frame_count);
 
     uint32 buffer_index = GetBufferIndex(hnd);
-    ResourceMemory* mem = GetBufferResourceMemory(res_group, buffer_index);
-    CTK_ASSERT(mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    ResourceMemory* res_mem = GetBufferResourceMemory(res_group, buffer_index);
+    CTK_ASSERT(res_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    return (Type*)&mem->host[GetBufferFrameState(res_group, buffer_index, frame_index)->buffer_mem_offset];
+    return (Type*)&res_mem->host[GetBufferFrameState(res_group, buffer_index, frame_index)->buffer_mem_offset];
 }
 
 static VkBuffer GetBuffer(BufferHnd hnd)

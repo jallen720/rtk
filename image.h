@@ -70,7 +70,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
     // Copy image data from buffer memory to image memory.
     ResourceGroup* res_group = GetResourceGroup(image_hnd);
     uint32 image_index = GetImageIndex(image_hnd);
-    uint32 staging_buffer_index = GetBufferIndex(staging_buffer_hnd);
+    uint32 staging_buffer_index = GetResourceIndex(staging_buffer_hnd.index);
     VkImage image = GetImageFrameState(res_group, image_index, frame_index)->image;
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.

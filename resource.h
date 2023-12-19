@@ -335,11 +335,6 @@ static void ValidateBufferMemory(BufferMemoryHnd hnd, const char* action)
 
 /// Buffer Utils
 ////////////////////////////////////////////////////////////
-static uint32 GetBufferIndex(BufferHnd hnd)
-{
-    return GetResourceIndex(hnd.index);
-}
-
 static ResourceGroup* GetResourceGroup(BufferHnd hnd)
 {
     return GetResourceGroup(GetResourceGroupIndex(hnd.index));

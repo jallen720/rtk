@@ -1,7 +1,5 @@
 /// Data
 ////////////////////////////////////////////////////////////
-static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
-
 struct HostBufferWrite
 {
     VkDeviceSize size;
@@ -36,7 +34,7 @@ struct DeviceBufferAppend
     BufferHnd    dst_hnd;
 };
 
-/// Utils
+/// Interface
 ////////////////////////////////////////////////////////////
 static void ValidateBuffer(BufferHnd hnd, const char* action)
 {
@@ -49,55 +47,6 @@ static void ValidateBuffer(BufferHnd hnd, const char* action)
     {
         CTK_FATAL("%s: buffer index %u exceeds buffer count of %u", action, buffer_index, res_group->buffer_count);
     }
-}
-
-/// Interface
-////////////////////////////////////////////////////////////
-static BufferHnd CreateBuffer(ResourceGroupHnd res_group_hnd, BufferInfo* info)
-{
-    ValidateResourceGroup(res_group_hnd, "can't create buffer");
-
-    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
-    if (res_group->buffer_count >= res_group->max_buffers)
-    {
-        CTK_FATAL("can't create buffer: already at max of %u", res_group->max_buffers);
-    }
-
-    // Figure out minimum offset alignment if requested.
-    // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
-    if (info->offset_alignment == USE_MIN_OFFSET_ALIGNMENT)
-    {
-        VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
-        info->offset_alignment = 4;
-
-        // Uniform
-        if ((info->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
-            info->offset_alignment < physical_device_limits->minUniformBufferOffsetAlignment)
-        {
-            info->offset_alignment = physical_device_limits->minUniformBufferOffsetAlignment;
-        }
-
-        // Storage
-        if ((info->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
-            info->offset_alignment < physical_device_limits->minStorageBufferOffsetAlignment)
-        {
-            info->offset_alignment = physical_device_limits->minStorageBufferOffsetAlignment;
-        }
-
-        // Texel
-        if ((info->usage & (VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT)) &&
-            info->offset_alignment < physical_device_limits->minTexelBufferOffsetAlignment)
-        {
-            info->offset_alignment = physical_device_limits->minTexelBufferOffsetAlignment;
-        }
-    }
-
-    uint32 buffer_index = res_group->buffer_count;
-    ++res_group->buffer_count;
-    BufferHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, buffer_index) };
-    *GetBufferInfo(res_group, buffer_index) = *info;
-
-    return hnd;
 }
 
 static void WriteHostBuffer(HostBufferWrite* write, uint32 frame_index)
@@ -116,7 +65,7 @@ static void WriteHostBuffer(HostBufferWrite* write, uint32 frame_index)
                   write->size, write->dst_offset, dst_info->size);
     }
 
-    ResourceMemory* buffer_mem = GetBufferMemory(res_group, dst_index);
+    ResourceMemory* buffer_mem = GetBufferResourceMemory(res_group, dst_index);
     CTK_ASSERT(buffer_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     uint8* dst = &buffer_mem->host[dst_frame_state->offset + write->dst_offset];
@@ -140,7 +89,7 @@ static void AppendHostBuffer(HostBufferAppend* append, uint32 frame_index)
                   append->size, dst_frame_state->index, dst_info->size);
     }
 
-    ResourceMemory* buffer_mem = GetBufferMemory(res_group, dst_index);
+    ResourceMemory* buffer_mem = GetBufferResourceMemory(res_group, dst_index);
     CTK_ASSERT(buffer_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     uint8* dst = &buffer_mem->host[dst_frame_state->offset + dst_frame_state->index];
@@ -274,7 +223,7 @@ static Type* GetHostMemory(BufferHnd hnd, uint32 frame_index)
     CTK_ASSERT(frame_index < res_group->frame_count);
 
     uint32 buffer_index = GetBufferIndex(hnd);
-    ResourceMemory* mem = GetBufferMemory(res_group, buffer_index);
+    ResourceMemory* mem = GetBufferResourceMemory(res_group, buffer_index);
     CTK_ASSERT(mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     return (Type*)&mem->host[GetBufferFrameState(res_group, buffer_index, frame_index)->offset];

@@ -17,7 +17,7 @@ struct ImageData
     uint8* data;
 };
 
-/// Utils
+/// Interface
 ////////////////////////////////////////////////////////////
 static void ValidateImage(ImageHnd hnd, const char* action)
 {
@@ -30,28 +30,6 @@ static void ValidateImage(ImageHnd hnd, const char* action)
     {
         CTK_FATAL("%s: image index %u exceeds image count of %u", action, image_index, res_group->image_count);
     }
-}
-
-/// Interface
-////////////////////////////////////////////////////////////
-static ImageHnd CreateImage(ResourceGroupHnd res_group_hnd, ImageInfo* info, ImageViewInfo* view_info)
-{
-    ValidateResourceGroup(res_group_hnd, "can't create image");
-
-    ResourceGroup* res_group = GetResourceGroup(res_group_hnd);
-    if (res_group->image_count >= res_group->max_images)
-    {
-        CTK_FATAL("can't create image: already at max of %u", res_group->max_images);
-    }
-
-    // Copy info.
-    uint32 image_index = res_group->image_count;
-    ++res_group->image_count;
-    ImageHnd hnd = { .index = GetResourceHndIndex(res_group_hnd, image_index) };
-    *GetImageInfo(res_group, image_index) = *info;
-    *GetImageViewInfo(res_group, image_index) = *view_info;
-
-    return hnd;
 }
 
 static void LoadImageData(ImageData* image_data, const char* path)

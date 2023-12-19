@@ -25,6 +25,7 @@ struct RenderTarget
     Array<VkFramebuffer> framebuffers;
     Array<VkClearValue>  attachment_clear_values;
     ResourceGroupHnd     depth_image_group;
+    ImageMemoryHnd       depth_image_mem;
     ImageHnd             depth_image;
 };
 
@@ -63,11 +64,10 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
     // Set render target to cover entire swapchain extent.
     render_target->extent = swapchain->surface_extent;
 
-    // Init depth image/views if depth testing is enabled.
+    // Create depth image if depth testing is enabled.
     if (render_target->depth_testing)
     {
-        // Create image resource with array layers for each swapchain image.
-        ImageInfo image_info =
+        ImageInfo depth_image_info =
         {
             .extent =
             {
@@ -75,23 +75,31 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
                 .height = render_target->extent.height,
                 .depth  = 1
             },
-            .per_frame      = false,
-            .flags          = 0,
             .type           = VK_IMAGE_TYPE_2D,
-            .format         = GetPhysicalDevice()->depth_image_format,
             .mip_levels     = 1,
             .array_layers   = 1,
             .samples        = VK_SAMPLE_COUNT_1_BIT,
-            .tiling         = VK_IMAGE_TILING_OPTIMAL,
             .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            .usage          = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            .per_frame      = false,
         };
-        ImageViewInfo image_view_info =
+        ImageMemoryInfo depth_image_mem_info =
+        {
+            .size       = 0,
+            .flags      = 0,
+            .usage      = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            .format     = GetPhysicalDevice()->depth_image_format,
+            .tiling     = VK_IMAGE_TILING_OPTIMAL,
+        };
+        depth_image_mem_info.size = GetImageSize(&depth_image_info, &depth_image_mem_info);
+        render_target->depth_image_mem = CreateImageMemory(render_target->depth_image_group, &depth_image_mem_info);
+
+        AllocateResourceGroup(render_target->depth_image_group);
+
+        ImageViewInfo depth_image_view_info =
         {
             .flags      = 0,
             .type       = VK_IMAGE_VIEW_TYPE_2D,
-            .format     = image_info.format,
             .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
             .subresource_range =
             {
@@ -102,8 +110,8 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
                 .layerCount     = VK_REMAINING_ARRAY_LAYERS,
             },
         };
-        render_target->depth_image = CreateImage(render_target->depth_image_group, &image_info, &image_view_info);
-        InitResourceGroup(render_target->depth_image_group, &frame);
+        render_target->depth_image =
+            CreateImage(render_target->depth_image_mem, &depth_image_info, &depth_image_view_info);
     }
 
     // Init framebuffers.
@@ -146,8 +154,12 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* perm_stack, Sta
     render_target->depth_testing = info->depth_testing;
     if (render_target->depth_testing)
     {
-        ResourceGroupInfo info = { .max_images = GetSwapchain()->image_views.count };
-        render_target->depth_image_group = CreateResourceGroup(&perm_stack->allocator, &info);
+        ResourceGroupInfo depth_image_group_info =
+        {
+            .max_image_mems  = 1,
+            .max_images      = 1,
+        };
+        render_target->depth_image_group = CreateResourceGroup(&free_list->allocator, &depth_image_group_info);
     }
 
     uint32 depth_attachment_count = render_target->depth_testing ? 1u : 0u;
@@ -221,7 +233,7 @@ static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* te
     // Destroy depth images.
     if (render_target->depth_testing)
     {
-        //DestroyResources(render_target->depth_image_group);
+        DeallocateResourceGroup(render_target->depth_image_group);
     }
 
     // Destroy framebuffers.

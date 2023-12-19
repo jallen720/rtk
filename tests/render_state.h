@@ -55,6 +55,9 @@ struct RenderState
 
     // Resources
     ResourceGroupHnd res_group;
+    BufferMemoryHnd  host_buffer_mem;
+    BufferMemoryHnd  device_buffer_mem;
+    ImageMemoryHnd   image_mem;
     BufferHnd        staging_buffer;
     BufferHnd        entity_buffer;
     Array<ImageHnd>  textures;
@@ -116,65 +119,87 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     ResourceGroupInfo res_group_info =
     {
-        .max_buffers = 32,
-        .max_images  = 32,
+        .max_buffer_mems = 4,
+        .max_image_mems  = 4,
+        .max_buffers     = 8,
+        .max_images      = 8,
     };
     g_render_state.res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
+
+    BufferMemoryInfo host_buffer_mem_info =
+    {
+        .size       = Megabyte32<16>(),
+        .flags      = 0,
+        .usage      = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        .properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    };
+    g_render_state.host_buffer_mem = CreateBufferMemory(g_render_state.res_group, &host_buffer_mem_info);
+    BufferMemoryInfo device_buffer_mem_info =
+    {
+        .size       = Megabyte32<1>(),
+        .flags      = 0,
+        .usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    };
+    g_render_state.device_buffer_mem = CreateBufferMemory(g_render_state.res_group, &device_buffer_mem_info);
+    ImageMemoryInfo image_mem_info =
+    {
+        .size       = Megabyte32<8>(),
+        .flags      = 0,
+        .usage      = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        .format     = GetSwapchain()->surface_format.format,
+        .tiling     = VK_IMAGE_TILING_OPTIMAL,
+    };
+    g_render_state.image_mem = CreateImageMemory(g_render_state.res_group, &image_mem_info);
+
+    AllocateResourceGroup(g_render_state.res_group);
 
     // Staging Buffer
     BufferInfo staging_buffer_info =
     {
-        .size             = Megabyte32<8>(),
-        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .per_frame        = false,
-        .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        .usage            = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .size      = Megabyte32<8>(),
+        .alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame = false,
     };
-    g_render_state.staging_buffer = CreateBuffer(g_render_state.res_group, &staging_buffer_info);
+    g_render_state.staging_buffer = CreateBuffer(g_render_state.host_buffer_mem, &staging_buffer_info);
 
     // Entity Buffer
     BufferInfo entity_buffer_info =
     {
-        .size             = sizeof(EntityBuffer),
-        .offset_alignment = USE_MIN_OFFSET_ALIGNMENT,
-        .per_frame        = true,
-        .mem_properties   = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        .usage            = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        .size      = sizeof(EntityBuffer),
+        .alignment = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame = true,
     };
-    g_render_state.entity_buffer = CreateBuffer(g_render_state.res_group, &entity_buffer_info);
+    g_render_state.entity_buffer = CreateBuffer(g_render_state.host_buffer_mem, &entity_buffer_info);
 
     // Textures
-    ImageData texture_datas[TEXTURE_COUNT] = {};
     InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
-        ImageData* texture_data = &texture_datas[i];
-        LoadImageData(texture_data, TEXTURE_IMAGE_PATHS[i]);
+        ImageData texture_data = {};
+        LoadImageData(&texture_data, TEXTURE_IMAGE_PATHS[i]);
         ImageInfo texture_info =
         {
             .extent =
             {
-                .width  = (uint32)texture_data->width,
-                .height = (uint32)texture_data->height,
+                .width  = (uint32)texture_data.width,
+                .height = (uint32)texture_data.height,
                 .depth  = 1
             },
-            .per_frame      = false,
-            .flags          = 0,
             .type           = VK_IMAGE_TYPE_2D,
-            .format         = GetSwapchain()->surface_format.format,
             .mip_levels     = 1,
             .array_layers   = 1,
             .samples        = VK_SAMPLE_COUNT_1_BIT,
-            .tiling         = VK_IMAGE_TILING_OPTIMAL,
             .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-            .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            .usage          = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            .per_frame      = false,
         };
         ImageViewInfo texture_view_info =
         {
             .flags      = 0,
             .type       = VK_IMAGE_VIEW_TYPE_2D,
-            .format     = texture_info.format,
             .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
             .subresource_range =
             {
@@ -185,49 +210,43 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
                 .layerCount     = VK_REMAINING_ARRAY_LAYERS,
             },
         };
-        Push(&g_render_state.textures, CreateImage(g_render_state.res_group, &texture_info, &texture_view_info));
+        ImageHnd texture = CreateImage(g_render_state.image_mem, &texture_info, &texture_view_info);
+        Push(&g_render_state.textures, texture);
+        LoadImage(texture, g_render_state.staging_buffer, 0, &texture_data);
+        DestroyImageData(&texture_data);
     }
 
     // Meshes
-    static constexpr uint32 MESH_COUNT = 3;
-    MeshData mesh_datas[MESH_COUNT] = {};
+    static constexpr const char* MESH_PATHS[] =
+    {
+        "blender/cube.gltf",
+        "blender/quad.gltf",
+        "blender/icosphere.gltf",
+    };
+    static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(MESH_PATHS);
+
+    InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
+
+    MeshGroupInfo mesh_group_info =
+    {
+        .max_meshes         = MESH_COUNT,
+        .vertex_buffer_size = Kilobyte32<8>(),
+        .index_buffer_size  = Kilobyte32<8>(),
+    };
+    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, g_render_state.device_buffer_mem,
+                                                &mesh_group_info);
 
     Swizzle position_swizzle = { 0, 2, 1 };
     AttributeSwizzles attribute_swizzles = { .POSITION = &position_swizzle };
-    LoadMeshData(&mesh_datas[0], &free_list->allocator, "blender/cube.gltf",      &attribute_swizzles);
-    LoadMeshData(&mesh_datas[1], &free_list->allocator, "blender/quad.gltf",      &attribute_swizzles);
-    LoadMeshData(&mesh_datas[2], &free_list->allocator, "blender/icosphere.gltf", &attribute_swizzles);
-
-    InitArray(&g_render_state.meshes, &perm_stack->allocator, CTK_ARRAY_SIZE(mesh_datas));
-    InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
-    MeshGroupInfo mesh_group_info =
+    InitArray(&g_render_state.meshes, &perm_stack->allocator, MESH_COUNT);
+    CTK_ITER_PTR(mesh_path, MESH_PATHS, MESH_COUNT)
     {
-        .max_meshes     = MESH_COUNT,
-        .mem_properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    };
-    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, &mesh_group_info);
-    CTK_ITER_PTR(mesh_data, mesh_datas, CTK_ARRAY_SIZE(mesh_datas))
-    {
-        Push(&g_render_state.meshes, CreateMesh(g_render_state.mesh_group, &mesh_data->info));
-    }
-
-    InitMeshGroup(g_render_state.mesh_group, g_render_state.res_group);
-
-    // Load data into assets resources.
-    InitResourceGroup(g_render_state.res_group, temp_stack);
-
-    // Textures
-    for (uint32 i = 0; i < g_render_state.textures.count; ++i)
-    {
-        ImageData* texture_data = &texture_datas[i];
-        LoadImage(Get(&g_render_state.textures, i), g_render_state.staging_buffer, 0, texture_data);
-        DestroyImageData(texture_data);
-    }
-
-    // Meshes
-    for (uint32 i = 0; i < g_render_state.meshes.count; ++i)
-    {
-        LoadDeviceMesh(Get(&g_render_state.meshes, i), g_render_state.staging_buffer, &mesh_datas[i]);
+        MeshData mesh_data = {};
+        LoadMeshData(&mesh_data, &free_list->allocator, *mesh_path, &attribute_swizzles);
+        MeshHnd mesh = CreateMesh(g_render_state.mesh_group, &mesh_data.info);
+        Push(&g_render_state.meshes, mesh);
+        LoadDeviceMesh(mesh, g_render_state.staging_buffer, &mesh_data);
+        DestroyMeshData(&mesh_data, &free_list->allocator);
     }
 }
 

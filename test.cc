@@ -1,5 +1,3 @@
-#define USE_WIP
-
 #include "ctk3/ctk.h"
 
 #define RTK_ENABLE_VALIDATION
@@ -9,12 +7,7 @@ using namespace CTK;
 using namespace RTK;
 
 #include "rtk/tests/defs.h"
-
-#ifdef USE_WIP
-#include "rtk/tests/render_state_2.h"
-#else
 #include "rtk/tests/render_state.h"
-#endif
 #include "rtk/tests/game_state.h"
 
 sint32 main()
@@ -65,73 +58,6 @@ sint32 main()
     InitContext(perm_stack, temp_stack, free_list, &context_info);
 // LogPhysicalDevice(GetPhysicalDevice());
 
-// #ifdef USE_WIP
-//     InitResourceModule(&perm_stack->allocator, { .max_resource_groups = 1 });
-//     ResourceGroupInfo res_group_info =
-//     {
-//         .max_buffer_mems = 1,
-//         .max_image_mems  = 1,
-//         .max_buffers     = 2,
-//         .max_images      = 1,
-//     };
-//     ResourceGroupHnd res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
-//     BufferMemoryInfo host_buffer_mem_info =
-//     {
-//         .size       = Megabyte32<1>(),
-//         .flags      = 0,
-//         .usage      = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-//         .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-//     };
-//     BufferMemoryHnd host_buffer_mem = CreateBufferMemory(res_group, &host_buffer_mem_info);
-//     ImageMemoryInfo texture_mem_info =
-//     {
-//         .size       = Megabyte32<1>(),
-//         .flags      = 0,
-//         .usage      = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-//         .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-//         .format     = GetSwapchain()->surface_format.format,
-//         .tiling     = VK_IMAGE_TILING_OPTIMAL,
-//     };
-//     ImageMemoryHnd texture_mem = CreateImageMemory(res_group, &texture_mem_info);
-//     AllocateResourceMemory(res_group);
-
-//     BufferInfo buffer_info =
-//     {
-//         .size      = 256,
-//         .alignment = 1024,
-//         .per_frame = true,
-//     };
-//     CreateBuffer(host_buffer_mem, &buffer_info);
-//     CreateBuffer(host_buffer_mem, &buffer_info);
-
-//     ImageInfo texture_info =
-//     {
-//         .extent         = { 16, 16, 1 },
-//         .type           = VK_IMAGE_TYPE_2D,
-//         .mip_levels     = 1,
-//         .array_layers   = 1,
-//         .samples        = VK_SAMPLE_COUNT_1_BIT,
-//         .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
-//         .per_frame      = true,
-//     };
-//     ImageViewInfo texture_view_info =
-//     {
-//         .flags      = 0,
-//         .type       = VK_IMAGE_VIEW_TYPE_2D,
-//         .components = RGBA_COMPONENT_SWIZZLE_IDENTITY,
-//         .subresource_range =
-//         {
-//             .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-//             .baseMipLevel   = 0,
-//             .levelCount     = VK_REMAINING_MIP_LEVELS,
-//             .baseArrayLayer = 0,
-//             .layerCount     = VK_REMAINING_ARRAY_LAYERS,
-//         },
-//     };
-//     CreateImage(texture_mem, &texture_info, &texture_view_info);
-
-// LogResourceGroups();
-// #else
     // Initialize other test state.
     InitRenderState(perm_stack, temp_stack, free_list, thread_pool->size);
     InitGameState(perm_stack);
@@ -198,5 +124,4 @@ sint32 main()
             recreate_swapchain = false;
         }
     }
-// #endif
 }

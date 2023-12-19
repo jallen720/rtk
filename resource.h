@@ -27,8 +27,8 @@ struct BufferMemoryInfo
 struct BufferMemoryState
 {
     VkDeviceSize size;
-    VkDeviceSize offset;
     VkDeviceSize index;
+    VkDeviceSize res_mem_offset;
     uint32       res_mem_index;
     VkBuffer     buffer;
 };
@@ -51,7 +51,7 @@ struct BufferState
 
 struct BufferFrameState
 {
-    VkDeviceSize offset;
+    VkDeviceSize buffer_mem_offset;
     VkDeviceSize index;
 };
 
@@ -84,8 +84,8 @@ struct ImageMemoryInfo
 struct ImageMemoryState
 {
     VkDeviceSize size;
-    VkDeviceSize offset;
     VkDeviceSize index;
+    VkDeviceSize res_mem_offset;
     uint32       res_mem_index;
 };
 
@@ -119,7 +119,7 @@ struct ImageViewInfo
 
 struct ImageFrameState
 {
-    VkDeviceSize offset;
+    VkDeviceSize image_mem_offset;
     VkImage      image;
     VkImageView  view;
 };
@@ -267,8 +267,9 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
 
 static VkDeviceSize AllocateBufferMemory(BufferMemoryState* buffer_mem_state, BufferState* buffer_state)
 {
-    VkDeviceSize res_mem_relative_index = buffer_mem_state->offset + buffer_mem_state->index;
-    VkDeviceSize buffer_mem_offset = Align(res_mem_relative_index, buffer_state->alignment) - buffer_mem_state->offset;
+    VkDeviceSize res_mem_relative_index = buffer_mem_state->res_mem_offset + buffer_mem_state->index;
+    VkDeviceSize buffer_mem_offset =
+        Align(res_mem_relative_index, buffer_state->alignment) - buffer_mem_state->res_mem_offset;
     if (buffer_mem_offset + buffer_state->size > buffer_mem_state->size)
     {
         CTK_FATAL("can't allocate %u bytes from buffer memory at %u-byte aligned offset of %u: allocation would exceed "
@@ -283,8 +284,9 @@ static VkDeviceSize AllocateBufferMemory(BufferMemoryState* buffer_mem_state, Bu
 
 static VkDeviceSize AllocateImageMemory(ImageMemoryState* image_mem_state, ImageState* image_state)
 {
-    VkDeviceSize res_mem_relative_index = image_mem_state->offset + image_mem_state->index;
-    VkDeviceSize image_mem_offset = Align(res_mem_relative_index, image_state->alignment) - image_mem_state->offset;
+    VkDeviceSize res_mem_relative_index = image_mem_state->res_mem_offset + image_mem_state->index;
+    VkDeviceSize image_mem_offset =
+        Align(res_mem_relative_index, image_state->alignment) - image_mem_state->res_mem_offset;
     if (image_mem_offset + image_state->size > image_mem_state->size)
     {
         CTK_FATAL("can't allocate %u bytes from image memory at %u-byte aligned offset of %u: allocation would exceed "
@@ -545,11 +547,11 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
     uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_mem_info->properties);
     ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
     BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
-    buffer_mem_state->size          = mem_requirements.size;
-    buffer_mem_state->offset        = res_mem->size;
-    buffer_mem_state->index         = 0;
-    buffer_mem_state->res_mem_index = res_mem_index;
-    buffer_mem_state->buffer        = mem_buffer;
+    buffer_mem_state->size           = mem_requirements.size;
+    buffer_mem_state->index          = 0;
+    buffer_mem_state->res_mem_offset = res_mem->size;
+    buffer_mem_state->res_mem_index  = res_mem_index;
+    buffer_mem_state->buffer         = mem_buffer;
 
     // Increase resource memory size by buffer memory size.
     res_mem->size += mem_requirements.size;
@@ -615,10 +617,10 @@ static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMem
     uint32 res_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, image_mem_info->properties);
     ResourceMemory* res_mem = GetResourceMemory(res_group, res_mem_index);
     ImageMemoryState* image_mem_state = GetImageMemoryState(res_group, image_mem_index);
-    image_mem_state->size          = image_mem_info->size;
-    image_mem_state->offset        = res_mem->size;
-    image_mem_state->index         = 0;
-    image_mem_state->res_mem_index = res_mem_index;
+    image_mem_state->size           = image_mem_info->size;
+    image_mem_state->index          = 0;
+    image_mem_state->res_mem_offset = res_mem->size;
+    image_mem_state->res_mem_index  = res_mem_index;
 
     // Increase resource memory size by image memory size.
     res_mem->size += image_mem_info->size;
@@ -661,7 +663,7 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
     {
         BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
         ResourceMemory* res_mem = GetResourceMemory(res_group, buffer_mem_state->res_mem_index);
-        res = vkBindBufferMemory(device, buffer_mem_state->buffer, res_mem->device, buffer_mem_state->offset);
+        res = vkBindBufferMemory(device, buffer_mem_state->buffer, res_mem->device, buffer_mem_state->res_mem_offset);
         Validate(res, "vkBindBufferMemory() failed");
     }
 }
@@ -740,8 +742,8 @@ static BufferHnd CreateBuffer(BufferMemoryHnd buffer_mem_hnd, BufferInfo* buffer
     for (uint32 frame_index = 0; frame_index < buffer_state->frame_count; ++frame_index)
     {
         BufferFrameState* buffer_frame_state = GetBufferFrameState(res_group, buffer_index, frame_index);
-        buffer_frame_state->offset = AllocateBufferMemory(buffer_mem_state, buffer_state);
-        buffer_frame_state->index  = 0;
+        buffer_frame_state->buffer_mem_offset = AllocateBufferMemory(buffer_mem_state, buffer_state);
+        buffer_frame_state->index             = 0;
     }
 
     return hnd;
@@ -831,10 +833,10 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* image_info,
     {
         ImageFrameState* image_frame_state = GetImageFrameState(res_group, image_index, frame_index);
 
-        image_frame_state->offset = AllocateImageMemory(image_mem_state, image_state);
+        image_frame_state->image_mem_offset = AllocateImageMemory(image_mem_state, image_state);
 
         ResourceMemory* res_mem = GetResourceMemory(res_group, image_mem_state->res_mem_index);
-        uint32 res_mem_offset = image_mem_state->offset + image_frame_state->offset;
+        uint32 res_mem_offset = image_mem_state->res_mem_offset + image_frame_state->image_mem_offset;
         res = vkBindImageMemory(device, image_frame_state->image, res_mem->device, res_mem_offset);
         Validate(res, "vkBindImageMemory() failed");
     }
@@ -964,11 +966,11 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("                properties:");
             PrintMemoryPropertyFlags(buffer_mem_info->properties, 5);
             PrintLine("            state:");
-            PrintLine("                size:          %llu", buffer_mem_state->size);
-            PrintLine("                offset:        %llu", buffer_mem_state->offset);
-            PrintLine("                index:         %llu", buffer_mem_state->index);
-            PrintLine("                res_mem_index: %u",   buffer_mem_state->res_mem_index);
-            PrintLine("                buffer:        0x%p", buffer_mem_state->buffer);
+            PrintLine("                size:           %llu", buffer_mem_state->size);
+            PrintLine("                index:          %llu", buffer_mem_state->index);
+            PrintLine("                res_mem_offset: %llu", buffer_mem_state->res_mem_offset);
+            PrintLine("                res_mem_index:  %u",   buffer_mem_state->res_mem_index);
+            PrintLine("                buffer:         0x%p", buffer_mem_state->buffer);
         }
         for (uint32 image_mem_index = 0; image_mem_index < res_group->image_mem_count;
              image_mem_index += 1)
@@ -987,10 +989,10 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("                format: %s", VkFormatName(image_mem_info->format));
             PrintLine("                tiling: %s", VkImageTilingName(image_mem_info->tiling));
             PrintLine("            state:");
-            PrintLine("                size:          %llu", image_mem_state->size);
-            PrintLine("                offset:        %llu", image_mem_state->offset);
-            PrintLine("                index:         %llu", image_mem_state->index);
-            PrintLine("                res_mem_index: %u",   image_mem_state->res_mem_index);
+            PrintLine("                size:           %llu", image_mem_state->size);
+            PrintLine("                index:          %llu", image_mem_state->index);
+            PrintLine("                res_mem_offset: %llu", image_mem_state->res_mem_offset);
+            PrintLine("                res_mem_index:  %u",   image_mem_state->res_mem_index);
         }
         for (uint32 res_mem_index = 0; res_mem_index < VK_MAX_MEMORY_TYPES; ++res_mem_index)
         {
@@ -1026,8 +1028,8 @@ static void LogResourceGroups(uint32 start = 0)
             {
                 BufferFrameState* frame_state = GetBufferFrameState(res_group, buffer_index, frame_index);
                 PrintLine("                frame %u:", frame_index);
-                PrintLine("                    offset: %llu", frame_state->offset);
-                PrintLine("                    index:  %llu", frame_state->index);
+                PrintLine("                    buffer_mem_offset: %llu", frame_state->buffer_mem_offset);
+                PrintLine("                    index:             %llu", frame_state->index);
             }
             PrintLine();
         }
@@ -1094,9 +1096,9 @@ static void LogResourceGroups(uint32 start = 0)
             {
                 ImageFrameState* frame_state = GetImageFrameState(res_group, image_index, frame_index);
                 PrintLine("                frame %u:", frame_index);
-                PrintLine("                    offset: %llu", frame_state->offset);
-                PrintLine("                    image:  0x%p", frame_state->image);
-                PrintLine("                    view:   0x%p", frame_state->view);
+                PrintLine("                    image_mem_offset: %llu", frame_state->image_mem_offset);
+                PrintLine("                    image:            0x%p", frame_state->image);
+                PrintLine("                    view:             0x%p", frame_state->view);
             }
             PrintLine();
         }

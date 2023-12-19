@@ -95,7 +95,7 @@ static void BindDescriptorSets(VkCommandBuffer command_buffer, Pipeline* pipelin
 static void BindMeshGroup(VkCommandBuffer command_buffer, MeshGroupHnd mesh_group_hnd)
 {
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_hnd);
-    VkDeviceSize vertex_buffer_offset = GetOffset(mesh_group->vertex_buffer, 0);
+    VkDeviceSize vertex_buffer_offset = GetBufferMemoryOffset(mesh_group->vertex_buffer, 0);
     VkBuffer vertex_buffer = GetBuffer(mesh_group->vertex_buffer);
     vkCmdBindVertexBuffers(command_buffer,
                            0, // First Binding
@@ -104,7 +104,7 @@ static void BindMeshGroup(VkCommandBuffer command_buffer, MeshGroupHnd mesh_grou
                            &vertex_buffer_offset);
     vkCmdBindIndexBuffer(command_buffer,
                          GetBuffer(mesh_group->index_buffer),
-                         GetOffset(mesh_group->index_buffer, 0),
+                         GetBufferMemoryOffset(mesh_group->index_buffer, 0),
                          VK_INDEX_TYPE_UINT32);
 }
 

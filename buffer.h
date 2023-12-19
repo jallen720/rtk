@@ -68,7 +68,7 @@ static void WriteHostBuffer(HostBufferWrite* write, uint32 frame_index)
     ResourceMemory* buffer_mem = GetBufferResourceMemory(res_group, dst_index);
     CTK_ASSERT(buffer_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    uint8* dst = &buffer_mem->host[dst_frame_state->offset + write->dst_offset];
+    uint8* dst = &buffer_mem->host[dst_frame_state->buffer_mem_offset + write->dst_offset];
     uint8* src = &((uint8*)write->src_data)[write->src_offset];
     memcpy(dst, src, write->size);
 }
@@ -92,7 +92,7 @@ static void AppendHostBuffer(HostBufferAppend* append, uint32 frame_index)
     ResourceMemory* buffer_mem = GetBufferResourceMemory(res_group, dst_index);
     CTK_ASSERT(buffer_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    uint8* dst = &buffer_mem->host[dst_frame_state->offset + dst_frame_state->index];
+    uint8* dst = &buffer_mem->host[dst_frame_state->buffer_mem_offset + dst_frame_state->index];
     uint8* src = &((uint8*)append->src_data)[append->src_offset];
     memcpy(dst, src, append->size);
     dst_frame_state->index += append->size;
@@ -119,8 +119,8 @@ static void WriteDeviceBufferCmd(DeviceBufferWrite* write, uint32 frame_index)
     BufferFrameState* src_frame_state = GetBufferFrameState(res_group, src_index, frame_index);
     VkBufferCopy copy =
     {
-        .srcOffset = src_frame_state->offset + write->src_offset,
-        .dstOffset = dst_frame_state->offset + write->dst_offset,
+        .srcOffset = src_frame_state->buffer_mem_offset + write->src_offset,
+        .dstOffset = dst_frame_state->buffer_mem_offset + write->dst_offset,
         .size      = write->size,
     };
     vkCmdCopyBuffer(GetTempCommandBuffer(),
@@ -150,8 +150,8 @@ static void AppendDeviceBufferCmd(DeviceBufferAppend* append, uint32 frame_index
     BufferFrameState* src_frame_state = GetBufferFrameState(res_group, src_index, frame_index);
     VkBufferCopy copy =
     {
-        .srcOffset = src_frame_state->offset + append->src_offset,
-        .dstOffset = dst_frame_state->offset + dst_frame_state->index,
+        .srcOffset = src_frame_state->buffer_mem_offset + append->src_offset,
+        .dstOffset = dst_frame_state->buffer_mem_offset + dst_frame_state->index,
         .size      = append->size,
     };
     vkCmdCopyBuffer(GetTempCommandBuffer(),
@@ -184,14 +184,14 @@ static VkDeviceSize GetSize(BufferHnd hnd)
     return GetBufferInfo(GetResourceGroup(hnd), GetBufferIndex(hnd))->size;
 }
 
-static VkDeviceSize GetOffset(BufferHnd hnd, uint32 frame_index)
+static VkDeviceSize GetBufferMemoryOffset(BufferHnd hnd, uint32 frame_index)
 {
     ValidateBuffer(hnd, "can't get buffer offset");
 
     ResourceGroup* res_group = GetResourceGroup(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count);
 
-    return GetBufferFrameState(res_group, GetBufferIndex(hnd), frame_index)->offset;
+    return GetBufferFrameState(res_group, GetBufferIndex(hnd), frame_index)->buffer_mem_offset;
 }
 
 static VkDeviceSize GetIndex(BufferHnd hnd, uint32 frame_index)
@@ -226,7 +226,7 @@ static Type* GetHostMemory(BufferHnd hnd, uint32 frame_index)
     ResourceMemory* mem = GetBufferResourceMemory(res_group, buffer_index);
     CTK_ASSERT(mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
-    return (Type*)&mem->host[GetBufferFrameState(res_group, buffer_index, frame_index)->offset];
+    return (Type*)&mem->host[GetBufferFrameState(res_group, buffer_index, frame_index)->buffer_mem_offset];
 }
 
 static VkBuffer GetBuffer(BufferHnd hnd)

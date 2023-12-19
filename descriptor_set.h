@@ -217,7 +217,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                         Push(buffer_infos,
                              {
                                  .buffer = GetBuffer(*buffer_hnd),
-                                 .offset = GetOffset(*buffer_hnd, frame_index),
+                                 .offset = GetBufferMemoryOffset(*buffer_hnd, frame_index),
                                  .range  = GetSize(*buffer_hnd),
                              });
                     }

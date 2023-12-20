@@ -25,7 +25,7 @@ static void ValidateImage(ImageHnd hnd, const char* action)
     ValidateResourceGroup(res_group_index, action);
 
     ResourceGroup* res_group = GetResourceGroup(hnd);
-    uint32 image_index = GetImageIndex(hnd);
+    uint32 image_index = GetResourceIndex(hnd.index);
     if (image_index >= res_group->image_count)
     {
         CTK_FATAL("%s: image index %u exceeds image count of %u", action, image_index, res_group->image_count);
@@ -69,7 +69,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
 
     // Copy image data from buffer memory to image memory.
     ResourceGroup* res_group = GetResourceGroup(image_hnd);
-    uint32 image_index = GetImageIndex(image_hnd);
+    uint32 image_index = GetResourceIndex(image_hnd.index);
     uint32 staging_buffer_index = GetResourceIndex(staging_buffer_hnd.index);
     VkImage image = GetImageFrameState(res_group, image_index, frame_index)->image;
     BeginTempCommandBuffer();
@@ -163,7 +163,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
 static ImageInfo* GetInfo(ImageHnd hnd)
 {
     ValidateImage(hnd, "can't get image info");
-    return GetImageInfo(GetResourceGroup(hnd), GetImageIndex(hnd));
+    return GetImageInfo(GetResourceGroup(hnd), GetResourceIndex(hnd.index));
 }
 
 static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
@@ -173,5 +173,5 @@ static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
     ResourceGroup* res_group = GetResourceGroup(hnd);
     CTK_ASSERT(frame_index < res_group->frame_count)
 
-    return GetImageFrameState(res_group, GetImageIndex(hnd), frame_index)->view;
+    return GetImageFrameState(res_group, GetResourceIndex(hnd.index), frame_index)->view;
 }

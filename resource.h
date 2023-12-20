@@ -299,11 +299,6 @@ static VkDeviceSize AllocateImageMemory(ImageMemoryState* image_mem_state, Image
 
 /// Buffer Memory Utils
 ////////////////////////////////////////////////////////////
-static uint32 GetBufferMemoryIndex(BufferMemoryHnd hnd)
-{
-    return GetResourceIndex(hnd.index);
-}
-
 static ResourceGroup* GetResourceGroup(BufferMemoryHnd hnd)
 {
     return GetResourceGroup(GetResourceGroupIndex(hnd.index));
@@ -325,11 +320,42 @@ static void ValidateBufferMemory(BufferMemoryHnd hnd, const char* action)
     ValidateResourceGroup(res_group_index, action);
 
     ResourceGroup* res_group = GetResourceGroup(res_group_index);
-    uint32 buffer_mem_index = GetBufferMemoryIndex(hnd);
+    uint32 buffer_mem_index = GetResourceIndex(hnd.index);
     if (buffer_mem_index >= res_group->buffer_mem_count)
     {
         CTK_FATAL("%s: buffer memory index %u exceeds buffer memory count of %u",
                   action, buffer_mem_index, res_group->buffer_mem_count);
+    }
+}
+
+/// Image Memory Utils
+////////////////////////////////////////////////////////////
+static ResourceGroup* GetResourceGroup(ImageMemoryHnd hnd)
+{
+    return GetResourceGroup(GetResourceGroupIndex(hnd.index));
+}
+
+static ImageMemoryInfo* GetImageMemoryInfo(ResourceGroup* res_group, uint32 image_mem_index)
+{
+    return &res_group->image_mem_infos[image_mem_index];
+}
+
+static ImageMemoryState* GetImageMemoryState(ResourceGroup* res_group, uint32 image_mem_index)
+{
+    return &res_group->image_mem_states[image_mem_index];
+}
+
+static void ValidateImageMemory(ImageMemoryHnd hnd, const char* action)
+{
+    uint32 res_group_index = GetResourceGroupIndex(hnd.index);
+    ValidateResourceGroup(res_group_index, action);
+
+    ResourceGroup* res_group = GetResourceGroup(res_group_index);
+    uint32 image_mem_index = GetResourceIndex(hnd.index);
+    if (image_mem_index >= res_group->image_mem_count)
+    {
+        CTK_FATAL("%s: image memory index %u exceeds image memory count of %u",
+                  action, image_mem_index, res_group->image_mem_count);
     }
 }
 
@@ -367,49 +393,8 @@ static DeviceMemory* GetBufferDeviceMemory(ResourceGroup* res_group, uint32 buff
     return GetDeviceMemory(res_group, GetBufferMemoryState(res_group, buffer_mem_index)->dev_mem_index);
 }
 
-/// Image Memory Utils
-////////////////////////////////////////////////////////////
-static uint32 GetImageMemoryIndex(ImageMemoryHnd hnd)
-{
-    return GetResourceIndex(hnd.index);
-}
-
-static ResourceGroup* GetResourceGroup(ImageMemoryHnd hnd)
-{
-    return GetResourceGroup(GetResourceGroupIndex(hnd.index));
-}
-
-static ImageMemoryInfo* GetImageMemoryInfo(ResourceGroup* res_group, uint32 image_mem_index)
-{
-    return &res_group->image_mem_infos[image_mem_index];
-}
-
-static ImageMemoryState* GetImageMemoryState(ResourceGroup* res_group, uint32 image_mem_index)
-{
-    return &res_group->image_mem_states[image_mem_index];
-}
-
-static void ValidateImageMemory(ImageMemoryHnd hnd, const char* action)
-{
-    uint32 res_group_index = GetResourceGroupIndex(hnd.index);
-    ValidateResourceGroup(res_group_index, action);
-
-    ResourceGroup* res_group = GetResourceGroup(res_group_index);
-    uint32 image_mem_index = GetImageMemoryIndex(hnd);
-    if (image_mem_index >= res_group->image_mem_count)
-    {
-        CTK_FATAL("%s: image memory index %u exceeds image memory count of %u",
-                  action, image_mem_index, res_group->image_mem_count);
-    }
-}
-
 /// Image Utils
 ////////////////////////////////////////////////////////////
-static uint32 GetImageIndex(ImageHnd hnd)
-{
-    return GetResourceIndex(hnd.index);
-}
-
 static ResourceGroup* GetResourceGroup(ImageHnd hnd)
 {
     return GetResourceGroup(GetResourceGroupIndex(hnd.index));

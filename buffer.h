@@ -3,7 +3,7 @@
 struct HostBufferWrite
 {
     VkDeviceSize size;
-    void*        src_data;
+    uint8*       src_data;
     VkDeviceSize src_offset;
     BufferHnd    dst_hnd;
     VkDeviceSize dst_offset;
@@ -12,7 +12,7 @@ struct HostBufferWrite
 struct HostBufferAppend
 {
     VkDeviceSize size;
-    void*        src_data;
+    uint8*       src_data;
     VkDeviceSize src_offset;
     BufferHnd    dst_hnd;
 };
@@ -70,7 +70,7 @@ static void WriteHostBuffer(HostBufferWrite* write, uint32 frame_index)
     CTK_ASSERT(dev_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     uint8* dst = &dev_mem->mapped[dst_frame_state->buffer_mem_offset + write->dst_offset];
-    uint8* src = &((uint8*)write->src_data)[write->src_offset];
+    uint8* src = &write->src_data[write->src_offset];
     memcpy(dst, src, write->size);
 }
 
@@ -92,7 +92,7 @@ static void AppendHostBuffer(HostBufferAppend* append, uint32 frame_index)
     CTK_ASSERT(dev_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
 
     uint8* dst = &dev_mem->mapped[dst_frame_state->buffer_mem_offset + dst_frame_state->index];
-    uint8* src = &((uint8*)append->src_data)[append->src_offset];
+    uint8* src = &append->src_data[append->src_offset];
     memcpy(dst, src, append->size);
     dst_frame_state->index += append->size;
 }

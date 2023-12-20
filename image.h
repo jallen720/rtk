@@ -58,7 +58,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
 
     HostBufferWrite image_data_write =
     {
-        .size       = (uint32)image_data->size,
+        .size       = (VkDeviceSize)image_data->size,
         .src_data   = image_data->data,
         .src_offset = 0,
         .dst_hnd    = staging_buffer_hnd,

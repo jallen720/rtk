@@ -1,7 +1,40 @@
 /// Data
 ////////////////////////////////////////////////////////////
-struct MeshHnd      { uint32 index; };
+struct MeshHnd      { uint32 group_index : 8; uint32 index : 24; };
 struct MeshGroupHnd { uint32 index; };
+
+union Swizzle
+{
+    struct { uint8 x, y, z, w; };
+    uint8 array[4];
+};
+
+union AttributeSwizzles
+{
+    struct
+    {
+        Swizzle* POSITION;
+        Swizzle* NORMAL;
+        Swizzle* TANGENT;
+        Swizzle* TEXCOORD_0;
+        Swizzle* TEXCOORD_1;
+        Swizzle* TEXCOORD_2;
+        Swizzle* TEXCOORD_3;
+        Swizzle* COLOR_0;
+        Swizzle* COLOR_1;
+        Swizzle* COLOR_2;
+        Swizzle* COLOR_3;
+        Swizzle* JOINTS_0;
+        Swizzle* JOINTS_1;
+        Swizzle* JOINTS_2;
+        Swizzle* JOINTS_3;
+        Swizzle* WEIGHTS_0;
+        Swizzle* WEIGHTS_1;
+        Swizzle* WEIGHTS_2;
+        Swizzle* WEIGHTS_3;
+    };
+    Swizzle* array[(uint32)GLTFAttributeType::COUNT];
+};
 
 struct MeshInfo
 {
@@ -56,47 +89,14 @@ static Array<MeshGroup> g_mesh_groups;
 
 /// Utils
 ////////////////////////////////////////////////////////////
-static uint32 GetMeshIndex(MeshHnd mesh_hnd)
-{
-    return 0x00FFFFFF & mesh_hnd.index;
-}
-
-static uint32 GetMeshGroupIndex(MeshHnd mesh_hnd)
-{
-    return (0xFF000000 & mesh_hnd.index) >> 24;
-}
-
-static uint32 CreateMeshHndIndex(MeshGroupHnd mesh_group_hnd, uint32 mesh_index)
-{
-    return (mesh_group_hnd.index << 24) | mesh_index;
-}
-
 static MeshGroup* GetMeshGroup(uint32 mesh_group_index)
 {
-    return &g_mesh_groups.data[mesh_group_index];
+    return GetPtr(&g_mesh_groups, mesh_group_index);
 }
 
 static Mesh* GetMesh(MeshGroup* mesh_group, uint32 mesh_index)
 {
-    return &mesh_group->meshes.data[mesh_index];
-}
-
-static void ValidateMeshGroupIndex(uint32 mesh_group_index, const char* action)
-{
-    if (mesh_group_index >= g_mesh_groups.count)
-    {
-        CTK_FATAL("%s: mesh group index %u exceeds mesh group count of %u",
-                  action, mesh_group_index, g_mesh_groups.count);
-    }
-}
-
-static void ValidateMeshIndex(MeshGroup* mesh_group, uint32 mesh_group_index, uint32 mesh_index, const char* action)
-{
-    if (mesh_index >= mesh_group->meshes.count)
-    {
-        CTK_FATAL("%s: mesh index %u exceeds mesh group %u's mesh count of %u",
-                  action, mesh_index, mesh_group_index, mesh_group->meshes.count);
-    }
+    return GetPtr(&mesh_group->meshes, mesh_index);
 }
 
 static void ValidateMeshDataLoad(MeshGroup* mesh_group, uint32 mesh_group_index, uint32 vertex_buffer_size,
@@ -156,15 +156,16 @@ static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, BufferMemoryHnd 
 
 static MeshHnd CreateMesh(MeshGroupHnd mesh_group_hnd, MeshInfo* info)
 {
-    ValidateMeshGroupIndex(mesh_group_hnd.index, "can't create mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_hnd.index);
     if (mesh_group->meshes.count >= mesh_group->meshes.size)
     {
         CTK_FATAL("can't create mesh: already at max of %u", mesh_group->meshes.size);
     }
 
-    MeshHnd mesh_hnd = { .index = CreateMeshHndIndex(mesh_group_hnd, mesh_group->meshes.count) };
+    // Create mesh handle.
+    MeshHnd mesh_hnd = { .group_index = mesh_group_hnd.index, .index = mesh_group->meshes.count };
 
+    // Init mesh.
     BufferFrameState* vertex_buffer_frame_state = GetBufferFrameState(mesh_group->vertex_buffer, 0);
     BufferFrameState* index_buffer_frame_state  = GetBufferFrameState(mesh_group->index_buffer,  0);
     Mesh* mesh = Push(&mesh_group->meshes);
@@ -184,17 +185,13 @@ static MeshHnd CreateMesh(MeshGroupHnd mesh_group_hnd, MeshInfo* info)
 
 static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
 {
-    uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
-    ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
-    MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
+    MeshGroup* mesh_group = GetMeshGroup(mesh_hnd.group_index);
 
     uint32 vertex_buffer_size = mesh_data->info.vertex_size * mesh_data->info.vertex_count;
     uint32 index_buffer_size  = mesh_data->info.index_size  * mesh_data->info.index_count;
-    ValidateMeshDataLoad(mesh_group, mesh_group_index, vertex_buffer_size, index_buffer_size);
+    ValidateMeshDataLoad(mesh_group, mesh_hnd.group_index, vertex_buffer_size, index_buffer_size);
 
-    uint32 mesh_index = GetMeshIndex(mesh_hnd);
-    ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
-    Mesh* mesh = GetMesh(mesh_group, mesh_index);
+    Mesh* mesh = GetMesh(mesh_group, mesh_hnd.index);
 
     static constexpr uint32 FRAME_INDEX = 0;
     HostBufferWrite vertex_buffer_write =
@@ -219,17 +216,13 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
 
 static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshData* mesh_data)
 {
-    uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
-    ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
-    MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
+    MeshGroup* mesh_group = GetMeshGroup(mesh_hnd.group_index);
 
     uint32 vertex_buffer_size = mesh_data->info.vertex_size * mesh_data->info.vertex_count;
     uint32 index_buffer_size  = mesh_data->info.index_size  * mesh_data->info.index_count;
-    ValidateMeshDataLoad(mesh_group, mesh_group_index, vertex_buffer_size, index_buffer_size);
+    ValidateMeshDataLoad(mesh_group, mesh_hnd.group_index, vertex_buffer_size, index_buffer_size);
 
-    uint32 mesh_index = GetMeshIndex(mesh_hnd);
-    ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't load mesh");
-    Mesh* mesh = GetMesh(mesh_group, mesh_index);
+    Mesh* mesh = GetMesh(mesh_group, mesh_hnd.index);
 
     static constexpr uint32 FRAME_INDEX = 0;
     Clear(staging_buffer_hnd);
@@ -272,143 +265,6 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
         WriteDeviceBufferCmd(&index_buffer_write, FRAME_INDEX);
     SubmitTempCommandBuffer();
 }
-
-static MeshGroup* GetMeshGroup(MeshGroupHnd mesh_group_hnd)
-{
-    ValidateMeshGroupIndex(mesh_group_hnd.index, "can't get mesh");
-    return GetMeshGroup(mesh_group_hnd.index);
-}
-
-static Mesh* GetMesh(MeshHnd mesh_hnd)
-{
-    uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
-    ValidateMeshGroupIndex(mesh_group_index, "can't get mesh");
-    MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);
-
-    uint32 mesh_index = GetMeshIndex(mesh_hnd);
-    ValidateMeshIndex(mesh_group, mesh_group_index, mesh_index, "can't get mesh");
-    return GetMesh(mesh_group, mesh_index);
-}
-
-static void PrintAccessorValues(GLTF* gltf, GLTFAccessor* accessor, const char* name)
-{
-    GLTFBufferView* buffer_view = GetPtr(&gltf->buffer_views, accessor->buffer_view);
-    GLTFBuffer*     buffer      = GetPtr(&gltf->buffers,      buffer_view->buffer);
-
-    uint32 buffer_offset      = buffer_view->offset + accessor->offset;
-    uint32 buffer_view_offset = 0;
-    uint32 component_count    = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type];
-    uint32 attribute_size     = component_count * GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
-    uint32 attribute_index    = 0;
-    PrintLine("%s: ", name);
-    while (buffer_view_offset < buffer_view->size)
-    {
-        Print("    [%4u] ", attribute_index);
-        if (accessor->component_type == GLTFComponentType::FLOAT)
-        {
-            auto vector = (float32*)&buffer->data[buffer_offset + buffer_view_offset];
-            for (uint32 i = 0; i < component_count; ++i)
-            {
-                Print("%8.3f,", vector[i]);
-            }
-            PrintLine();
-        }
-        else if (accessor->component_type == GLTFComponentType::SIGNED_BYTE)
-        {
-            auto vector = (sint8*)&buffer->data[buffer_offset + buffer_view_offset];
-            for (uint32 i = 0; i < component_count; ++i)
-            {
-                Print("%8i,", vector[i]);
-            }
-            PrintLine();
-        }
-        else if (accessor->component_type == GLTFComponentType::SIGNED_SHORT)
-        {
-            auto vector = (sint16*)&buffer->data[buffer_offset + buffer_view_offset];
-            for (uint32 i = 0; i < component_count; ++i)
-            {
-                Print("%8i,", vector[i]);
-            }
-            PrintLine();
-        }
-        else if (accessor->component_type == GLTFComponentType::SIGNED_INT)
-        {
-            auto vector = (sint32*)&buffer->data[buffer_offset + buffer_view_offset];
-            for (uint32 i = 0; i < component_count; ++i)
-            {
-                Print("%8i,", vector[i]);
-            }
-            PrintLine();
-        }
-        else if (accessor->component_type == GLTFComponentType::UNSIGNED_BYTE)
-        {
-            auto vector = (uint8*)&buffer->data[buffer_offset + buffer_view_offset];
-            for (uint32 i = 0; i < component_count; ++i)
-            {
-                Print("%8u,", vector[i]);
-            }
-            PrintLine();
-        }
-        else if (accessor->component_type == GLTFComponentType::UNSIGNED_SHORT)
-        {
-            auto vector = (uint16*)&buffer->data[buffer_offset + buffer_view_offset];
-            for (uint32 i = 0; i < component_count; ++i)
-            {
-                Print("%8u,", vector[i]);
-            }
-            PrintLine();
-        }
-        else if (accessor->component_type == GLTFComponentType::UNSIGNED_INT)
-        {
-            auto vector = (uint32*)&buffer->data[buffer_offset + buffer_view_offset];
-            for (uint32 i = 0; i < component_count; ++i)
-            {
-                Print("%8u,", vector[i]);
-            }
-            PrintLine();
-        }
-        else
-        {
-            CTK_FATAL("unhandle GLTFComponentType: %u", (uint32)accessor->component_type);
-        }
-        ++attribute_index;
-
-        buffer_view_offset += attribute_size;
-    }
-}
-
-union Swizzle
-{
-    struct { uint8 x, y, z, w; };
-    uint8 array[4];
-};
-
-union AttributeSwizzles
-{
-    struct
-    {
-        Swizzle* POSITION;
-        Swizzle* NORMAL;
-        Swizzle* TANGENT;
-        Swizzle* TEXCOORD_0;
-        Swizzle* TEXCOORD_1;
-        Swizzle* TEXCOORD_2;
-        Swizzle* TEXCOORD_3;
-        Swizzle* COLOR_0;
-        Swizzle* COLOR_1;
-        Swizzle* COLOR_2;
-        Swizzle* COLOR_3;
-        Swizzle* JOINTS_0;
-        Swizzle* JOINTS_1;
-        Swizzle* JOINTS_2;
-        Swizzle* JOINTS_3;
-        Swizzle* WEIGHTS_0;
-        Swizzle* WEIGHTS_1;
-        Swizzle* WEIGHTS_2;
-        Swizzle* WEIGHTS_3;
-    };
-    Swizzle* array[(uint32)GLTFAttributeType::COUNT];
-};
 
 static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const char* path,
                          AttributeSwizzles* attribute_swizzles = NULL)
@@ -518,4 +374,103 @@ static void DestroyMeshData(MeshData* mesh_data, const Allocator* allocator)
 {
     Deallocate(allocator, mesh_data->vertex_buffer);
     Deallocate(allocator, mesh_data->index_buffer);
+}
+
+static MeshGroup* GetMeshGroup(MeshGroupHnd mesh_group_hnd)
+{
+    return GetMeshGroup(mesh_group_hnd.index);
+}
+
+static Mesh* GetMesh(MeshHnd mesh_hnd)
+{
+    return GetMesh(GetMeshGroup(mesh_hnd.group_index), mesh_hnd.index);
+}
+
+/// Debug
+////////////////////////////////////////////////////////////
+static void PrintAccessorValues(GLTF* gltf, GLTFAccessor* accessor, const char* name)
+{
+    GLTFBufferView* buffer_view = GetPtr(&gltf->buffer_views, accessor->buffer_view);
+    GLTFBuffer*     buffer      = GetPtr(&gltf->buffers,      buffer_view->buffer);
+
+    uint32 buffer_offset      = buffer_view->offset + accessor->offset;
+    uint32 buffer_view_offset = 0;
+    uint32 component_count    = GLTF_ACCESSOR_TYPE_COMPONENT_COUNTS[(uint32)accessor->type];
+    uint32 attribute_size     = component_count * GLTF_COMPONENT_TYPE_SIZES[(uint32)accessor->component_type];
+    uint32 attribute_index    = 0;
+    PrintLine("%s: ", name);
+    while (buffer_view_offset < buffer_view->size)
+    {
+        Print("    [%4u] ", attribute_index);
+        if (accessor->component_type == GLTFComponentType::FLOAT)
+        {
+            auto vector = (float32*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8.3f,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::SIGNED_BYTE)
+        {
+            auto vector = (sint8*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8i,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::SIGNED_SHORT)
+        {
+            auto vector = (sint16*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8i,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::SIGNED_INT)
+        {
+            auto vector = (sint32*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8i,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::UNSIGNED_BYTE)
+        {
+            auto vector = (uint8*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8u,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::UNSIGNED_SHORT)
+        {
+            auto vector = (uint16*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8u,", vector[i]);
+            }
+            PrintLine();
+        }
+        else if (accessor->component_type == GLTFComponentType::UNSIGNED_INT)
+        {
+            auto vector = (uint32*)&buffer->data[buffer_offset + buffer_view_offset];
+            for (uint32 i = 0; i < component_count; ++i)
+            {
+                Print("%8u,", vector[i]);
+            }
+            PrintLine();
+        }
+        else
+        {
+            CTK_FATAL("unhandle GLTFComponentType: %u", (uint32)accessor->component_type);
+        }
+        ++attribute_index;
+
+        buffer_view_offset += attribute_size;
+    }
 }

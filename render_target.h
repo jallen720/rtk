@@ -123,7 +123,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
 
         if (render_target->depth_testing)
         {
-            Push(attachments, GetView(render_target->depth_image, 0));
+            Push(attachments, GetImageView(render_target->depth_image, 0));
         }
 
         VkFramebufferCreateInfo info =

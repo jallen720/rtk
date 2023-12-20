@@ -239,7 +239,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                     {
                         VkDescriptorImageInfo* desc_image_info = Push(desc_image_infos);
                         desc_image_info->sampler     = VK_NULL_HANDLE;
-                        desc_image_info->imageView   = GetView(*image_hnd, frame_index);
+                        desc_image_info->imageView   = GetImageView(*image_hnd, frame_index);
                         desc_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                     }
                 }
@@ -250,7 +250,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                     {
                         VkDescriptorImageInfo* desc_image_info = Push(desc_image_infos);
                         desc_image_info->sampler     = data_binding->image_samplers.sampler;
-                        desc_image_info->imageView   = GetView(*image_hnd, frame_index);
+                        desc_image_info->imageView   = GetImageView(*image_hnd, frame_index);
                         desc_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                     }
                 }

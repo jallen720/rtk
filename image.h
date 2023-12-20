@@ -17,21 +17,18 @@ struct ImageData
     uint8* data;
 };
 
-/// Interface
+/// Utils
 ////////////////////////////////////////////////////////////
-static void ValidateImage(ImageHnd hnd, const char* action)
+static void ValidateImage(ResourceGroup* res_group, uint32 image_index, const char* action)
 {
-    uint32 res_group_index = GetResourceGroupIndex(hnd.index);
-    ValidateResourceGroup(res_group_index, action);
-
-    ResourceGroup* res_group = GetResourceGroup(GetResourceGroupIndex(hnd.index));
-    uint32 image_index = GetResourceIndex(hnd.index);
     if (image_index >= res_group->image_count)
     {
         CTK_FATAL("%s: image index %u exceeds image count of %u", action, image_index, res_group->image_count);
     }
 }
 
+/// Interface
+////////////////////////////////////////////////////////////
 static void LoadImageData(ImageData* image_data, const char* path)
 {
     image_data->data = stbi_load(path, &image_data->width, &image_data->height, &image_data->channel_count, 0);
@@ -55,8 +52,9 @@ static void DestroyImageData(ImageData* image_data)
 
 static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 frame_index, ImageData* image_data)
 {
-    ValidateImage(image_hnd, "can't load image");
-    ValidateBuffer(staging_buffer_hnd, "can't load image from buffer");
+    ResourceGroup* res_group = GetResourceGroup(image_hnd.group_index);
+    ValidateImage(res_group, image_hnd.index, "can't load image");
+    ValidateBuffer(res_group, staging_buffer_hnd.index, "can't load image from buffer");
 
     HostBufferWrite image_data_write =
     {
@@ -68,10 +66,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
     WriteHostBuffer(&image_data_write, frame_index);
 
     // Copy image data from buffer memory to image memory.
-    ResourceGroup* res_group = GetResourceGroup(GetResourceGroupIndex(image_hnd.index));
-    uint32 image_index = GetResourceIndex(image_hnd.index);
-    uint32 staging_buffer_index = GetResourceIndex(staging_buffer_hnd.index);
-    VkImage image = GetImageFrameState(res_group, image_index, frame_index)->image;
+    VkImage image = GetImageFrameState(res_group, image_hnd.index, frame_index)->image;
     BeginTempCommandBuffer();
         // Transition image layout for use in shader.
         VkImageMemoryBarrier pre_copy_mem_barrier =
@@ -122,9 +117,9 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
                 .y = 0,
                 .z = 0,
             },
-            .imageExtent = GetImageInfo(res_group, image_index)->extent,
+            .imageExtent = GetImageInfo(res_group, image_hnd.index)->extent,
         };
-        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBuffer(res_group, staging_buffer_index), image,
+        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBuffer(res_group, staging_buffer_hnd.index), image,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition image layout for use in shader.
@@ -160,18 +155,12 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
     SubmitTempCommandBuffer();
 }
 
-static ImageInfo* GetInfo(ImageHnd hnd)
+static VkImageView GetImageView(ImageHnd image_hnd, uint32 frame_index)
 {
-    ValidateImage(hnd, "can't get image info");
-    return GetImageInfo(GetResourceGroup(GetResourceGroupIndex(hnd.index)), GetResourceIndex(hnd.index));
-}
+    ResourceGroup* res_group = GetResourceGroup(image_hnd.group_index);
+    ValidateImage(res_group, image_hnd.index, "can't get image view");
 
-static VkImageView GetView(ImageHnd hnd, uint32 frame_index)
-{
-    ValidateImage(hnd, "can't get image view");
-
-    ResourceGroup* res_group = GetResourceGroup(GetResourceGroupIndex(hnd.index));
     CTK_ASSERT(frame_index < res_group->frame_count)
 
-    return GetImageFrameState(res_group, GetResourceIndex(hnd.index), frame_index)->view;
+    return GetImageFrameState(res_group, image_hnd.index, frame_index)->view;
 }

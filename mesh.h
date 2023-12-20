@@ -219,8 +219,6 @@ static void LoadHostMesh(MeshHnd mesh_hnd, MeshData* mesh_data)
 
 static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshData* mesh_data)
 {
-    ValidateBuffer(staging_buffer_hnd, "can't load mesh from buffer");
-
     uint32 mesh_group_index = GetMeshGroupIndex(mesh_hnd);
     ValidateMeshGroupIndex(mesh_group_index, "can't load mesh");
     MeshGroup* mesh_group = GetMeshGroup(mesh_group_index);

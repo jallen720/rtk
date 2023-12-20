@@ -299,11 +299,6 @@ static VkDeviceSize AllocateImageMemory(ImageMemoryState* image_mem_state, Image
 
 /// Buffer Memory Utils
 ////////////////////////////////////////////////////////////
-static ResourceGroup* GetResourceGroup(BufferMemoryHnd hnd)
-{
-    return GetResourceGroup(GetResourceGroupIndex(hnd.index));
-}
-
 static BufferMemoryInfo* GetBufferMemoryInfo(ResourceGroup* res_group, uint32 buffer_mem_index)
 {
     return &res_group->buffer_mem_infos[buffer_mem_index];
@@ -330,11 +325,6 @@ static void ValidateBufferMemory(BufferMemoryHnd hnd, const char* action)
 
 /// Image Memory Utils
 ////////////////////////////////////////////////////////////
-static ResourceGroup* GetResourceGroup(ImageMemoryHnd hnd)
-{
-    return GetResourceGroup(GetResourceGroupIndex(hnd.index));
-}
-
 static ImageMemoryInfo* GetImageMemoryInfo(ResourceGroup* res_group, uint32 image_mem_index)
 {
     return &res_group->image_mem_infos[image_mem_index];
@@ -361,11 +351,6 @@ static void ValidateImageMemory(ImageMemoryHnd hnd, const char* action)
 
 /// Buffer Utils
 ////////////////////////////////////////////////////////////
-static ResourceGroup* GetResourceGroup(BufferHnd hnd)
-{
-    return GetResourceGroup(GetResourceGroupIndex(hnd.index));
-}
-
 static BufferInfo* GetBufferInfo(ResourceGroup* res_group, uint32 buffer_index)
 {
     return &res_group->buffer_infos[buffer_index];
@@ -395,11 +380,6 @@ static DeviceMemory* GetBufferDeviceMemory(ResourceGroup* res_group, uint32 buff
 
 /// Image Utils
 ////////////////////////////////////////////////////////////
-static ResourceGroup* GetResourceGroup(ImageHnd hnd)
-{
-    return GetResourceGroup(GetResourceGroupIndex(hnd.index));
-}
-
 static ImageInfo* GetImageInfo(ResourceGroup* res_group, uint32 image_index)
 {
     return &res_group->image_infos[image_index];

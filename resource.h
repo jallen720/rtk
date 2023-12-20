@@ -346,12 +346,17 @@ static ImageFrameState* GetImageFrameState(ResourceGroup* res_group, uint32 imag
 ////////////////////////////////////////////////////////////
 static void InitResourceModule(const Allocator* allocator, ResourceModuleInfo info)
 {
+    CTK_ASSERT(info.max_resource_groups <= MAX_RESOURCE_GROUPS);
     InitArray(&g_res_groups, allocator, info.max_resource_groups);
 }
 
 static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, ResourceGroupInfo* info)
 {
-    PrintLine("CreateResourceGroup()");
+    CTK_ASSERT(info->max_buffer_mems <= MAX_RESOURCES);
+    CTK_ASSERT(info->max_image_mems  <= MAX_RESOURCES);
+    CTK_ASSERT(info->max_buffers     <= MAX_RESOURCES);
+    CTK_ASSERT(info->max_images      <= MAX_RESOURCES);
+
     ResourceGroupHnd hnd = { .index = g_res_groups.count };
     ResourceGroup* res_group = Push(&g_res_groups);
 

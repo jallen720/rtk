@@ -171,6 +171,9 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="rtk.h" />
     <ClInclude Include="shader.h" />
+    <ClInclude Include="tests\defs.h" />
+    <ClInclude Include="tests\game_state.h" />
+    <ClInclude Include="tests\render_state.h" />
     <ClInclude Include="vk_array.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

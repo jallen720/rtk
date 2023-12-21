@@ -544,10 +544,7 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
     for (uint32 dev_mem_index = 0; dev_mem_index < VK_MAX_MEMORY_TYPES; ++dev_mem_index)
     {
         DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
-        if (dev_mem->size == 0)
-        {
-            continue;
-        }
+        if (dev_mem->size == 0) { continue; }
 
         // Allocate memory.
         dev_mem->properties = physical_device->mem_properties.memoryTypes[dev_mem_index].propertyFlags;

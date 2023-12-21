@@ -32,7 +32,6 @@ struct BufferMemoryState
     VkDeviceSize index;
     VkDeviceSize dev_mem_offset;
     uint32       dev_mem_index;
-    VkBuffer     buffer;
 };
 
 struct BufferInfo
@@ -133,6 +132,8 @@ struct DeviceMemory
     VkMemoryPropertyFlags properties;
     VkDeviceMemory        hnd;
     uint8*                mapped;
+    VkBufferUsageFlags    buffer_usage;
+    VkBuffer              buffer;
 };
 
 struct ResourceGroupInfo
@@ -316,7 +317,10 @@ static BufferFrameState* GetBufferFrameState(ResourceGroup* res_group, uint32 bu
 
 static VkBuffer GetBuffer(ResourceGroup* res_group, uint32 buffer_index)
 {
-    return res_group->buffer_mem_states[GetBufferState(res_group, buffer_index)->buffer_mem_index].buffer;
+    BufferState*       buffer_state     = GetBufferState      (res_group, buffer_index);
+    BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_state->buffer_mem_index);
+    DeviceMemory*      dev_mem          = GetDeviceMemory     (res_group, buffer_mem_state->dev_mem_index);
+    return dev_mem->buffer;
 }
 
 /// Image Utils
@@ -423,7 +427,7 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
     // Copy info.
     *GetBufferMemoryInfo(res_group, buffer_mem_hnd.index) = *buffer_mem_info;
 
-    // Create buffer to get memory requirements and for usage by buffer memory.
+    // Create dummy buffer to get memory requirements.
     VkBufferCreateInfo buffer_create_info = {};
     buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_create_info.pNext = NULL;
@@ -442,11 +446,12 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
         buffer_create_info.queueFamilyIndexCount = 0;
         buffer_create_info.pQueueFamilyIndices   = NULL;
     }
-    VkBuffer mem_buffer = VK_NULL_HANDLE;
-    res = vkCreateBuffer(device, &buffer_create_info, NULL, &mem_buffer);
+    VkBuffer temp = VK_NULL_HANDLE;
+    res = vkCreateBuffer(device, &buffer_create_info, NULL, &temp);
     Validate(res, "vkCreateBuffer() failed");
     VkMemoryRequirements mem_requirements = {};
-    vkGetBufferMemoryRequirements(device, mem_buffer, &mem_requirements);
+    vkGetBufferMemoryRequirements(device, temp, &mem_requirements);
+    vkDestroyBuffer(device, temp, NULL);
 
     // Initialize buffer memory state.
     uint32 dev_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_mem_info->properties);
@@ -456,10 +461,10 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
     buffer_mem_state->index          = 0;
     buffer_mem_state->dev_mem_offset = dev_mem->size;
     buffer_mem_state->dev_mem_index  = dev_mem_index;
-    buffer_mem_state->buffer         = mem_buffer;
 
     // Increase resource memory size by buffer memory size.
-    dev_mem->size += mem_requirements.size;
+    dev_mem->size         += mem_requirements.size;
+    dev_mem->buffer_usage |= buffer_mem_info->usage;
 
     return buffer_mem_hnd;
 }
@@ -546,24 +551,52 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
         DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
         if (dev_mem->size == 0) { continue; }
 
-        // Allocate memory.
+        // Cache properties for device memory type for easy access.
         dev_mem->properties = physical_device->mem_properties.memoryTypes[dev_mem_index].propertyFlags;
-        dev_mem->hnd        = AllocateDeviceMemory(dev_mem_index, dev_mem->size, NULL);
+
+        // Create buffer to be used by buffer resources suballocated from this device memory. This is done first to
+        // get memory requirements in case required size is large than device memory size.
+        if (dev_mem->buffer_usage != 0)
+        {
+            VkBufferCreateInfo buffer_create_info = {};
+            buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            buffer_create_info.pNext = NULL;
+            buffer_create_info.flags = 0;
+            buffer_create_info.size  = dev_mem->size;
+            buffer_create_info.usage = dev_mem->buffer_usage;
+            if (queue_families->graphics != queue_families->present)
+            {
+                buffer_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
+                buffer_create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
+                buffer_create_info.pQueueFamilyIndices   = (uint32*)queue_families;
+            }
+            else
+            {
+                buffer_create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
+                buffer_create_info.queueFamilyIndexCount = 0;
+                buffer_create_info.pQueueFamilyIndices   = NULL;
+            }
+            res = vkCreateBuffer(device, &buffer_create_info, NULL, &dev_mem->buffer);
+            Validate(res, "vkCreateBuffer() failed");
+            VkMemoryRequirements mem_requirements = {};
+            vkGetBufferMemoryRequirements(device, dev_mem->buffer, &mem_requirements);
+            dev_mem->size = mem_requirements.size;
+        }
+
+        dev_mem->hnd = AllocateDeviceMemory(dev_mem_index, dev_mem->size, NULL);
 
         // Map host visible memory.
         if (dev_mem->properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT)
         {
             vkMapMemory(device, dev_mem->hnd, 0, dev_mem->size, 0, (void**)&dev_mem->mapped);
         }
-    }
 
-    // Bind buffer-memory buffers to memory.
-    for (uint32 buffer_mem_index = 0; buffer_mem_index < res_group->buffer_mem_count; buffer_mem_index += 1)
-    {
-        BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
-        DeviceMemory* dev_mem = GetDeviceMemory(res_group, buffer_mem_state->dev_mem_index);
-        res = vkBindBufferMemory(device, buffer_mem_state->buffer, dev_mem->hnd, buffer_mem_state->dev_mem_offset);
-        Validate(res, "vkBindBufferMemory() failed");
+        // Bind memory to buffer.
+        if (dev_mem->buffer_usage != 0)
+        {
+            res = vkBindBufferMemory(device, dev_mem->buffer, dev_mem->hnd, 0);
+            Validate(res, "vkBindBufferMemory() failed");
+        }
     }
 }
 
@@ -807,13 +840,6 @@ static void DeallocateResourceGroup(ResourceGroupHnd res_group_hnd)
         }
     }
 
-    // Destroy buffer-memory buffers.
-    for (uint32 buffer_mem_index = 0; buffer_mem_index < res_group->buffer_mem_count; ++buffer_mem_index)
-    {
-        BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
-        vkDestroyBuffer(device, buffer_mem_state->buffer, NULL);
-    }
-
     // Free resouce memory.
     for (uint32 mem_index = 0; mem_index < VK_MAX_MEMORY_TYPES; ++mem_index)
     {
@@ -825,6 +851,11 @@ static void DeallocateResourceGroup(ResourceGroupHnd res_group_hnd)
             vkUnmapMemory(device, dev_mem->hnd);
         }
         vkFreeMemory(device, dev_mem->hnd, NULL);
+
+        if (dev_mem->buffer_usage != 0)
+        {
+            vkDestroyBuffer(device, dev_mem->buffer, NULL);
+        }
     }
 
     // Zero resource memory so sizes are set to 0 to prevent usage of freed resource memory.
@@ -866,7 +897,6 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("                index:          %llu", buffer_mem_state->index);
             PrintLine("                dev_mem_offset: %llu", buffer_mem_state->dev_mem_offset);
             PrintLine("                dev_mem_index:  %u",   buffer_mem_state->dev_mem_index);
-            PrintLine("                buffer:         0x%p", buffer_mem_state->buffer);
         }
         for (uint32 image_mem_index = 0; image_mem_index < res_group->image_mem_count;
              image_mem_index += 1)
@@ -896,10 +926,13 @@ static void LogResourceGroups(uint32 start = 0)
             if (dev_mem->size == 0) { continue; }
 
             PrintLine("        resource memory %u:", dev_mem_index);
-            PrintLine("             size:   %llu", dev_mem->size);
-            PrintLine("             hnd:    0x%p", dev_mem->hnd);
-            PrintLine("             mapped: 0x%p", dev_mem->mapped);
-            PrintLine("             properties: ");
+            PrintLine("            size:   %llu", dev_mem->size);
+            PrintLine("            hnd:    0x%p", dev_mem->hnd);
+            PrintLine("            mapped: 0x%p", dev_mem->mapped);
+            PrintLine("            buffer: 0x%p", dev_mem->buffer);
+            PrintLine("            buffer_usage:");
+            PrintBufferUsageFlags(dev_mem->buffer_usage, 4);
+            PrintLine("            properties: ");
             PrintMemoryPropertyFlags(dev_mem->properties, 4);
         }
 

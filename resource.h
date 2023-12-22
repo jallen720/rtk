@@ -18,23 +18,17 @@ struct ResourceGroupHnd { uint32 index; };
 // set in usage2 are a subset of the bits set in usage1, and they have the same flags and
 // VkExternalMemoryBufferCreateInfo::handleTypes, then the bits set in memoryTypeBits returned for usage1 must be a
 // subset of the bits set in memoryTypeBits returned for usage2, for all values of flags.
-struct BufferMemoryInfo
+struct BufferInfo
 {
     VkDeviceSize          size;
+    VkDeviceSize          alignment;
+    bool                  per_frame;
     VkBufferCreateFlags   flags;
     VkBufferUsageFlags    usage;
     VkMemoryPropertyFlags properties;
 };
 
-struct BufferMemoryState
-{
-    VkDeviceSize size;
-    VkDeviceSize index;
-    VkDeviceSize dev_mem_offset;
-    uint32       dev_mem_index;
-};
-
-struct BufferInfo
+struct ChildBufferInfo
 {
     VkDeviceSize size;
     VkDeviceSize alignment;
@@ -45,14 +39,14 @@ struct BufferState
 {
     VkDeviceSize size;
     VkDeviceSize alignment;
-    uint32       buffer_mem_index;
+    uint32       dev_mem_index;
     uint32       frame_stride;
     uint32       frame_count;
 };
 
 struct BufferFrameState
 {
-    VkDeviceSize buffer_mem_offset;
+    VkDeviceSize dev_mem_offset;
     VkDeviceSize index;
 };
 
@@ -138,29 +132,24 @@ struct DeviceMemory
 
 struct ResourceGroupInfo
 {
-    uint32 max_buffer_mems;
-    uint32 max_image_mems;
+    // uint32 max_buffer_mems;
     uint32 max_buffers;
+    uint32 max_image_mems;
     uint32 max_images;
 };
 
 struct ResourceGroup
 {
-    uint32             max_buffer_mems;
-    uint32             buffer_mem_count;
-    BufferMemoryInfo*  buffer_mem_infos;
-    BufferMemoryState* buffer_mem_states;
-
-    uint32             max_image_mems;
-    uint32             image_mem_count;
-    ImageMemoryInfo*   image_mem_infos;
-    ImageMemoryState*  image_mem_states;
-
     uint32             max_buffers;
     uint32             buffer_count;
     BufferInfo*        buffer_infos;        // size: max_buffers
     BufferState*       buffer_states;       // size: max_buffers
     BufferFrameState*  buffer_frame_states; // size: max_buffers * frame_count
+
+    uint32             max_image_mems;
+    uint32             image_mem_count;
+    ImageMemoryInfo*   image_mem_infos;
+    ImageMemoryState*  image_mem_states;
 
     uint32             max_images;
     uint32             image_count;
@@ -240,23 +229,6 @@ static VkDeviceMemory AllocateDeviceMemory(uint32 mem_type_index, VkDeviceSize s
     return mem;
 }
 
-static VkDeviceSize AllocateBufferMemory(BufferMemoryState* buffer_mem_state, BufferState* buffer_state)
-{
-    VkDeviceSize dev_mem_relative_index = buffer_mem_state->dev_mem_offset + buffer_mem_state->index;
-    VkDeviceSize buffer_mem_offset =
-        Align(dev_mem_relative_index, buffer_state->alignment) - buffer_mem_state->dev_mem_offset;
-    if (buffer_mem_offset + buffer_state->size > buffer_mem_state->size)
-    {
-        CTK_FATAL("can't allocate %u bytes from buffer memory at %u-byte aligned offset of %u: allocation would exceed "
-                  "buffer memory size of %u",
-                  buffer_state->size, buffer_state->alignment, buffer_mem_offset, buffer_mem_state->size);
-    }
-
-    buffer_mem_state->index = buffer_mem_offset + buffer_state->size;
-    return buffer_mem_offset;
-}
-
-
 static VkDeviceSize AllocateImageMemory(ImageMemoryState* image_mem_state, ImageState* image_state)
 {
     VkDeviceSize dev_mem_relative_index = image_mem_state->dev_mem_offset + image_mem_state->index;
@@ -271,30 +243,6 @@ static VkDeviceSize AllocateImageMemory(ImageMemoryState* image_mem_state, Image
 
     image_mem_state->index = image_mem_offset + image_state->size;
     return image_mem_offset;
-}
-
-/// Buffer Memory Utils
-////////////////////////////////////////////////////////////
-static BufferMemoryInfo* GetBufferMemoryInfo(ResourceGroup* res_group, uint32 buffer_mem_index)
-{
-    return &res_group->buffer_mem_infos[buffer_mem_index];
-}
-
-static BufferMemoryState* GetBufferMemoryState(ResourceGroup* res_group, uint32 buffer_mem_index)
-{
-    return &res_group->buffer_mem_states[buffer_mem_index];
-}
-
-/// Image Memory Utils
-////////////////////////////////////////////////////////////
-static ImageMemoryInfo* GetImageMemoryInfo(ResourceGroup* res_group, uint32 image_mem_index)
-{
-    return &res_group->image_mem_infos[image_mem_index];
-}
-
-static ImageMemoryState* GetImageMemoryState(ResourceGroup* res_group, uint32 image_mem_index)
-{
-    return &res_group->image_mem_states[image_mem_index];
 }
 
 /// Buffer Utils
@@ -317,10 +265,19 @@ static BufferFrameState* GetBufferFrameState(ResourceGroup* res_group, uint32 bu
 
 static VkBuffer GetBuffer(ResourceGroup* res_group, uint32 buffer_index)
 {
-    BufferState*       buffer_state     = GetBufferState      (res_group, buffer_index);
-    BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_state->buffer_mem_index);
-    DeviceMemory*      dev_mem          = GetDeviceMemory     (res_group, buffer_mem_state->dev_mem_index);
-    return dev_mem->buffer;
+    return GetDeviceMemory(res_group, GetBufferState(res_group, buffer_index)->dev_mem_index)->buffer;
+}
+
+/// Image Memory Utils
+////////////////////////////////////////////////////////////
+static ImageMemoryInfo* GetImageMemoryInfo(ResourceGroup* res_group, uint32 image_mem_index)
+{
+    return &res_group->image_mem_infos[image_mem_index];
+}
+
+static ImageMemoryState* GetImageMemoryState(ResourceGroup* res_group, uint32 image_mem_index)
+{
+    return &res_group->image_mem_states[image_mem_index];
 }
 
 /// Image Utils
@@ -356,9 +313,9 @@ static void InitResourceModule(const Allocator* allocator, ResourceModuleInfo in
 
 static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, ResourceGroupInfo* info)
 {
-    CTK_ASSERT(info->max_buffer_mems <= MAX_RESOURCES);
-    CTK_ASSERT(info->max_image_mems  <= MAX_RESOURCES);
+    // CTK_ASSERT(info->max_buffer_mems <= MAX_RESOURCES);
     CTK_ASSERT(info->max_buffers     <= MAX_RESOURCES);
+    CTK_ASSERT(info->max_image_mems  <= MAX_RESOURCES);
     CTK_ASSERT(info->max_images      <= MAX_RESOURCES);
 
     ResourceGroupHnd hnd = { .index = g_res_groups.count };
@@ -366,13 +323,21 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
 
     uint32 frame_count = GetFrameCount();
 
-    // Resource Memory Data
-    res_group->max_buffer_mems  = info->max_buffer_mems;
-    res_group->buffer_mem_count = 0;
-    if (res_group->max_buffer_mems > 0)
+    // res_group->max_buffer_mems  = info->max_buffer_mems;
+    // res_group->buffer_mem_count = 0;
+    // if (res_group->max_buffer_mems > 0)
+    // {
+    //     res_group->buffer_mem_infos  = Allocate<BufferMemoryInfo> (allocator, info->max_buffer_mems);
+    //     res_group->buffer_mem_states = Allocate<BufferMemoryState>(allocator, info->max_buffer_mems);
+    // }
+
+    res_group->max_buffers  = info->max_buffers;
+    res_group->buffer_count = 0;
+    if (res_group->max_buffers > 0)
     {
-        res_group->buffer_mem_infos  = Allocate<BufferMemoryInfo> (allocator, info->max_buffer_mems);
-        res_group->buffer_mem_states = Allocate<BufferMemoryState>(allocator, info->max_buffer_mems);
+        res_group->buffer_infos        = Allocate<BufferInfo>      (allocator, info->max_buffers);
+        res_group->buffer_states       = Allocate<BufferState>     (allocator, info->max_buffers);
+        res_group->buffer_frame_states = Allocate<BufferFrameState>(allocator, info->max_buffers * frame_count);
     }
 
     res_group->max_image_mems  = info->max_image_mems;
@@ -381,16 +346,6 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
     {
         res_group->image_mem_infos  = Allocate<ImageMemoryInfo> (allocator, info->max_image_mems);
         res_group->image_mem_states = Allocate<ImageMemoryState>(allocator, info->max_image_mems);
-    }
-
-    // Resource Data
-    res_group->max_buffers  = info->max_buffers;
-    res_group->buffer_count = 0;
-    if (res_group->max_buffers > 0)
-    {
-        res_group->buffer_infos        = Allocate<BufferInfo>      (allocator, info->max_buffers);
-        res_group->buffer_states       = Allocate<BufferState>     (allocator, info->max_buffers);
-        res_group->buffer_frame_states = Allocate<BufferFrameState>(allocator, info->max_buffers * frame_count);
     }
 
     res_group->max_images  = info->max_images;
@@ -408,32 +363,66 @@ static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, Resource
     return hnd;
 }
 
-static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, BufferMemoryInfo* buffer_mem_info)
+static void SetMinAlignmentIfRequested(BufferInfo* buffer_info, BufferState* buffer_state)
 {
-    ResourceGroup* res_group = GetResourceGroup(res_group_hnd.index);
-    if (res_group->buffer_mem_count >= res_group->max_buffer_mems)
+    // Set alignment to be minimum alignment for memory usage if requested.
+    // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
+    if (buffer_state->alignment == USE_MIN_OFFSET_ALIGNMENT)
     {
-        CTK_FATAL("can't create buffer memory: already at max of %u", res_group->max_buffer_mems);
-    }
+        VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
+        buffer_state->alignment = 16;
 
+        // Uniform
+        if ((buffer_info->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
+            buffer_state->alignment < physical_device_limits->minUniformBufferOffsetAlignment)
+        {
+            buffer_state->alignment = physical_device_limits->minUniformBufferOffsetAlignment;
+        }
+
+        // Storage
+        if ((buffer_info->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
+            buffer_state->alignment < physical_device_limits->minStorageBufferOffsetAlignment)
+        {
+            buffer_state->alignment = physical_device_limits->minStorageBufferOffsetAlignment;
+        }
+
+        // Texel
+        VkBufferUsageFlags texel_usage_flags = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
+                                               VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+        if ((buffer_info->usage & texel_usage_flags) &&
+            buffer_state->alignment < physical_device_limits->minTexelBufferOffsetAlignment)
+        {
+            buffer_state->alignment = physical_device_limits->minTexelBufferOffsetAlignment;
+        }
+    }
+}
+
+static BufferHnd CreateBuffer(ResourceGroupHnd res_group_hnd, BufferInfo* buffer_info)
+{
     VkDevice device = GetDevice();
     QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
     VkResult res = VK_SUCCESS;
 
+    ResourceGroup* res_group = GetResourceGroup(res_group_hnd.index);
+    if (res_group->buffer_count >= res_group->max_buffers)
+    {
+        CTK_FATAL("can't create buffer: already at max of %u buffers", res_group->max_buffers);
+    }
+
     // Create handle.
-    BufferMemoryHnd buffer_mem_hnd = { .group_index = res_group_hnd.index, .index = res_group->buffer_mem_count };
-    res_group->buffer_mem_count += 1;
+    BufferHnd buffer_hnd = { .group_index = res_group_hnd.index, .index = res_group->buffer_count };
+    res_group->buffer_count += 1;
 
     // Copy info.
-    *GetBufferMemoryInfo(res_group, buffer_mem_hnd.index) = *buffer_mem_info;
+    *GetBufferInfo(res_group, buffer_hnd.index) = *buffer_info;
 
     // Create dummy buffer to get memory requirements.
     VkBufferCreateInfo buffer_create_info = {};
     buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_create_info.pNext = NULL;
     buffer_create_info.flags = 0;
-    buffer_create_info.size  = buffer_mem_info->size;
-    buffer_create_info.usage = buffer_mem_info->usage;
+    buffer_create_info.size  = buffer_info->size;
+    buffer_create_info.usage = buffer_info->usage;
     if (queue_families->graphics != queue_families->present)
     {
         buffer_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
@@ -453,20 +442,38 @@ static BufferMemoryHnd CreateBufferMemory(ResourceGroupHnd res_group_hnd, Buffer
     vkGetBufferMemoryRequirements(device, temp, &mem_requirements);
     vkDestroyBuffer(device, temp, NULL);
 
-    // Initialize buffer memory state.
-    uint32 dev_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_mem_info->properties);
+    // Initialize buffer state.
+    uint32 dev_mem_index = GetCapableMemoryTypeIndex(&mem_requirements, buffer_info->properties);
     DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
-    BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_hnd.index);
-    buffer_mem_state->size           = mem_requirements.size;
-    buffer_mem_state->index          = 0;
-    buffer_mem_state->dev_mem_offset = dev_mem->size;
-    buffer_mem_state->dev_mem_index  = dev_mem_index;
+    BufferState* buffer_state = GetBufferState(res_group, buffer_hnd.index);
+    buffer_state->size          = mem_requirements.size;
+    buffer_state->alignment     = buffer_info->alignment;
+    buffer_state->dev_mem_index = dev_mem_index;
+    if (buffer_info->per_frame)
+    {
+        buffer_state->frame_stride = res_group->max_buffers;
+        buffer_state->frame_count  = res_group->frame_count;
+    }
+    else
+    {
+        buffer_state->frame_stride = 0;
+        buffer_state->frame_count  = 1;
+    }
+    SetMinAlignmentIfRequested(buffer_info, buffer_state);
 
-    // Increase resource memory size by buffer memory size.
-    dev_mem->size         += mem_requirements.size;
-    dev_mem->buffer_usage |= buffer_mem_info->usage;
+    // Append usage for vulkan buffer creation during device memory allocation.
+    dev_mem->buffer_usage |= buffer_info->usage;
 
-    return buffer_mem_hnd;
+    // Calculate buffer offsets for each frame and update device memory size.
+    for (uint32 frame_index = 0; frame_index < buffer_state->frame_count; ++frame_index)
+    {
+        BufferFrameState* buffer_frame_state = GetBufferFrameState(res_group, buffer_hnd.index, frame_index);
+        buffer_frame_state->dev_mem_offset = Align(dev_mem->size, buffer_state->alignment);
+        buffer_frame_state->index          = 0;
+        dev_mem->size = buffer_frame_state->dev_mem_offset + buffer_state->size;
+    }
+
+    return buffer_hnd;
 }
 
 static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMemoryInfo* image_mem_info)
@@ -474,7 +481,7 @@ static ImageMemoryHnd CreateImageMemory(ResourceGroupHnd res_group_hnd, ImageMem
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd.index);
     if (res_group->image_mem_count >= res_group->max_image_mems)
     {
-        CTK_FATAL("can't create image memory: already at max of %u", res_group->max_image_mems);
+        CTK_FATAL("can't create image memory: already at max of %u image memories", res_group->max_image_mems);
     }
 
     VkDevice device = GetDevice();
@@ -600,32 +607,41 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
     }
 }
 
-static BufferHnd CreateBuffer(BufferMemoryHnd buffer_mem_hnd, BufferInfo* buffer_info)
+static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, ChildBufferInfo* child_buffer_info)
 {
-    ResourceGroup* res_group = GetResourceGroup(buffer_mem_hnd.group_index);
+    ResourceGroup* res_group = GetResourceGroup(parent_buffer_hnd.group_index);
     if (res_group->buffer_count >= res_group->max_buffers)
     {
-        CTK_FATAL("can't create buffer: already at max of %u", res_group->max_buffers);
+        CTK_FATAL("can't create sub-buffer: already at max of %u buffers", res_group->max_buffers);
     }
-    if (buffer_mem_hnd.index >= res_group->buffer_mem_count)
+
+    BufferState* parent_buffer_state = GetBufferState(res_group, parent_buffer_hnd.index);
+    if (parent_buffer_state->frame_count != 1)
     {
-        CTK_FATAL("can't create buffer: buffer memory index %u exceeds buffer memory count of %u",
-                  buffer_mem_hnd.index, res_group->buffer_mem_count);
+        CTK_FATAL("can't create sub-buffer: parent buffer must have 1 frame, but has %u",
+                  parent_buffer_state->frame_count);
     }
 
     // Create handle.
-    BufferHnd buffer_hnd = { .group_index = buffer_mem_hnd.group_index, .index = res_group->buffer_count };
+    BufferHnd buffer_hnd = { .group_index = parent_buffer_hnd.group_index, .index = res_group->buffer_count };
     res_group->buffer_count += 1;
 
-    // Copy info.
-    *GetBufferInfo(res_group, buffer_hnd.index) = *buffer_info;
+    // Init buffer info.
+    BufferInfo* parent_buffer_info = GetBufferInfo(res_group, parent_buffer_hnd.index);
+    BufferInfo* buffer_info = GetBufferInfo(res_group, buffer_hnd.index);
+    buffer_info->size       = child_buffer_info   ->size;
+    buffer_info->alignment  = child_buffer_info   ->alignment;
+    buffer_info->per_frame  = child_buffer_info   ->per_frame;
+    buffer_info->flags      = parent_buffer_info->flags;
+    buffer_info->usage      = parent_buffer_info->usage;
+    buffer_info->properties = parent_buffer_info->properties;
 
     // Init buffer state.
     BufferState* buffer_state = GetBufferState(res_group, buffer_hnd.index);
-    buffer_state->size             = buffer_info->size;
-    buffer_state->alignment        = buffer_info->alignment;
-    buffer_state->buffer_mem_index = buffer_mem_hnd.index;
-    if (buffer_info->per_frame)
+    buffer_state->size          = child_buffer_info    ->size;
+    buffer_state->alignment     = child_buffer_info    ->alignment;
+    buffer_state->dev_mem_index = parent_buffer_state->dev_mem_index;
+    if (child_buffer_info->per_frame)
     {
         buffer_state->frame_stride = res_group->max_buffers;
         buffer_state->frame_count  = res_group->frame_count;
@@ -635,46 +651,30 @@ static BufferHnd CreateBuffer(BufferMemoryHnd buffer_mem_hnd, BufferInfo* buffer
         buffer_state->frame_stride = 0;
         buffer_state->frame_count  = 1;
     }
-
-    // Update alignment to be minimum alignment for memory usage if requested.
-    // Spec: https://registry.khronos.org/vulkan/specs/1.3-extensions/html/vkspec.html#VkMemoryRequirements
-    BufferMemoryInfo* buffer_mem_info = GetBufferMemoryInfo(res_group, buffer_mem_hnd.index);
-    if (buffer_state->alignment == USE_MIN_OFFSET_ALIGNMENT)
-    {
-        VkPhysicalDeviceLimits* physical_device_limits = &GetPhysicalDevice()->properties.limits;
-        buffer_state->alignment = 4;
-
-        // Uniform
-        if ((buffer_mem_info->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT) &&
-            buffer_state->alignment < physical_device_limits->minUniformBufferOffsetAlignment)
-        {
-            buffer_state->alignment = physical_device_limits->minUniformBufferOffsetAlignment;
-        }
-
-        // Storage
-        if ((buffer_mem_info->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT) &&
-            buffer_state->alignment < physical_device_limits->minStorageBufferOffsetAlignment)
-        {
-            buffer_state->alignment = physical_device_limits->minStorageBufferOffsetAlignment;
-        }
-
-        // Texel
-        VkBufferUsageFlags texel_usage_flags = VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
-                                               VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
-        if ((buffer_mem_info->usage & texel_usage_flags) &&
-            buffer_state->alignment < physical_device_limits->minTexelBufferOffsetAlignment)
-        {
-            buffer_state->alignment = physical_device_limits->minTexelBufferOffsetAlignment;
-        }
-    }
+    SetMinAlignmentIfRequested(buffer_info, buffer_state);
 
     // Init buffer frame states.
-    BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_hnd.index);
-    for (uint32 frame_index = 0; frame_index < buffer_state->frame_count; ++frame_index)
+    BufferFrameState* parent_buffer_frame_state = GetBufferFrameState(res_group, parent_buffer_hnd.index, 0);
+    for (uint32 frame_index = 0; frame_index < buffer_state->frame_count; frame_index += 1)
     {
+        VkDeviceSize dev_mem_relative_index =
+            parent_buffer_frame_state->dev_mem_offset + parent_buffer_frame_state->index;
+        VkDeviceSize aligned_index =
+            Align(dev_mem_relative_index, buffer_state->alignment) - parent_buffer_frame_state->dev_mem_offset;
+        if (aligned_index + buffer_state->size >= parent_buffer_state->size)
+        {
+            CTK_FATAL("can't create sub-buffer frame %u from parent buffer at %u-byte aligned index %u: buffer size of "
+                      "%u would exceed parent buffer's size of %u",
+                      frame_index,
+                      buffer_state->alignment,
+                      aligned_index,
+                      buffer_state->size,
+                      parent_buffer_state->size);
+        }
         BufferFrameState* buffer_frame_state = GetBufferFrameState(res_group, buffer_hnd.index, frame_index);
-        buffer_frame_state->buffer_mem_offset = AllocateBufferMemory(buffer_mem_state, buffer_state);
-        buffer_frame_state->index             = 0;
+        buffer_frame_state->dev_mem_offset = parent_buffer_frame_state->dev_mem_offset + aligned_index;
+        buffer_frame_state->index          = 0;
+        parent_buffer_frame_state->index = aligned_index + buffer_state->size;
     }
 
     return buffer_hnd;
@@ -685,7 +685,7 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* image_info,
     ResourceGroup* res_group = GetResourceGroup(image_mem_hnd.group_index);
     if (res_group->image_count >= res_group->max_images)
     {
-        CTK_FATAL("can't create image: already at max of %u", res_group->max_images);
+        CTK_FATAL("can't create image: already at max of %u images", res_group->max_images);
     }
     if (image_mem_hnd.index >= res_group->image_mem_count)
     {
@@ -862,10 +862,9 @@ static void DeallocateResourceGroup(ResourceGroupHnd res_group_hnd)
     memset(res_group->dev_mems, 0, VK_MAX_MEMORY_TYPES * sizeof(DeviceMemory));
 
     // Clear resource group.
-    res_group->buffer_mem_count = 0;
-    res_group->image_mem_count  = 0;
-    res_group->buffer_count     = 0;
-    res_group->image_count      = 0;
+    res_group->buffer_count    = 0;
+    res_group->image_mem_count = 0;
+    res_group->image_count     = 0;
 }
 
 /// Debug
@@ -876,65 +875,6 @@ static void LogResourceGroups(uint32 start = 0)
     {
         ResourceGroup* res_group = GetResourceGroup(res_group_index);
         PrintLine("resource group %u (0x%p):", res_group_index, res_group);
-
-        PrintLine("    memory:");
-        for (uint32 buffer_mem_index = 0; buffer_mem_index < res_group->buffer_mem_count;
-             buffer_mem_index += 1)
-        {
-            BufferMemoryInfo*  buffer_mem_info  = GetBufferMemoryInfo (res_group, buffer_mem_index);
-            BufferMemoryState* buffer_mem_state = GetBufferMemoryState(res_group, buffer_mem_index);
-            PrintLine("        buffer memory %u:", buffer_mem_index);
-            PrintLine("            info:");
-            PrintLine("                size: %llu", buffer_mem_info->size);
-            PrintLine("                flags:");
-            PrintBufferCreateFlags(buffer_mem_info->flags, 5);
-            PrintLine("                usage:");
-            PrintBufferUsageFlags(buffer_mem_info->usage, 5);
-            PrintLine("                properties:");
-            PrintMemoryPropertyFlags(buffer_mem_info->properties, 5);
-            PrintLine("            state:");
-            PrintLine("                size:           %llu", buffer_mem_state->size);
-            PrintLine("                index:          %llu", buffer_mem_state->index);
-            PrintLine("                dev_mem_offset: %llu", buffer_mem_state->dev_mem_offset);
-            PrintLine("                dev_mem_index:  %u",   buffer_mem_state->dev_mem_index);
-        }
-        for (uint32 image_mem_index = 0; image_mem_index < res_group->image_mem_count;
-             image_mem_index += 1)
-        {
-            ImageMemoryInfo*  image_mem_info  = GetImageMemoryInfo (res_group, image_mem_index);
-            ImageMemoryState* image_mem_state = GetImageMemoryState(res_group, image_mem_index);
-            PrintLine("        image memory %u:", image_mem_index);
-            PrintLine("            info:");
-            PrintLine("                size:   %llu", image_mem_info->size);
-            PrintLine("                flags:");
-            PrintImageCreateFlags(image_mem_info->flags, 5);
-            PrintLine("                usage:");
-            PrintImageUsageFlags(image_mem_info->usage, 5);
-            PrintLine("                properties:");
-            PrintMemoryPropertyFlags(image_mem_info->properties, 5);
-            PrintLine("                format: %s", VkFormatName(image_mem_info->format));
-            PrintLine("                tiling: %s", VkImageTilingName(image_mem_info->tiling));
-            PrintLine("            state:");
-            PrintLine("                size:           %llu", image_mem_state->size);
-            PrintLine("                index:          %llu", image_mem_state->index);
-            PrintLine("                dev_mem_offset: %llu", image_mem_state->dev_mem_offset);
-            PrintLine("                dev_mem_index:  %u",   image_mem_state->dev_mem_index);
-        }
-        for (uint32 dev_mem_index = 0; dev_mem_index < VK_MAX_MEMORY_TYPES; ++dev_mem_index)
-        {
-            DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
-            if (dev_mem->size == 0) { continue; }
-
-            PrintLine("        resource memory %u:", dev_mem_index);
-            PrintLine("            size:   %llu", dev_mem->size);
-            PrintLine("            hnd:    0x%p", dev_mem->hnd);
-            PrintLine("            mapped: 0x%p", dev_mem->mapped);
-            PrintLine("            buffer: 0x%p", dev_mem->buffer);
-            PrintLine("            buffer_usage:");
-            PrintBufferUsageFlags(dev_mem->buffer_usage, 4);
-            PrintLine("            properties: ");
-            PrintMemoryPropertyFlags(dev_mem->properties, 4);
-        }
 
         PrintLine("    resources:");
         for (uint32 buffer_index = 0; buffer_index < res_group->buffer_count; buffer_index += 1)
@@ -947,18 +887,18 @@ static void LogResourceGroups(uint32 start = 0)
             PrintLine("                alignment: %llu", info->alignment);
             PrintLine("                per_frame: %s",   info->per_frame ? "true" : "false");
             PrintLine("            state:");
-            PrintLine("                size:             %llu", state->size);
-            PrintLine("                alignment:        %llu", state->alignment);
-            PrintLine("                buffer_mem_index: %u",   state->buffer_mem_index);
-            PrintLine("                frame_stride:     %u",   state->frame_stride);
-            PrintLine("                frame_count:      %u",   state->frame_count);
+            PrintLine("                size:          %llu", state->size);
+            PrintLine("                alignment:     %llu", state->alignment);
+            PrintLine("                dev_mem_index: %u",   state->dev_mem_index);
+            PrintLine("                frame_stride:  %u",   state->frame_stride);
+            PrintLine("                frame_count:   %u",   state->frame_count);
             PrintLine("            frame_states:");
             for (uint32 frame_index = 0; frame_index < state->frame_count; ++frame_index)
             {
                 BufferFrameState* frame_state = GetBufferFrameState(res_group, buffer_index, frame_index);
                 PrintLine("                frame %u:", frame_index);
-                PrintLine("                    buffer_mem_offset: %llu", frame_state->buffer_mem_offset);
-                PrintLine("                    index:             %llu", frame_state->index);
+                PrintLine("                    dev_mem_offset: %llu", frame_state->dev_mem_offset);
+                PrintLine("                    index:          %llu", frame_state->index);
             }
             PrintLine();
         }
@@ -1030,6 +970,45 @@ static void LogResourceGroups(uint32 start = 0)
                 PrintLine("                    view:             0x%p", frame_state->view);
             }
             PrintLine();
+        }
+
+        PrintLine("    memory:");
+        for (uint32 image_mem_index = 0; image_mem_index < res_group->image_mem_count;
+             image_mem_index += 1)
+        {
+            ImageMemoryInfo*  image_mem_info  = GetImageMemoryInfo (res_group, image_mem_index);
+            ImageMemoryState* image_mem_state = GetImageMemoryState(res_group, image_mem_index);
+            PrintLine("        image memory %u:", image_mem_index);
+            PrintLine("            info:");
+            PrintLine("                size:   %llu", image_mem_info->size);
+            PrintLine("                flags:");
+            PrintImageCreateFlags(image_mem_info->flags, 5);
+            PrintLine("                usage:");
+            PrintImageUsageFlags(image_mem_info->usage, 5);
+            PrintLine("                properties:");
+            PrintMemoryPropertyFlags(image_mem_info->properties, 5);
+            PrintLine("                format: %s", VkFormatName(image_mem_info->format));
+            PrintLine("                tiling: %s", VkImageTilingName(image_mem_info->tiling));
+            PrintLine("            state:");
+            PrintLine("                size:           %llu", image_mem_state->size);
+            PrintLine("                index:          %llu", image_mem_state->index);
+            PrintLine("                dev_mem_offset: %llu", image_mem_state->dev_mem_offset);
+            PrintLine("                dev_mem_index:  %u",   image_mem_state->dev_mem_index);
+        }
+        for (uint32 dev_mem_index = 0; dev_mem_index < VK_MAX_MEMORY_TYPES; ++dev_mem_index)
+        {
+            DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
+            if (dev_mem->size == 0) { continue; }
+
+            PrintLine("        resource memory %u:", dev_mem_index);
+            PrintLine("            size:   %llu", dev_mem->size);
+            PrintLine("            hnd:    0x%p", dev_mem->hnd);
+            PrintLine("            mapped: 0x%p", dev_mem->mapped);
+            PrintLine("            buffer: 0x%p", dev_mem->buffer);
+            PrintLine("            buffer_usage:");
+            PrintBufferUsageFlags(dev_mem->buffer_usage, 4);
+            PrintLine("            properties: ");
+            PrintMemoryPropertyFlags(dev_mem->properties, 4);
         }
 
         PrintLine();

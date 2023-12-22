@@ -123,7 +123,7 @@ static void InitMeshModule(const Allocator* allocator, MeshModuleInfo info)
     InitArray(&g_mesh_groups, allocator, info.max_mesh_groups);
 };
 
-static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, BufferMemoryHnd buffer_mem, MeshGroupInfo* info)
+static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, BufferHnd parent_buffer, MeshGroupInfo* info)
 {
     if (g_mesh_groups.count >= g_mesh_groups.size)
     {
@@ -136,20 +136,20 @@ static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, BufferMemoryHnd 
     InitArray(&mesh_group->meshes, allocator, info->max_meshes);
     mesh_group->vertex_buffer_size = info->vertex_buffer_size;
     mesh_group->index_buffer_size  = info->index_buffer_size;
-    BufferInfo vertex_buffer_info =
+    SubBufferInfo vertex_buffer_info =
     {
         .size      = info->vertex_buffer_size,
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = false,
     };
-    mesh_group->vertex_buffer = CreateBuffer(buffer_mem, &vertex_buffer_info);
-    BufferInfo index_buffer_info =
+    mesh_group->vertex_buffer = CreateBuffer(parent_buffer, &vertex_buffer_info);
+    SubBufferInfo index_buffer_info =
     {
         .size      = info->index_buffer_size,
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = false,
     };
-    mesh_group->index_buffer = CreateBuffer(buffer_mem, &index_buffer_info);
+    mesh_group->index_buffer = CreateBuffer(parent_buffer, &index_buffer_info);
 
     return hnd;
 }

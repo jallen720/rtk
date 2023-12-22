@@ -101,7 +101,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
 
         VkBufferImageCopy copy =
         {
-            .bufferOffset      = GetBufferFrameState(staging_buffer_hnd, frame_index)->buffer_mem_offset,
+            .bufferOffset      = GetBufferFrameState(staging_buffer_hnd, frame_index)->dev_mem_offset,
             .bufferRowLength   = 0,
             .bufferImageHeight = 0,
             .imageSubresource =

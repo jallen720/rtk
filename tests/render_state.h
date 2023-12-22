@@ -55,8 +55,8 @@ struct RenderState
 
     // Resources
     ResourceGroupHnd res_group;
-    BufferMemoryHnd  host_buffer_mem;
-    BufferMemoryHnd  device_buffer_mem;
+    BufferHnd        host_buffer;
+    BufferHnd        device_buffer;
     ImageMemoryHnd   image_mem;
     BufferHnd        staging_buffer;
     BufferHnd        entity_buffer;
@@ -119,31 +119,35 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     ResourceGroupInfo res_group_info =
     {
-        .max_buffer_mems = 4,
-        .max_image_mems  = 4,
+        // .max_buffer_mems = 4,
         .max_buffers     = 8,
+        .max_image_mems  = 4,
         .max_images      = 8,
     };
     g_render_state.res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
 
-    BufferMemoryInfo host_buffer_mem_info =
+    BufferInfo host_buffer_info =
     {
         .size       = Megabyte32<16>(),
+        .alignment  = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame  = false,
         .flags      = 0,
         .usage      = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         .properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
     };
-    g_render_state.host_buffer_mem = CreateBufferMemory(g_render_state.res_group, &host_buffer_mem_info);
-    BufferMemoryInfo device_buffer_mem_info =
+    g_render_state.host_buffer = CreateBuffer(g_render_state.res_group, &host_buffer_info);
+    BufferInfo device_buffer_info =
     {
         .size       = Megabyte32<1>(),
+        .alignment  = USE_MIN_OFFSET_ALIGNMENT,
+        .per_frame  = false,
         .flags      = 0,
         .usage      = VK_BUFFER_USAGE_TRANSFER_DST_BIT |
                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                       VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
         .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
-    g_render_state.device_buffer_mem = CreateBufferMemory(g_render_state.res_group, &device_buffer_mem_info);
+    g_render_state.device_buffer = CreateBuffer(g_render_state.res_group, &device_buffer_info);
     ImageMemoryInfo image_mem_info =
     {
         .size       = Megabyte32<8>(),
@@ -158,22 +162,22 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     AllocateResourceGroup(g_render_state.res_group);
 
     // Staging Buffer
-    BufferInfo staging_buffer_info =
+    ChildBufferInfo staging_buffer_info =
     {
         .size      = Megabyte32<8>(),
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = false,
     };
-    g_render_state.staging_buffer = CreateBuffer(g_render_state.host_buffer_mem, &staging_buffer_info);
+    g_render_state.staging_buffer = CreateBuffer(g_render_state.host_buffer, &staging_buffer_info);
 
     // Entity Buffer
-    BufferInfo entity_buffer_info =
+    ChildBufferInfo entity_buffer_info =
     {
         .size      = sizeof(EntityBuffer),
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = true,
     };
-    g_render_state.entity_buffer = CreateBuffer(g_render_state.host_buffer_mem, &entity_buffer_info);
+    g_render_state.entity_buffer = CreateBuffer(g_render_state.host_buffer, &entity_buffer_info);
 
     // Textures
     InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
@@ -233,7 +237,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
         .vertex_buffer_size = Kilobyte32<8>(),
         .index_buffer_size  = Kilobyte32<8>(),
     };
-    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, g_render_state.device_buffer_mem,
+    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, g_render_state.device_buffer,
                                                 &mesh_group_info);
 
     Swizzle position_swizzle = { 0, 2, 1 };

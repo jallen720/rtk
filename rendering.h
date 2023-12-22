@@ -100,10 +100,10 @@ static void BindMeshGroup(VkCommandBuffer command_buffer, MeshGroupHnd mesh_grou
                            0, // First Binding
                            1, // Binding Count
                            &vertex_buffer,
-                           &GetBufferFrameState(mesh_group->vertex_buffer, 0)->buffer_mem_offset);
+                           &GetBufferFrameState(mesh_group->vertex_buffer, 0)->dev_mem_offset);
     vkCmdBindIndexBuffer(command_buffer,
                          GetBuffer(mesh_group->index_buffer),
-                         GetBufferFrameState(mesh_group->index_buffer, 0)->buffer_mem_offset,
+                         GetBufferFrameState(mesh_group->index_buffer, 0)->dev_mem_offset,
                          VK_INDEX_TYPE_UINT32);
 }
 

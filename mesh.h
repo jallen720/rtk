@@ -136,14 +136,14 @@ static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, BufferHnd parent
     InitArray(&mesh_group->meshes, allocator, info->max_meshes);
     mesh_group->vertex_buffer_size = info->vertex_buffer_size;
     mesh_group->index_buffer_size  = info->index_buffer_size;
-    SubBufferInfo vertex_buffer_info =
+    ChildBufferInfo vertex_buffer_info =
     {
         .size      = info->vertex_buffer_size,
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = false,
     };
     mesh_group->vertex_buffer = CreateBuffer(parent_buffer, &vertex_buffer_info);
-    SubBufferInfo index_buffer_info =
+    ChildBufferInfo index_buffer_info =
     {
         .size      = info->index_buffer_size,
         .alignment = USE_MIN_OFFSET_ALIGNMENT,

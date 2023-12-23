@@ -25,7 +25,7 @@ struct RenderTarget
     Array<VkFramebuffer> framebuffers;
     Array<VkClearValue>  attachment_clear_values;
     ResourceGroupHnd     depth_image_group;
-    ImageMemoryHnd       depth_image_mem;
+    ImageBufferHnd       depth_image_buffer;
     ImageHnd             depth_image;
 };
 
@@ -82,7 +82,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
             .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
             .per_frame      = false,
         };
-        ImageMemoryInfo depth_image_mem_info =
+        ImageBufferInfo depth_image_buffer_info =
         {
             .size       = 0,
             .flags      = 0,
@@ -91,8 +91,8 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
             .format     = GetPhysicalDevice()->depth_image_format,
             .tiling     = VK_IMAGE_TILING_OPTIMAL,
         };
-        depth_image_mem_info.size = GetImageSize(&depth_image_info, &depth_image_mem_info);
-        render_target->depth_image_mem = CreateImageMemory(render_target->depth_image_group, &depth_image_mem_info);
+        depth_image_buffer_info.size = GetImageSize(&depth_image_info, &depth_image_buffer_info);
+        render_target->depth_image_buffer = DefineImageBuffer(render_target->depth_image_group, &depth_image_buffer_info);
 
         AllocateResourceGroup(render_target->depth_image_group);
 
@@ -111,7 +111,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
             },
         };
         render_target->depth_image =
-            CreateImage(render_target->depth_image_mem, &depth_image_info, &depth_image_view_info);
+            CreateImage(render_target->depth_image_buffer, &depth_image_info, &depth_image_view_info);
     }
 
     // Init framebuffers.
@@ -156,8 +156,8 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* perm_stack, Sta
     {
         ResourceGroupInfo depth_image_group_info =
         {
-            .max_image_mems  = 1,
-            .max_images      = 1,
+            .max_image_buffers = 1,
+            .max_images        = 1,
         };
         render_target->depth_image_group = CreateResourceGroup(&free_list->allocator, &depth_image_group_info);
     }

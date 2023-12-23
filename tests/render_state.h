@@ -57,7 +57,7 @@ struct RenderState
     ResourceGroupHnd res_group;
     BufferHnd        host_buffer;
     BufferHnd        device_buffer;
-    ImageBufferHnd   image_buffer;
+    ImageMemoryHnd   image_mem;
     BufferHnd        staging_buffer;
     BufferHnd        entity_buffer;
     Array<ImageHnd>  textures;
@@ -119,9 +119,9 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     ResourceGroupInfo res_group_info =
     {
-        .max_buffers       = 8,
-        .max_image_buffers = 4,
-        .max_images        = 8,
+        .max_buffers    = 8,
+        .max_image_mems = 4,
+        .max_images     = 8,
     };
     g_render_state.res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
 
@@ -147,7 +147,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
         .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     };
     g_render_state.device_buffer = DefineBuffer(g_render_state.res_group, &device_buffer_info);
-    ImageBufferInfo image_buffer_info =
+    ImageMemoryInfo image_mem_info =
     {
         .size       = Megabyte32<8>(),
         .flags      = 0,
@@ -156,7 +156,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
         .format     = GetSwapchain()->surface_format.format,
         .tiling     = VK_IMAGE_TILING_OPTIMAL,
     };
-    g_render_state.image_buffer = DefineImageBuffer(g_render_state.res_group, &image_buffer_info);
+    g_render_state.image_mem = DefineImageMemory(g_render_state.res_group, &image_mem_info);
 
     AllocateResourceGroup(g_render_state.res_group);
 
@@ -213,7 +213,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
                 .layerCount     = VK_REMAINING_ARRAY_LAYERS,
             },
         };
-        ImageHnd texture = CreateImage(g_render_state.image_buffer, &texture_info, &texture_view_info);
+        ImageHnd texture = CreateImage(g_render_state.image_mem, &texture_info, &texture_view_info);
         Push(&g_render_state.textures, texture);
         LoadImage(texture, g_render_state.staging_buffer, 0, &texture_data);
         DestroyImageData(&texture_data);

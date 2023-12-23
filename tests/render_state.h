@@ -119,10 +119,9 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     ResourceGroupInfo res_group_info =
     {
-        // .max_buffer_mems = 4,
-        .max_buffers     = 8,
-        .max_image_mems  = 4,
-        .max_images      = 8,
+        .max_buffers    = 8,
+        .max_image_mems = 4,
+        .max_images     = 8,
     };
     g_render_state.res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
 

@@ -27,13 +27,6 @@ struct BufferInfo
     VkMemoryPropertyFlags properties;
 };
 
-struct ChildBufferInfo
-{
-    VkDeviceSize size;
-    VkDeviceSize alignment;
-    bool         per_frame;
-};
-
 struct BufferState
 {
     VkDeviceSize size;
@@ -596,7 +589,7 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
     }
 }
 
-static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, ChildBufferInfo* child_buffer_info)
+static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, BufferInfo* buffer_info)
 {
     ResourceGroup* res_group = GetResourceGroup(parent_buffer_hnd.group_index);
     if (res_group->buffer_count >= res_group->max_buffers)
@@ -617,20 +610,20 @@ static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, ChildBufferInfo* chil
 
     // Init buffer info.
     BufferInfo* parent_buffer_info = GetBufferInfo(res_group, parent_buffer_hnd.index);
-    BufferInfo* buffer_info = GetBufferInfo(res_group, buffer_hnd.index);
-    buffer_info->size       = child_buffer_info   ->size;
-    buffer_info->alignment  = child_buffer_info   ->alignment;
-    buffer_info->per_frame  = child_buffer_info   ->per_frame;
-    buffer_info->flags      = parent_buffer_info->flags;
-    buffer_info->usage      = parent_buffer_info->usage;
-    buffer_info->properties = parent_buffer_info->properties;
+    BufferInfo* stored_buffer_info = GetBufferInfo(res_group, buffer_hnd.index);
+    stored_buffer_info->size       = buffer_info       ->size;
+    stored_buffer_info->alignment  = buffer_info       ->alignment;
+    stored_buffer_info->per_frame  = buffer_info       ->per_frame;
+    stored_buffer_info->flags      = parent_buffer_info->flags;
+    stored_buffer_info->usage      = parent_buffer_info->usage;
+    stored_buffer_info->properties = parent_buffer_info->properties;
 
     // Init buffer state.
     BufferState* buffer_state = GetBufferState(res_group, buffer_hnd.index);
-    buffer_state->size          = child_buffer_info    ->size;
-    buffer_state->alignment     = child_buffer_info    ->alignment;
+    buffer_state->size          = buffer_info        ->size;
+    buffer_state->alignment     = buffer_info        ->alignment;
     buffer_state->dev_mem_index = parent_buffer_state->dev_mem_index;
-    if (child_buffer_info->per_frame)
+    if (buffer_info->per_frame)
     {
         buffer_state->frame_stride = res_group->max_buffers;
         buffer_state->frame_count  = res_group->frame_count;

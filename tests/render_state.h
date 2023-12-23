@@ -161,7 +161,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     AllocateResourceGroup(g_render_state.res_group);
 
     // Staging Buffer
-    ChildBufferInfo staging_buffer_info =
+    BufferInfo staging_buffer_info =
     {
         .size      = Megabyte32<8>(),
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
@@ -170,7 +170,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     g_render_state.staging_buffer = CreateBuffer(g_render_state.host_buffer, &staging_buffer_info);
 
     // Entity Buffer
-    ChildBufferInfo entity_buffer_info =
+    BufferInfo entity_buffer_info =
     {
         .size      = sizeof(EntityBuffer),
         .alignment = USE_MIN_OFFSET_ALIGNMENT,

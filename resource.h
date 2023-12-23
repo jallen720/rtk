@@ -4,8 +4,8 @@ static constexpr VkDeviceSize USE_MIN_OFFSET_ALIGNMENT = 0;
 static constexpr uint32 MAX_RESOURCE_GROUPS = 0xFF;
 static constexpr uint32 MAX_RESOURCES       = 0xFFFFFF;
 
-struct ImageBufferHnd   { uint32 group_index : 8; uint32 index : 24; };
 struct BufferHnd        { uint32 group_index : 8; uint32 index : 24; };
+struct ImageBufferHnd   { uint32 group_index : 8; uint32 index : 24; };
 struct ImageHnd         { uint32 group_index : 8; uint32 index : 24; };
 struct ResourceGroupHnd { uint32 index; };
 
@@ -311,23 +311,14 @@ static void InitResourceModule(const Allocator* allocator, ResourceModuleInfo in
 
 static ResourceGroupHnd CreateResourceGroup(const Allocator* allocator, ResourceGroupInfo* info)
 {
-    // CTK_ASSERT(info->max_buffer_mems <= MAX_RESOURCES);
-    CTK_ASSERT(info->max_buffers     <= MAX_RESOURCES);
-    CTK_ASSERT(info->max_image_buffers  <= MAX_RESOURCES);
-    CTK_ASSERT(info->max_images      <= MAX_RESOURCES);
+    CTK_ASSERT(info->max_buffers       <= MAX_RESOURCES);
+    CTK_ASSERT(info->max_image_buffers <= MAX_RESOURCES);
+    CTK_ASSERT(info->max_images        <= MAX_RESOURCES);
 
     ResourceGroupHnd hnd = { .index = g_res_groups.count };
     ResourceGroup* res_group = Push(&g_res_groups);
 
     uint32 frame_count = GetFrameCount();
-
-    // res_group->max_buffer_mems  = info->max_buffer_mems;
-    // res_group->buffer_mem_count = 0;
-    // if (res_group->max_buffer_mems > 0)
-    // {
-    //     res_group->buffer_mem_infos  = Allocate<BufferMemoryInfo> (allocator, info->max_buffer_mems);
-    //     res_group->buffer_mem_states = Allocate<BufferMemoryState>(allocator, info->max_buffer_mems);
-    // }
 
     res_group->max_buffers  = info->max_buffers;
     res_group->buffer_count = 0;

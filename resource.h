@@ -382,7 +382,7 @@ static void SetMinAlignmentIfRequested(BufferInfo* buffer_info, BufferState* buf
 static BufferHnd DefineBuffer(ResourceGroupHnd res_group_hnd, BufferInfo* buffer_info)
 {
     VkDevice device = GetDevice();
-    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
+    ResourceSharing* resource_sharing = &GetPhysicalDevice()->resource_sharing;
     VkResult res = VK_SUCCESS;
 
     ResourceGroup* res_group = GetResourceGroup(res_group_hnd.index);
@@ -400,23 +400,15 @@ static BufferHnd DefineBuffer(ResourceGroupHnd res_group_hnd, BufferInfo* buffer
 
     // Create dummy buffer to get memory requirements.
     VkBufferCreateInfo buffer_create_info = {};
-    buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_create_info.pNext = NULL;
-    buffer_create_info.flags = 0;
-    buffer_create_info.size  = buffer_info->size;
-    buffer_create_info.usage = buffer_info->usage;
-    if (queue_families->graphics != queue_families->present)
-    {
-        buffer_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-        buffer_create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
-        buffer_create_info.pQueueFamilyIndices   = (uint32*)queue_families;
-    }
-    else
-    {
-        buffer_create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
-        buffer_create_info.queueFamilyIndexCount = 0;
-        buffer_create_info.pQueueFamilyIndices   = NULL;
-    }
+    buffer_create_info.sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_create_info.pNext                 = NULL;
+    buffer_create_info.flags                 = 0;
+    buffer_create_info.size                  = buffer_info     ->size;
+    buffer_create_info.usage                 = buffer_info     ->usage;
+    buffer_create_info.sharingMode           = resource_sharing->mode;
+    buffer_create_info.queueFamilyIndexCount = resource_sharing->queue_family_index_count;
+    buffer_create_info.pQueueFamilyIndices   = resource_sharing->queue_family_indexes;
+
     VkBuffer temp = VK_NULL_HANDLE;
     res = vkCreateBuffer(device, &buffer_create_info, NULL, &temp);
     Validate(res, "vkCreateBuffer() failed");
@@ -467,7 +459,7 @@ static ImageMemoryHnd DefineImageMemory(ResourceGroupHnd res_group_hnd, ImageMem
     }
 
     VkDevice device = GetDevice();
-    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
+    ResourceSharing* resource_sharing = &GetPhysicalDevice()->resource_sharing;
     VkResult res = VK_SUCCESS;
 
     // Create handle.
@@ -479,30 +471,22 @@ static ImageMemoryHnd DefineImageMemory(ResourceGroupHnd res_group_hnd, ImageMem
 
     // Create dummy image to get memory requirements.
     VkImageCreateInfo image_create_info = {};
-    image_create_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_create_info.pNext         = NULL;
-    image_create_info.flags         = image_mem_info->flags;
-    image_create_info.format        = image_mem_info->format;
-    image_create_info.tiling        = image_mem_info->tiling;
-    image_create_info.usage         = image_mem_info->usage;
-    image_create_info.imageType     = VK_IMAGE_TYPE_1D;
-    image_create_info.extent        = { 1, 1, 1 };
-    image_create_info.mipLevels     = 1;
-    image_create_info.arrayLayers   = 1;
-    image_create_info.samples       = VK_SAMPLE_COUNT_1_BIT;
-    image_create_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    if (queue_families->graphics != queue_families->present)
-    {
-        image_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-        image_create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
-        image_create_info.pQueueFamilyIndices   = (uint32*)queue_families;
-    }
-    else
-    {
-        image_create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
-        image_create_info.queueFamilyIndexCount = 0;
-        image_create_info.pQueueFamilyIndices   = NULL;
-    }
+    image_create_info.sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.pNext                 = NULL;
+    image_create_info.flags                 = image_mem_info  ->flags;
+    image_create_info.format                = image_mem_info  ->format;
+    image_create_info.tiling                = image_mem_info  ->tiling;
+    image_create_info.usage                 = image_mem_info  ->usage;
+    image_create_info.sharingMode           = resource_sharing->mode;
+    image_create_info.queueFamilyIndexCount = resource_sharing->queue_family_index_count;
+    image_create_info.pQueueFamilyIndices   = resource_sharing->queue_family_indexes;
+    image_create_info.imageType             = VK_IMAGE_TYPE_1D;
+    image_create_info.extent                = { 1, 1, 1 };
+    image_create_info.mipLevels             = 1;
+    image_create_info.arrayLayers           = 1;
+    image_create_info.samples               = VK_SAMPLE_COUNT_1_BIT;
+    image_create_info.initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED;
+
     VkImage temp = VK_NULL_HANDLE;
     res = vkCreateImage(device, &image_create_info, NULL, &temp);
     Validate(res, "vkCreateImage() failed");
@@ -531,10 +515,10 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
 
     VkDevice device = GetDevice();
     PhysicalDevice* physical_device = GetPhysicalDevice();
-    QueueFamilies* queue_families = &physical_device->queue_families;
+    ResourceSharing* resource_sharing = &physical_device->resource_sharing;
     VkResult res = VK_SUCCESS;
 
-    // Allocate allo resource memory and map to host memory if necessary.
+    // Allocate all resource memory and map to host memory if necessary.
     for (uint32 dev_mem_index = 0; dev_mem_index < VK_MAX_MEMORY_TYPES; ++dev_mem_index)
     {
         DeviceMemory* dev_mem = GetDeviceMemory(res_group, dev_mem_index);
@@ -548,23 +532,15 @@ static void AllocateResourceGroup(ResourceGroupHnd res_group_hnd)
         if (dev_mem->buffer_usage != 0)
         {
             VkBufferCreateInfo buffer_create_info = {};
-            buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-            buffer_create_info.pNext = NULL;
-            buffer_create_info.flags = 0;
-            buffer_create_info.size  = dev_mem->size;
-            buffer_create_info.usage = dev_mem->buffer_usage;
-            if (queue_families->graphics != queue_families->present)
-            {
-                buffer_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-                buffer_create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
-                buffer_create_info.pQueueFamilyIndices   = (uint32*)queue_families;
-            }
-            else
-            {
-                buffer_create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
-                buffer_create_info.queueFamilyIndexCount = 0;
-                buffer_create_info.pQueueFamilyIndices   = NULL;
-            }
+            buffer_create_info.sType                 = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+            buffer_create_info.pNext                 = NULL;
+            buffer_create_info.flags                 = 0;
+            buffer_create_info.size                  = dev_mem         ->size;
+            buffer_create_info.usage                 = dev_mem         ->buffer_usage;
+            buffer_create_info.sharingMode           = resource_sharing->mode;
+            buffer_create_info.queueFamilyIndexCount = resource_sharing->queue_family_index_count;
+            buffer_create_info.pQueueFamilyIndices   = resource_sharing->queue_family_indexes;
+
             res = vkCreateBuffer(device, &buffer_create_info, NULL, &dev_mem->buffer);
             Validate(res, "vkCreateBuffer() failed");
             VkMemoryRequirements mem_requirements = {};
@@ -678,7 +654,7 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* image_info,
     ImageMemoryInfo* image_mem_info = GetImageMemoryInfo(res_group, image_mem_hnd.index);
 
     VkDevice device = GetDevice();
-    QueueFamilies* queue_families = &GetPhysicalDevice()->queue_families;
+    ResourceSharing* resource_sharing = &GetPhysicalDevice()->resource_sharing;
     VkResult res = VK_SUCCESS;
 
     // Create handle.
@@ -699,30 +675,21 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* image_info,
 
     // Create images for each frame.
     VkImageCreateInfo image_create_info = {};
-    image_create_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    image_create_info.pNext         = NULL;
-    image_create_info.flags         = image_mem_info->flags;
-    image_create_info.format        = image_mem_info->format;
-    image_create_info.tiling        = image_mem_info->tiling;
-    image_create_info.usage         = image_mem_info->usage;
-    image_create_info.imageType     = image_info    ->type;
-    image_create_info.extent        = image_info    ->extent;
-    image_create_info.mipLevels     = image_info    ->mip_levels;
-    image_create_info.arrayLayers   = image_info    ->array_layers;
-    image_create_info.samples       = image_info    ->samples;
-    image_create_info.initialLayout = image_info    ->initial_layout;
-    if (queue_families->graphics != queue_families->present)
-    {
-        image_create_info.sharingMode           = VK_SHARING_MODE_CONCURRENT;
-        image_create_info.queueFamilyIndexCount = sizeof(QueueFamilies) / sizeof(uint32);
-        image_create_info.pQueueFamilyIndices   = (uint32*)queue_families;
-    }
-    else
-    {
-        image_create_info.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
-        image_create_info.queueFamilyIndexCount = 0;
-        image_create_info.pQueueFamilyIndices   = NULL;
-    }
+    image_create_info.sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.pNext                 = NULL;
+    image_create_info.flags                 = image_mem_info  ->flags;
+    image_create_info.format                = image_mem_info  ->format;
+    image_create_info.tiling                = image_mem_info  ->tiling;
+    image_create_info.usage                 = image_mem_info  ->usage;
+    image_create_info.imageType             = image_info      ->type;
+    image_create_info.extent                = image_info      ->extent;
+    image_create_info.mipLevels             = image_info      ->mip_levels;
+    image_create_info.arrayLayers           = image_info      ->array_layers;
+    image_create_info.samples               = image_info      ->samples;
+    image_create_info.initialLayout         = image_info      ->initial_layout;
+    image_create_info.sharingMode           = resource_sharing->mode;
+    image_create_info.queueFamilyIndexCount = resource_sharing->queue_family_index_count;
+    image_create_info.pQueueFamilyIndices   = resource_sharing->queue_family_indexes;
     for (uint32 frame_index = 0; frame_index < image_frame_count; ++frame_index)
     {
         ImageFrameState* image_frame_state = GetImageFrameState(res_group, image_hnd.index, frame_index);
@@ -779,30 +746,32 @@ static ImageHnd CreateImage(ImageMemoryHnd image_mem_hnd, ImageInfo* image_info,
 static VkDeviceSize GetImageSize(ImageInfo* image_info, ImageMemoryInfo* image_mem_info)
 {
     VkDevice device = GetDevice();
-    VkImageCreateInfo image_create_info =
-    {
-        .sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .pNext                 = NULL,
-        .flags                 = image_mem_info->flags,
-        .imageType             = image_info    ->type,
-        .format                = image_mem_info->format,
-        .extent                = image_info    ->extent,
-        .mipLevels             = image_info    ->mip_levels,
-        .arrayLayers           = image_info    ->array_layers,
-        .samples               = image_info    ->samples,
-        .tiling                = image_mem_info->tiling,
-        .usage                 = image_mem_info->usage,
-        .sharingMode           = VK_SHARING_MODE_EXCLUSIVE,
-        .queueFamilyIndexCount = 0,
-        .pQueueFamilyIndices   = NULL,
-        .initialLayout         = image_info->initial_layout,
-    };
+    ResourceSharing* resource_sharing = &GetPhysicalDevice()->resource_sharing;
+
+    VkImageCreateInfo image_create_info = {};
+    image_create_info.sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_create_info.pNext                 = NULL;
+    image_create_info.flags                 = image_mem_info  ->flags;
+    image_create_info.format                = image_mem_info  ->format;
+    image_create_info.tiling                = image_mem_info  ->tiling;
+    image_create_info.usage                 = image_mem_info  ->usage;
+    image_create_info.imageType             = image_info      ->type;
+    image_create_info.extent                = image_info      ->extent;
+    image_create_info.mipLevels             = image_info      ->mip_levels;
+    image_create_info.arrayLayers           = image_info      ->array_layers;
+    image_create_info.samples               = image_info      ->samples;
+    image_create_info.initialLayout         = image_info      ->initial_layout;
+    image_create_info.sharingMode           = resource_sharing->mode;
+    image_create_info.queueFamilyIndexCount = resource_sharing->queue_family_index_count;
+    image_create_info.pQueueFamilyIndices   = resource_sharing->queue_family_indexes;
+
     VkImage temp = VK_NULL_HANDLE;
     VkResult res = vkCreateImage(device, &image_create_info, NULL, &temp);
     Validate(res, "vkCreateImage() failed");
     VkMemoryRequirements mem_requirements = {};
     vkGetImageMemoryRequirements(device, temp, &mem_requirements);
     vkDestroyImage(device, temp, NULL);
+
     return mem_requirements.size;
 }
 

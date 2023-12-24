@@ -36,11 +36,19 @@ struct QueueFamilies
     uint32 present;
 };
 
+struct ResourceSharing
+{
+    VkSharingMode mode;
+    uint32        queue_family_index_count;
+    const uint32* queue_family_indexes;
+};
+
 struct PhysicalDevice
 {
     VkPhysicalDevice                 hnd;
-    QueueFamilies                    queue_families;
     VkFormat                         depth_image_format;
+    QueueFamilies                    queue_families;
+    ResourceSharing                  resource_sharing;
     VkPhysicalDeviceProperties       properties;
     VkPhysicalDeviceMemoryProperties mem_properties;
     DeviceFeatures                   features;
@@ -417,12 +425,29 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
         VkPhysicalDevice vk_physical_device = Get(&vk_physical_devices, physical_device_index);
 
         // Collect all info about physical device.
-        PhysicalDevice physical_device =
+        PhysicalDevice physical_device = {};
+        physical_device.hnd                = vk_physical_device;
+        physical_device.depth_image_format = FindDepthImageFormat(vk_physical_device);
+        physical_device.queue_families     = FindQueueFamilies(&frame, vk_physical_device, g_context.surface);
+        if (physical_device.queue_families.graphics != physical_device.queue_families.present)
         {
-            .hnd                = vk_physical_device,
-            .queue_families     = FindQueueFamilies(&frame, vk_physical_device, g_context.surface),
-            .depth_image_format = FindDepthImageFormat(vk_physical_device),
-        };
+            physical_device.resource_sharing =
+            {
+                .mode                     = VK_SHARING_MODE_CONCURRENT,
+                .queue_family_index_count = sizeof(QueueFamilies) / sizeof(uint32),
+                .queue_family_indexes     = (const uint32*)&physical_device.queue_families,
+            };
+        }
+        else
+        {
+            physical_device.resource_sharing =
+            {
+                .mode                     = VK_SHARING_MODE_EXCLUSIVE,
+                .queue_family_index_count = 0,
+                .queue_family_indexes     = NULL,
+            };
+        }
+
         vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
         vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
 

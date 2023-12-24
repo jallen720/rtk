@@ -980,7 +980,7 @@ static void UpdateSwapchainSurfaceExtent(Stack* temp_stack, FreeList* free_list)
 {
     Swapchain* swapchain = &g_context.swapchain;
 
-    // Destroy image views.
+    // Destroy swapchain image views.
     for (uint32 i = 0; i < swapchain->image_views.count; ++i)
     {
         vkDestroyImageView(g_context.device, Get(&swapchain->image_views, i), NULL);

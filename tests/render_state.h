@@ -516,34 +516,25 @@ static void UpdateMVPMatrixesThread(void* data)
     }
 }
 
-static void UpdateAllPipelineViewports(FreeList* free_list)
-{
-    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
-    VkViewport viewports[] =
-    {
-        {
-            .x        = 0,
-            .y        = 0,
-            .width    = (float32)swapchain_extent.width,
-            .height   = (float32)swapchain_extent.height,
-            .minDepth = 0,
-            .maxDepth = 1,
-        },
-    };
-    UpdatePipelineViewports(&g_render_state.pipeline, free_list, CTK_WRAP_ARRAY(viewports));
-}
-
-static void UpdateAllRenderTargetAttachments(Stack* temp_stack, FreeList* free_list)
-{
-    UpdateRenderTargetAttachments(&g_render_state.render_target, temp_stack, free_list);
-}
-
 static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
 {
     WaitIdle();
+
     UpdateSwapchainSurfaceExtent(temp_stack, free_list);
-    UpdateAllPipelineViewports(free_list);
-    UpdateAllRenderTargetAttachments(temp_stack, free_list);
+
+    VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
+    VkViewport viewport =
+    {
+        .x        = 0,
+        .y        = 0,
+        .width    = (float32)swapchain_extent.width,
+        .height   = (float32)swapchain_extent.height,
+        .minDepth = 0,
+        .maxDepth = 1,
+    };
+    UpdatePipelineViewports(&g_render_state.pipeline, free_list, CTK_WRAP_ARRAY_1(&viewport));
+
+    UpdateRenderTargetAttachments(&g_render_state.render_target, temp_stack, free_list);
 }
 
 /// Interface

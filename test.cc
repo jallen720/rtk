@@ -85,7 +85,7 @@ LogResourceGroups();
         }
 
         // When window is re-focused after being minimized, surface extent is 0,0 for a short period of time. Skip
-        // rendering until surface extent > 0,0.
+        // rendering until surface extent > 0,0 to avoid recreating swapchain with extent of 0,0 which will fail.
         VkSurfaceCapabilitiesKHR surface_capabilities = {};
         GetSurfaceCapabilities(&surface_capabilities);
         VkExtent2D current_surface_extent = surface_capabilities.currentExtent;

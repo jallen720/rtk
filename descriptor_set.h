@@ -217,7 +217,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                     {
                         VkDescriptorBufferInfo* desc_buffer_info = Push(desc_buffer_infos);
                         desc_buffer_info->buffer = GetBuffer(*buffer_hnd);
-                        desc_buffer_info->offset = GetBufferFrameState(*buffer_hnd, frame_index)->dev_mem_offset;
+                        desc_buffer_info->offset = GetBufferFrameState(*buffer_hnd, frame_index)->res_mem_offset;
                         desc_buffer_info->range  = GetBufferState(*buffer_hnd)->size;
                     }
                 }

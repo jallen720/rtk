@@ -11,7 +11,7 @@ static VkResult AcquireSwapchainImage()
     Validate(res, "vkWaitForFences() failed");
 
     // Once frame is ready, acquire next swapchain image's index.
-    res = vkAcquireNextImageKHR(device, GetSwapchain()->hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
+    res = vkAcquireNextImageKHR(device, GetSwapchain()->handle, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
                                 &frame->swapchain_image_index);
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -88,7 +88,7 @@ static void BindDescriptorSets(VkCommandBuffer command_buffer, Pipeline* pipelin
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
                             pipeline->layout,
                             first_binding, // First set
-                            descriptor_sets->count, descriptor_sets->data, // Descriptor Set
+                            descriptor_sets->count, descriptor_sets->data, // Descriptor Sets
                             0, NULL); // Dynamic Offsets
 }
 
@@ -192,7 +192,7 @@ static VkResult SubmitRenderCommands(RenderTarget* render_target)
         .waitSemaphoreCount = 1,
         .pWaitSemaphores    = &frame->render_finished,
         .swapchainCount     = 1,
-        .pSwapchains        = &GetSwapchain()->hnd,
+        .pSwapchains        = &GetSwapchain()->handle,
         .pImageIndices      = &frame->swapchain_image_index,
         .pResults           = NULL,
     };

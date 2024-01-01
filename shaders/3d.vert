@@ -3,7 +3,7 @@
 #extension GL_GOOGLE_include_directive    : require
 #extension GL_EXT_scalar_block_layout     : require
 
-#include "../tests/3d/defs.h"
+#include "../tests/defs.h"
 
 layout(location = 0) in vec3 in_vert_pos;
 layout(location = 1) in vec2 in_vert_uv;

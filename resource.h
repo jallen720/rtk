@@ -619,7 +619,7 @@ static BufferHnd CreateBuffer(BufferHnd parent_buffer_hnd, BufferInfo* buffer_in
             parent_buffer_frame_state->res_mem_offset + parent_buffer_frame_state->index;
         VkDeviceSize aligned_index =
             Align(res_mem_relative_index, buffer_state->alignment) - parent_buffer_frame_state->res_mem_offset;
-        if (aligned_index + buffer_state->size >= parent_buffer_state->size)
+        if (aligned_index + buffer_state->size > parent_buffer_state->size)
         {
             CTK_FATAL("can't create sub-buffer frame %u from parent buffer at %u-byte aligned index %u: buffer size of "
                       "%u would exceed parent buffer's size of %u",

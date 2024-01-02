@@ -23,33 +23,6 @@ struct VkResultInfo
     const char* message;
 };
 
-/// Utils
-////////////////////////////////////////////////////////////
-static uint32 PrintToChar(const char* msg, uint32 msg_size, char end_char, uint32 index, const char* color = NULL)
-{
-    uint32 start = index;
-    while (index < msg_size)
-    {
-        char curr_char = msg[index];
-        if (curr_char == end_char)
-        {
-            break;
-        }
-        ++index;
-    }
-
-    if (color != NULL)
-    {
-        Print("%s%.*s" CTK_ANSI_RESET, color, index - start, &msg[start]);
-    }
-    else
-    {
-        Print("%.*s" CTK_ANSI_RESET, index - start, &msg[start]);
-    }
-
-    return index;
-}
-
 /// Interface
 ////////////////////////////////////////////////////////////
 static void PrintResult(VkResult result)
@@ -243,83 +216,9 @@ DefaultDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity_fla
     CTK_UNUSED(message_type_flags)
     CTK_UNUSED(user_data)
 
-    uint32 msg_size = StringSize(callback_data->pMessage);
-    uint32 index = 0;
     if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT & message_severity_flag_bit)
     {
-        // Print formatted error message properties.
-        Print(CTK_ERROR_TAG);
-
-        index = PrintToChar(callback_data->pMessage, msg_size, ':', index, CTK_ANSI_COLOR_SKY);
-        index = PrintToChar(callback_data->pMessage, msg_size, ']', index);
-        index += 2;
-        Print("]" CTK_ERROR_NL);
-
-        // Print each object on separate line.
-        while (StringsMatch(&callback_data->pMessage[index], "Object", 6))
-        {
-            index = PrintToChar(callback_data->pMessage, msg_size, ':', index, CTK_ANSI_COLOR_SKY);
-            index = PrintToChar(callback_data->pMessage, msg_size, ';', index);
-            index += 2;
-            Print(CTK_ERROR_NL);
-        }
-        index += 2;
-
-        index = PrintToChar(callback_data->pMessage, msg_size, ' ', index, CTK_ANSI_COLOR_SKY);
-        Print(':');
-        index += 2;
-        index = PrintToChar(callback_data->pMessage, msg_size, '|', index);
-        index += 2;
-        Print(CTK_ERROR_NL);
-
-        // Print formatted error message text, word-wrapped to console width.
-        static constexpr const char* MESSAGE_TAG = CTK_ANSI_HIGHLIGHT(SKY, "Message") ": ";
-        static constexpr uint32 ERROR_TAG_SIZE   = 7;
-        static constexpr uint32 MESSAGE_TAG_SIZE = 9;
-        Print(MESSAGE_TAG);
-
-        uint32 max_width = (uint32)GetConsoleScreenBufferWidth();
-        uint32 first_line_start = ERROR_TAG_SIZE + MESSAGE_TAG_SIZE; // First line starts after message tag.
-        CTK_ASSERT(max_width > first_line_start); // Must be room for atleast 1 character on first line.
-
-        uint32 line_start = first_line_start;
-        while (index < msg_size)
-        {
-            uint32 line_size = 0;
-            uint32 print_size = 0;
-            for (;;)
-            {
-                if (callback_data->pMessage[index + line_size] == ' ')
-                {
-                    ++line_size;
-                    print_size = line_size;
-                }
-
-                ++line_size;
-                if (index + line_size >= msg_size)
-                {
-                    // Print remaing characters in message.
-                    print_size = msg_size - index;
-                    break;
-                }
-
-                if (line_start + line_size >= max_width)
-                {
-                    if (print_size == 0)
-                    {
-                        print_size = max_width - line_start;
-                    }
-                    break;
-                }
-            }
-            Print("%.*s", print_size, &callback_data->pMessage[index]);
-            Print(CTK_ERROR_NL);
-            index += print_size;
-            line_start = ERROR_TAG_SIZE; // Subsequent lines start after error tag.
-        }
-        PrintLine();
-
-        throw 0;
+        CTK_FATAL(callback_data->pMessage);
     }
     else if (VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT & message_severity_flag_bit)
     {
@@ -379,12 +278,12 @@ static void PrintBufferCreateFlags(VkBufferCreateFlags buffer_create_flags, uint
     RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_SPARSE_BINDING_BIT)
     RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_SPARSE_RESIDENCY_BIT)
     RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_SPARSE_ALIASED_BIT)
-    // Provided by VK_VERSION_1_1
-    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_PROTECTED_BIT)
-    // Provided by VK_VERSION_1_2
-    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT)
-    // Provided by VK_EXT_descriptor_buffer
-    RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
+    // // Provided by VK_VERSION_1_1
+    // RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_PROTECTED_BIT)
+    // // Provided by VK_VERSION_1_2
+    // RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT)
+    // // Provided by VK_EXT_descriptor_buffer
+    // RTK_CHECK_PRINT_FLAG(buffer_create_flags, VK_BUFFER_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
 }
 
 static void PrintImageUsageFlags(VkImageUsageFlags image_usage_flags, uint32 tabs = 0)
@@ -397,33 +296,29 @@ static void PrintImageUsageFlags(VkImageUsageFlags image_usage_flags, uint32 tab
     RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
     RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT)
     RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
-    // Provided by VK_KHR_video_decode_queue
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR)
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_DECODE_SRC_BIT_KHR)
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR)
-    // Provided by VK_EXT_fragment_density_map
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT)
-    // Provided by VK_KHR_fragment_shading_rate
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)
-    // Provided by VK_EXT_host_image_copy
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT)
-    // Provided by VK_KHR_video_encode_queue
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_ENCODE_DST_BIT_KHR)
-#endif
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR)
-#endif
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR)
-#endif
-    // Provided by VK_EXT_attachment_feedback_loop_layout
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT)
-    // Provided by VK_HUAWEI_invocation_mask
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_INVOCATION_MASK_BIT_HUAWEI)
-    // Provided by VK_QCOM_image_processing
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_SAMPLE_WEIGHT_BIT_QCOM)
-    RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_SAMPLE_BLOCK_MATCH_BIT_QCOM)
+    // // Provided by VK_KHR_video_decode_queue
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR)
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_DECODE_SRC_BIT_KHR)
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR)
+    // // Provided by VK_EXT_fragment_density_map
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_FRAGMENT_DENSITY_MAP_BIT_EXT)
+    // // Provided by VK_KHR_fragment_shading_rate
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR)
+    // // Provided by VK_EXT_host_image_copy
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_HOST_TRANSFER_BIT_EXT)
+    // // Provided by VK_KHR_video_encode_queue
+// #ifdef VK_ENABLE_BETA_EXTENSIONS
+//     RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_ENCODE_DST_BIT_KHR)
+//     RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_ENCODE_SRC_BIT_KHR)
+//     RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_VIDEO_ENCODE_DPB_BIT_KHR)
+// #endif
+    // // Provided by VK_EXT_attachment_feedback_loop_layout
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT)
+    // // Provided by VK_HUAWEI_invocation_mask
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_INVOCATION_MASK_BIT_HUAWEI)
+    // // Provided by VK_QCOM_image_processing
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_SAMPLE_WEIGHT_BIT_QCOM)
+    // RTK_CHECK_PRINT_FLAG(image_usage_flags, VK_IMAGE_USAGE_SAMPLE_BLOCK_MATCH_BIT_QCOM)
 }
 
 static void PrintImageCreateFlags(VkImageCreateFlags image_create_flags, uint32 tabs = 0)
@@ -441,20 +336,20 @@ static void PrintImageCreateFlags(VkImageCreateFlags image_create_flags, uint32 
     RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_EXTENDED_USAGE_BIT)
     RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_PROTECTED_BIT)
     RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_DISJOINT_BIT)
-    // Provided by VK_NV_corner_sampled_image
-    RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV)
-    // Provided by VK_EXT_sample_locations
-    RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT)
-    // Provided by VK_EXT_fragment_density_map
-    RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_SUBSAMPLED_BIT_EXT)
-    // Provided by VK_EXT_descriptor_buffer
-    RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
-    // Provided by VK_EXT_multisampled_render_to_single_sampled
-    RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT)
-    // Provided by VK_EXT_image_2d_view_of_3d
-    RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT)
-    // Provided by VK_QCOM_fragment_density_map_offset
-    RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_FRAGMENT_DENSITY_MAP_OFFSET_BIT_QCOM)
+    // // Provided by VK_NV_corner_sampled_image
+    // RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV)
+    // // Provided by VK_EXT_sample_locations
+    // RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT)
+    // // Provided by VK_EXT_fragment_density_map
+    // RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_SUBSAMPLED_BIT_EXT)
+    // // Provided by VK_EXT_descriptor_buffer
+    // RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
+    // // Provided by VK_EXT_multisampled_render_to_single_sampled
+    // RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT)
+    // // Provided by VK_EXT_image_2d_view_of_3d
+    // RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT)
+    // // Provided by VK_QCOM_fragment_density_map_offset
+    // RTK_CHECK_PRINT_FLAG(image_create_flags, VK_IMAGE_CREATE_FRAGMENT_DENSITY_MAP_OFFSET_BIT_QCOM)
 }
 
 static void PrintImageAspectFlags(VkImageAspectFlags image_aspect_flags, uint32 tabs = 0)
@@ -469,21 +364,21 @@ static void PrintImageAspectFlags(VkImageAspectFlags image_aspect_flags, uint32 
     RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_PLANE_2_BIT)
     // Provided by VK_VERSION_1_3
     RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_NONE)
-    // Provided by VK_EXT_image_drm_format_modifier
-    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT)
-    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_1_BIT_EXT)
-    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_2_BIT_EXT)
-    RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_3_BIT_EXT)
+    // // Provided by VK_EXT_image_drm_format_modifier
+    // RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_0_BIT_EXT)
+    // RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_1_BIT_EXT)
+    // RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_2_BIT_EXT)
+    // RTK_CHECK_PRINT_FLAG(image_aspect_flags, VK_IMAGE_ASPECT_MEMORY_PLANE_3_BIT_EXT)
 }
 
 static void PrintImageViewCreateFlags(VkImageViewCreateFlags image_view_create_flags, uint32 tabs = 0)
 {
-    // Provided by VK_EXT_fragment_density_map
-    RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DYNAMIC_BIT_EXT)
-    // Provided by VK_EXT_descriptor_buffer
-    RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
-    // Provided by VK_EXT_fragment_density_map2
-    RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DEFERRED_BIT_EXT)
+    // // Provided by VK_EXT_fragment_density_map
+    // RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DYNAMIC_BIT_EXT)
+    // // Provided by VK_EXT_descriptor_buffer
+    // RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
+    // // Provided by VK_EXT_fragment_density_map2
+    // RTK_CHECK_PRINT_FLAG(image_view_create_flags, VK_IMAGE_VIEW_CREATE_FRAGMENT_DENSITY_MAP_DEFERRED_BIT_EXT)
 }
 
 /// Enum Strings
@@ -580,44 +475,44 @@ static constexpr const char* VkResultName(VkResult result)
         RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS)
         // Provided by VK_VERSION_1_3
         RTK_ENUM_NAME_CASE(VK_PIPELINE_COMPILE_REQUIRED)
-        // Provided by VK_KHR_surface
-        RTK_ENUM_NAME_CASE(VK_ERROR_SURFACE_LOST_KHR)
-        RTK_ENUM_NAME_CASE(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR)
-        // Provided by VK_KHR_swapchain
-        RTK_ENUM_NAME_CASE(VK_SUBOPTIMAL_KHR)
-        RTK_ENUM_NAME_CASE(VK_ERROR_OUT_OF_DATE_KHR)
-        // Provided by VK_KHR_display_swapchain
-        RTK_ENUM_NAME_CASE(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR)
-        // Provided by VK_EXT_debug_report
-        RTK_ENUM_NAME_CASE(VK_ERROR_VALIDATION_FAILED_EXT)
-        // Provided by VK_NV_glsl_shader
-        RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_SHADER_NV)
-        // Provided by VK_KHR_video_queue
-        RTK_ENUM_NAME_CASE(VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR)
-        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR)
-        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR)
-        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR)
-        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR)
-        RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR)
-        // Provided by VK_EXT_image_drm_format_modifier
-        RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT)
-        // Provided by VK_KHR_global_priority
-        RTK_ENUM_NAME_CASE(VK_ERROR_NOT_PERMITTED_KHR)
-        // Provided by VK_EXT_full_screen_exclusive
-        RTK_ENUM_NAME_CASE(VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
-        // Provided by VK_KHR_deferred_host_operations
-        RTK_ENUM_NAME_CASE(VK_THREAD_IDLE_KHR)
-        RTK_ENUM_NAME_CASE(VK_THREAD_DONE_KHR)
-        RTK_ENUM_NAME_CASE(VK_OPERATION_DEFERRED_KHR)
-        RTK_ENUM_NAME_CASE(VK_OPERATION_NOT_DEFERRED_KHR)
-#ifdef VK_ENABLE_BETA_EXTENSIONS
-        // Provided by VK_KHR_video_encode_queue
-        RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR)
-#endif
-        // Provided by VK_EXT_image_compression_control
-        RTK_ENUM_NAME_CASE(VK_ERROR_COMPRESSION_EXHAUSTED_EXT)
-        // Provided by VK_EXT_shader_object
-        RTK_ENUM_NAME_CASE(VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT)
+        // // Provided by VK_KHR_surface
+        // RTK_ENUM_NAME_CASE(VK_ERROR_SURFACE_LOST_KHR)
+        // RTK_ENUM_NAME_CASE(VK_ERROR_NATIVE_WINDOW_IN_USE_KHR)
+        // // Provided by VK_KHR_swapchain
+        // RTK_ENUM_NAME_CASE(VK_SUBOPTIMAL_KHR)
+        // RTK_ENUM_NAME_CASE(VK_ERROR_OUT_OF_DATE_KHR)
+        // // Provided by VK_KHR_display_swapchain
+        // RTK_ENUM_NAME_CASE(VK_ERROR_INCOMPATIBLE_DISPLAY_KHR)
+        // // Provided by VK_EXT_debug_report
+        // RTK_ENUM_NAME_CASE(VK_ERROR_VALIDATION_FAILED_EXT)
+        // // Provided by VK_NV_glsl_shader
+        // RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_SHADER_NV)
+        // // Provided by VK_KHR_video_queue
+        // RTK_ENUM_NAME_CASE(VK_ERROR_IMAGE_USAGE_NOT_SUPPORTED_KHR)
+        // RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PICTURE_LAYOUT_NOT_SUPPORTED_KHR)
+        // RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_OPERATION_NOT_SUPPORTED_KHR)
+        // RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_FORMAT_NOT_SUPPORTED_KHR)
+        // RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_PROFILE_CODEC_NOT_SUPPORTED_KHR)
+        // RTK_ENUM_NAME_CASE(VK_ERROR_VIDEO_STD_VERSION_NOT_SUPPORTED_KHR)
+        // // Provided by VK_EXT_image_drm_format_modifier
+        // RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_DRM_FORMAT_MODIFIER_PLANE_LAYOUT_EXT)
+        // // Provided by VK_KHR_global_priority
+        // RTK_ENUM_NAME_CASE(VK_ERROR_NOT_PERMITTED_KHR)
+        // // Provided by VK_EXT_full_screen_exclusive
+        // RTK_ENUM_NAME_CASE(VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT)
+        // // Provided by VK_KHR_deferred_host_operations
+        // RTK_ENUM_NAME_CASE(VK_THREAD_IDLE_KHR)
+        // RTK_ENUM_NAME_CASE(VK_THREAD_DONE_KHR)
+        // RTK_ENUM_NAME_CASE(VK_OPERATION_DEFERRED_KHR)
+        // RTK_ENUM_NAME_CASE(VK_OPERATION_NOT_DEFERRED_KHR)
+// #ifdef VK_ENABLE_BETA_EXTENSIONS
+//         // Provided by VK_KHR_video_encode_queue
+//         RTK_ENUM_NAME_CASE(VK_ERROR_INVALID_VIDEO_STD_PARAMETERS_KHR)
+// #endif
+        // // Provided by VK_EXT_image_compression_control
+        // RTK_ENUM_NAME_CASE(VK_ERROR_COMPRESSION_EXHAUSTED_EXT)
+        // // Provided by VK_EXT_shader_object
+        // RTK_ENUM_NAME_CASE(VK_ERROR_INCOMPATIBLE_SHADER_BINARY_EXT)
 
         ///
         /// Duplicates
@@ -659,18 +554,18 @@ static constexpr const char* VkImageCreateName(VkImageCreateFlagBits image_creat
         RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_EXTENDED_USAGE_BIT)
         RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_PROTECTED_BIT)
         RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_DISJOINT_BIT)
-        // Provided by VK_NV_corner_sampled_image
-        RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV)
-        // Provided by VK_EXT_sample_locations
-        RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT)
-        // Provided by VK_EXT_fragment_density_map
-        RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_SUBSAMPLED_BIT_EXT)
-        // Provided by VK_EXT_descriptor_buffer
-        RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
-        // Provided by VK_EXT_multisampled_render_to_single_sampled
-        RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT)
-        // Provided by VK_EXT_image_2d_view_of_3d
-        RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT)
+        // // Provided by VK_NV_corner_sampled_image
+        // RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_CORNER_SAMPLED_BIT_NV)
+        // // Provided by VK_EXT_sample_locations
+        // RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT)
+        // // Provided by VK_EXT_fragment_density_map
+        // RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_SUBSAMPLED_BIT_EXT)
+        // // Provided by VK_EXT_descriptor_buffer
+        // RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_DESCRIPTOR_BUFFER_CAPTURE_REPLAY_BIT_EXT)
+        // // Provided by VK_EXT_multisampled_render_to_single_sampled
+        // RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_MULTISAMPLED_RENDER_TO_SINGLE_SAMPLED_BIT_EXT)
+        // // Provided by VK_EXT_image_2d_view_of_3d
+        // RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_2D_VIEW_COMPATIBLE_BIT_EXT)
         // Provided by VK_QCOM_fragment_density_map_offset
         RTK_ENUM_NAME_CASE(VK_IMAGE_CREATE_FRAGMENT_DENSITY_MAP_OFFSET_BIT_QCOM)
         default: CTK_FATAL("unknown VkImageCreateFlagBits value: %u", (uint32)image_create);
@@ -933,20 +828,20 @@ static constexpr const char* VkFormatName(VkFormat format)
         RTK_ENUM_NAME_CASE(VK_FORMAT_ASTC_10x10_SFLOAT_BLOCK)
         RTK_ENUM_NAME_CASE(VK_FORMAT_ASTC_12x10_SFLOAT_BLOCK)
         RTK_ENUM_NAME_CASE(VK_FORMAT_ASTC_12x12_SFLOAT_BLOCK)
-        // Provided by VK_IMG_format_pvrtc
-        RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG)
-        RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG)
-        RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG)
-        RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG)
-        RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG)
-        RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG)
-        RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG)
-        RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG)
-        // Provided by VK_NV_optical_flow
-        RTK_ENUM_NAME_CASE(VK_FORMAT_R16G16_S10_5_NV)
-        // Provided by VK_KHR_maintenance5
-        RTK_ENUM_NAME_CASE(VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR)
-        RTK_ENUM_NAME_CASE(VK_FORMAT_A8_UNORM_KHR)
+        // // Provided by VK_IMG_format_pvrtc
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC1_2BPP_UNORM_BLOCK_IMG)
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC1_4BPP_UNORM_BLOCK_IMG)
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC2_2BPP_UNORM_BLOCK_IMG)
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC2_4BPP_UNORM_BLOCK_IMG)
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC1_2BPP_SRGB_BLOCK_IMG)
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC1_4BPP_SRGB_BLOCK_IMG)
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC2_2BPP_SRGB_BLOCK_IMG)
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG)
+        // // Provided by VK_NV_optical_flow
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_R16G16_S10_5_NV)
+        // // Provided by VK_KHR_maintenance5
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_A1B5G5R5_UNORM_PACK16_KHR)
+        // RTK_ENUM_NAME_CASE(VK_FORMAT_A8_UNORM_KHR)
         default: CTK_FATAL("unknown VkFormat value: %u", (uint32)format);
     }
 }
@@ -972,8 +867,8 @@ static constexpr const char* VkImageTilingName(VkImageTiling image_tiling)
     {
         RTK_ENUM_NAME_CASE(VK_IMAGE_TILING_OPTIMAL)
         RTK_ENUM_NAME_CASE(VK_IMAGE_TILING_LINEAR)
-        // Provided by VK_EXT_image_drm_format_modifier
-        RTK_ENUM_NAME_CASE(VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT)
+        // // Provided by VK_EXT_image_drm_format_modifier
+        // RTK_ENUM_NAME_CASE(VK_IMAGE_TILING_DRM_FORMAT_MODIFIER_EXT)
         default: CTK_FATAL("unknown VkImageTiling value: %u", (uint32)image_tiling);
     }
 }

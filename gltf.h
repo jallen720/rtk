@@ -331,9 +331,9 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
     InitArray(&gltf->meshes,       allocator, json_meshes->list.size);
     for (uint32 i = 0; i < json_accessors->list.size; ++i)
     {
-        GLTFAccessor* accessor = Push(&gltf->accessors);
         JSONNode* json_accessor = GetObject(&json, json_accessors, i);
-        JSONNode* json_offset    = FindNode(&json, json_accessor, "offset");
+        JSONNode* json_offset   = FindNode(&json, json_accessor, "offset");
+        GLTFAccessor* accessor   = Push(&gltf->accessors);
         accessor->buffer_view    = GetUInt32(&json, json_accessor, "bufferView");
         accessor->count          = GetUInt32(&json, json_accessor, "count");
         accessor->offset         = json_offset == NULL ? 0 : json_offset->num_uint32;
@@ -342,8 +342,8 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
     }
     for (uint32 i = 0; i < json_buffer_views->list.size; ++i)
     {
-        GLTFBufferView* buffer_view = Push(&gltf->buffer_views);
         JSONNode* json_buffer_view = GetObject(&json, json_buffer_views, i);
+        GLTFBufferView* buffer_view = Push(&gltf->buffer_views);
         buffer_view->buffer = GetUInt32(&json, json_buffer_view, "buffer");
         buffer_view->size   = GetUInt32(&json, json_buffer_view, "byteLength");
         buffer_view->offset = GetUInt32(&json, json_buffer_view, "byteOffset");
@@ -351,12 +351,12 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
     }
     for (uint32 i = 0; i < json_buffers->list.size; ++i)
     {
-        GLTFBuffer* buffer = Push(&gltf->buffers);
         JSONNode* json_buffer = GetObject(&json, json_buffers, i);
-
-        // Append buffer uri in GLTF file to GLTF file directory.
         String* json_uri = GetString(&json, json_buffer, "uri");
         uint32 path_dir_size = GetPathDirSize(path);
+
+        // Append buffer uri in GLTF file to GLTF file directory.
+        GLTFBuffer* buffer = Push(&gltf->buffers);
         InitString(&buffer->uri, allocator, path_dir_size + json_uri->size);
         PushRange(&buffer->uri, path, path_dir_size);
         PushRange(&buffer->uri, json_uri);
@@ -365,8 +365,8 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
     }
     for (uint32 i = 0; i < json_meshes->list.size; ++i)
     {
-        GLTFMesh* mesh = Push(&gltf->meshes);
         JSONNode* json_mesh = GetObject(&json, json_meshes, i);
+        GLTFMesh* mesh = Push(&gltf->meshes);
         InitString(&mesh->name, allocator, GetString(&json, json_mesh, "name"));
 
         // Primitives
@@ -374,8 +374,8 @@ void LoadGLTF(GLTF* gltf, const Allocator* allocator, const char* path)
         InitArray(&mesh->primitives, allocator, json_primitives->list.size);
         for (uint32 primitive_index = 0; primitive_index < json_primitives->list.size; ++primitive_index)
         {
-            GLTFPrimitive* primitive = Push(&mesh->primitives);
             JSONNode* json_primitive = GetObject(&json, json_primitives, primitive_index);
+            GLTFPrimitive* primitive = Push(&mesh->primitives);
             primitive->indexes_accessor = GetUInt32(&json, json_primitive, "indices");
 
             // Attributes

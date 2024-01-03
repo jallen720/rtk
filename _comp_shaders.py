@@ -19,6 +19,9 @@ def IsShaderSrc(file):
     return False
 
 if __name__ == "__main__":
-    for file in os.listdir("shaders"):
-        if IsShaderSrc(file):
-            os.system(f"%VULKAN_SDK%/Bin/glslangValidator.exe -V shaders/{file} -o shaders/bin/{file}.spv")
+    for spirv_bin in os.listdir("shaders/bin"):
+        os.remove(f"shaders/bin/{spirv_bin}")
+
+    for shader in os.listdir("shaders"):
+        if IsShaderSrc(shader):
+            os.system(f"%VULKAN_SDK%/Bin/glslangValidator.exe -V shaders/{shader} -o shaders/bin/{shader}.spv")

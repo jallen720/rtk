@@ -50,7 +50,8 @@ static void DestroyImageData(ImageData* image_data)
     *image_data = {};
 }
 
-static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 frame_index, ImageData* image_data)
+static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 frame_index,
+                      VkDeviceSize size, uint8* data, VkDeviceSize offset)
 {
     ResourceGroup* res_group = GetResourceGroup(image_hnd.group_index);
     ValidateImage(res_group, image_hnd.index, "can't load image");
@@ -58,9 +59,9 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
 
     HostBufferWrite image_data_write =
     {
-        .size       = (VkDeviceSize)image_data->size,
-        .src_data   = image_data->data,
-        .src_offset = 0,
+        .size       = size,
+        .src_data   = data,
+        .src_offset = offset,
         .dst_hnd    = staging_buffer_hnd,
     };
     WriteHostBuffer(&image_data_write, frame_index);
@@ -153,6 +154,11 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
                              1,                                     // Image Memory Barrier Count
                              &post_copy_mem_barrier);               // Image Memory Barriers
     SubmitTempCommandBuffer();
+}
+
+static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 frame_index, ImageData* image_data)
+{
+    LoadImage(image_hnd, staging_buffer_hnd, frame_index, (VkDeviceSize)image_data->size, image_data->data, (VkDeviceSize)0);
 }
 
 static VkImageView GetImageView(ImageHnd image_hnd, uint32 frame_index)

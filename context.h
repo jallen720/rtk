@@ -714,11 +714,12 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
     }
 
     // Default to FIFO (only present mode with guarenteed availability), check for preferred mailbox present mode.
+    static constexpr VkPresentModeKHR PREFERRED_PRESENT_MODE = VK_PRESENT_MODE_MAILBOX_KHR;
     swapchain->surface_present_mode = VK_PRESENT_MODE_FIFO_KHR;
     for (uint32 i = 0; i < present_modes.count; ++i)
     {
         VkPresentModeKHR surface_present_mode = Get(&present_modes, i);
-        if (surface_present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
+        if (surface_present_mode == PREFERRED_PRESENT_MODE)
         {
             swapchain->surface_present_mode = surface_present_mode;
             break;

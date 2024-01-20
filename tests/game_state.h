@@ -54,7 +54,8 @@ static uint32 TextureIndex(uint32 entity_index)
 
 static uint32 SamplerIndex(uint32 entity_index)
 {
-    return (TextureIndex(entity_index) + 1) % 3 == 0;
+    static constexpr uint32 SAMPLER_INDEXES[TEXTURE_COUNT] = { 0, 0, 1, 0, 1, 1 };
+    return SAMPLER_INDEXES[TextureIndex(entity_index)];
 }
 
 static void UpdateMouse(Mouse* mouse)

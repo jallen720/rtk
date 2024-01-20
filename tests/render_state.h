@@ -151,7 +151,9 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     {
         .size       = Megabyte32<8>(),
         .flags      = 0,
-        .usage      = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        .usage      = VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                      VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                      VK_IMAGE_USAGE_SAMPLED_BIT,
         .properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         .format     = GetSwapchain()->surface_format.format,
         .tiling     = VK_IMAGE_TILING_OPTIMAL,
@@ -184,6 +186,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     {
         ImageData texture_data = {};
         LoadImageData(&texture_data, TEXTURE_IMAGE_PATHS[i]);
+        uint32 mip_levels = MipLevels(&texture_data);
         ImageInfo texture_info =
         {
             .extent =
@@ -193,7 +196,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
                 .depth  = 1
             },
             .type           = VK_IMAGE_TYPE_2D,
-            .mip_levels     = 1,
+            .mip_levels     = mip_levels,
             .array_layers   = 1,
             .samples        = VK_SAMPLE_COUNT_1_BIT,
             .initial_layout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -257,6 +260,7 @@ static void CreateSamplers(Stack* perm_stack)
 {
     VkResult res = VK_SUCCESS;
     VkDevice device = GetDevice();
+    float32 max_sampler_anisotropy = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy;
     VkSamplerCreateInfo sampler_infos[MAX_SAMPLERS] =
     {
         {
@@ -265,17 +269,17 @@ static void CreateSamplers(Stack* perm_stack)
             .flags                   = 0,
             .magFilter               = VK_FILTER_NEAREST,
             .minFilter               = VK_FILTER_NEAREST,
-            .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST,
+            .mipmapMode              = VK_SAMPLER_MIPMAP_MODE_LINEAR,
             .addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             .addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             .mipLodBias              = 0.0f,
             .anisotropyEnable        = VK_FALSE,
-            .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+            .maxAnisotropy           = max_sampler_anisotropy,
             .compareEnable           = VK_FALSE,
             .compareOp               = VK_COMPARE_OP_ALWAYS,
-            .minLod                  = 0.0f,
-            .maxLod                  = 0.0f,
+            .minLod                  = 0,
+            .maxLod                  = 7,
             .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
             .unnormalizedCoordinates = VK_FALSE,
         },
@@ -291,11 +295,11 @@ static void CreateSamplers(Stack* perm_stack)
             .addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
             .mipLodBias              = 0.0f,
             .anisotropyEnable        = VK_FALSE,
-            .maxAnisotropy           = GetPhysicalDevice()->properties.limits.maxSamplerAnisotropy,
+            .maxAnisotropy           = max_sampler_anisotropy,
             .compareEnable           = VK_FALSE,
             .compareOp               = VK_COMPARE_OP_ALWAYS,
-            .minLod                  = 0.0f,
-            .maxLod                  = 0.0f,
+            .minLod                  = 0,
+            .maxLod                  = 10,
             .borderColor             = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
             .unnormalizedCoordinates = VK_FALSE,
         },

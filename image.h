@@ -92,7 +92,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
             {
                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel   = 0,
-                .levelCount     = image_info->mip_levels,
+                .levelCount     = VK_REMAINING_MIP_LEVELS,
                 .baseArrayLayer = 0,
                 .layerCount     = 1,
             },
@@ -129,33 +129,138 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
         vkCmdCopyBufferToImage(temp_command_buffer, staging_buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                1, &copy);
 
-        // Transition all image mip levels to be shader_read & shader_read_only_optimal.
-        VkImageMemoryBarrier transition_shader_read_only_optimal =
+        // Blit mip images.
+        sint32 mip_width  = image_info->extent.width;
+        sint32 mip_height = image_info->extent.height;
+        for (uint32 i = 1; i < image_info->mip_levels; i += 1)
         {
-            .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
-            .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
-            .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image               = image,
-            .subresourceRange =
+            // Transition previous mip level to transfer_read & transfer_src.
+            VkImageMemoryBarrier transition_prev_mip_level =
             {
-                .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel   = 0,
-                .levelCount     = image_info->mip_levels,
-                .baseArrayLayer = 0,
-                .layerCount     = 1,
-            },
-        };
-        vkCmdPipelineBarrier(temp_command_buffer,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,           // Source Stage Mask
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,    // Destination Stage Mask
-                             0,                                        // Dependency Flags
-                             0, NULL,                                  // Memory Barriers
-                             0, NULL,                                  // Buffer Memory Barriers
-                             1, &transition_shader_read_only_optimal); // Image Memory Barriers
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image               = image,
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = i - 1,
+                    .levelCount     = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+            };
+            vkCmdPipelineBarrier(temp_command_buffer,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, // Source Stage Mask
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, // Destination Stage Mask
+                                 0,                              // Dependency Flags
+                                 0, NULL,                        // Memory Barriers
+                                 0, NULL,                        // Buffer Memory Barriers
+                                 1, &transition_prev_mip_level); // Image Memory Barriers
+
+            sint32 half_mip_width  = Max(1, mip_width  / 2);
+            sint32 half_mip_height = Max(1, mip_height / 2);
+            VkImageBlit image_blit =
+            {
+                .srcSubresource =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel       = i - 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+                .srcOffsets =
+                {
+                    { 0,         0,          0 },
+                    { mip_width, mip_height, 1 },
+                },
+                .dstSubresource =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel       = i,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+                .dstOffsets =
+                {
+                    { 0,              0,               0 },
+                    { half_mip_width, half_mip_height, 1 },
+                },
+            };
+            vkCmdBlitImage(temp_command_buffer,
+                           image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                           1, &image_blit,
+                           VK_FILTER_LINEAR);
+
+            mip_width  = half_mip_width;
+            mip_height = half_mip_height;
+        }
+
+        // Transition mip levels 0 -> level_count - 1 to shader_read & shader_read_only_optimal.
+        if (image_info->mip_levels > 1)
+        {
+            VkImageMemoryBarrier transition_shader_read_only_optimal =
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask       = VK_ACCESS_TRANSFER_READ_BIT,
+                .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image               = image,
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = 0,
+                    .levelCount     = image_info->mip_levels - 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+            };
+            vkCmdPipelineBarrier(temp_command_buffer,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,           // Source Stage Mask
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,    // Destination Stage Mask
+                                 0,                                        // Dependency Flags
+                                 0, NULL,                                  // Memory Barriers
+                                 0, NULL,                                  // Buffer Memory Barriers
+                                 1, &transition_shader_read_only_optimal); // Image Memory Barriers
+        }
+
+        // Transition last mip level to shader_read & shader_read_only_optimal.
+        {
+            VkImageMemoryBarrier transition_shader_read_only_optimal =
+            {
+                .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask       = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .newLayout           = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image               = image,
+                .subresourceRange =
+                {
+                    .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel   = image_info->mip_levels - 1,
+                    .levelCount     = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount     = 1,
+                },
+            };
+            vkCmdPipelineBarrier(temp_command_buffer,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT,           // Source Stage Mask
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,    // Destination Stage Mask
+                                 0,                                        // Dependency Flags
+                                 0, NULL,                                  // Memory Barriers
+                                 0, NULL,                                  // Buffer Memory Barriers
+                                 1, &transition_shader_read_only_optimal); // Image Memory Barriers
+        }
     SubmitTempCommandBuffer();
 }
 

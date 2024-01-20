@@ -358,5 +358,6 @@ MigrationBackup/
 *.sublime-*
 *.blend1
 *.cap
+*.rdbg
 todo.txt
 old/

@@ -78,10 +78,10 @@ struct RenderState
 static constexpr const char* TEXTURE_IMAGE_PATHS[] =
 {
     "images/axis_cube.png",
-    "images/axis_cube.png",
+    "images/axis_cube_inv.png",
     "images/icosphere_triangle.png",
-    "images/axis_cube.png",
-    "images/axis_cube.png",
+    "images/dirt_block.png",
+    "images/stone_tiles.png",
     "images/icosphere_triangle.png",
 };
 static constexpr uint32 TEXTURE_COUNT = CTK_ARRAY_SIZE(TEXTURE_IMAGE_PATHS);

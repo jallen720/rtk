@@ -72,10 +72,13 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
     WriteHostBuffer(&image_data_write, frame_index);
 
     // Copy image data from buffer memory to image memory.
+    VkBuffer staging_buffer = GetBuffer(res_group, staging_buffer_hnd.index);
     VkImage image = GetImageFrameState(res_group, image_hnd.index, frame_index)->image;
+    ImageInfo* image_info = GetImageInfo(res_group, image_hnd.index);
+    VkCommandBuffer temp_command_buffer = GetTempCommandBuffer();
     BeginTempCommandBuffer();
-        // Transition image layout for use in shader.
-        VkImageMemoryBarrier pre_copy_mem_barrier =
+        // Transition all mip levels to transfer_write & transfer_dst.
+        VkImageMemoryBarrier transition_transfer_dst =
         {
             .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .srcAccessMask       = VK_ACCESS_NONE,
@@ -89,22 +92,20 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
             {
                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel   = 0,
-                .levelCount     = 1,
+                .levelCount     = image_info->mip_levels,
                 .baseArrayLayer = 0,
                 .layerCount     = 1,
             },
         };
-        vkCmdPipelineBarrier(GetTempCommandBuffer(),
+        vkCmdPipelineBarrier(temp_command_buffer,
                              VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // Source Stage Mask
                              VK_PIPELINE_STAGE_TRANSFER_BIT,    // Destination Stage Mask
                              0,                                 // Dependency Flags
-                             0,                                 // Memory Barrier Count
-                             NULL,                              // Memory Barriers
-                             0,                                 // Buffer Memory Barrier Count
-                             NULL,                              // Buffer Memory Barriers
-                             1,                                 // Image Memory Barrier Count
-                             &pre_copy_mem_barrier);            // Image Memory Barriers
+                             0, NULL,                           // Memory Barriers
+                             0, NULL,                           // Buffer Memory Barriers
+                             1, &transition_transfer_dst);      // Image Memory Barriers
 
+        // Copy buffer data to image.
         VkBufferImageCopy copy =
         {
             .bufferOffset      = GetBufferFrameState(staging_buffer_hnd, frame_index)->res_mem_offset,
@@ -123,13 +124,13 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
                 .y = 0,
                 .z = 0,
             },
-            .imageExtent = GetImageInfo(res_group, image_hnd.index)->extent,
+            .imageExtent = image_info->extent,
         };
-        vkCmdCopyBufferToImage(GetTempCommandBuffer(), GetBuffer(res_group, staging_buffer_hnd.index), image,
-                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+        vkCmdCopyBufferToImage(temp_command_buffer, staging_buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               1, &copy);
 
-        // Transition image layout for use in shader.
-        VkImageMemoryBarrier post_copy_mem_barrier =
+        // Transition all image mip levels to be shader_read & shader_read_only_optimal.
+        VkImageMemoryBarrier transition_shader_read_only_optimal =
         {
             .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
             .srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -143,27 +144,25 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
             {
                 .aspectMask     = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel   = 0,
-                .levelCount     = 1,
+                .levelCount     = image_info->mip_levels,
                 .baseArrayLayer = 0,
                 .layerCount     = 1,
             },
         };
-        vkCmdPipelineBarrier(GetTempCommandBuffer(),
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,        // Source Stage Mask
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, // Destination Stage Mask
-                             0,                                     // Dependency Flags
-                             0,                                     // Memory Barrier Count
-                             NULL,                                  // Memory Barriers
-                             0,                                     // Buffer Memory Barrier Count
-                             NULL,                                  // Buffer Memory Barriers
-                             1,                                     // Image Memory Barrier Count
-                             &post_copy_mem_barrier);               // Image Memory Barriers
+        vkCmdPipelineBarrier(temp_command_buffer,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT,           // Source Stage Mask
+                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,    // Destination Stage Mask
+                             0,                                        // Dependency Flags
+                             0, NULL,                                  // Memory Barriers
+                             0, NULL,                                  // Buffer Memory Barriers
+                             1, &transition_shader_read_only_optimal); // Image Memory Barriers
     SubmitTempCommandBuffer();
 }
 
 static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 frame_index, ImageData* image_data)
 {
-    LoadImage(image_hnd, staging_buffer_hnd, frame_index, (VkDeviceSize)image_data->size, image_data->data, (VkDeviceSize)0);
+    LoadImage(image_hnd, staging_buffer_hnd, frame_index, (VkDeviceSize)image_data->size, image_data->data,
+              (VkDeviceSize)0);
 }
 
 static VkImageView GetImageView(ImageHnd image_hnd, uint32 frame_index)

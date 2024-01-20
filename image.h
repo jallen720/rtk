@@ -78,7 +78,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
         VkImageMemoryBarrier pre_copy_mem_barrier =
         {
             .sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .srcAccessMask       = 0,
+            .srcAccessMask       = VK_ACCESS_NONE,
             .dstAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT,
             .oldLayout           = VK_IMAGE_LAYOUT_UNDEFINED,
             .newLayout           = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,

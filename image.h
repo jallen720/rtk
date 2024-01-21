@@ -62,6 +62,17 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
     ValidateImage(res_group, image_hnd.index, "can't load image");
     ValidateBuffer(res_group, staging_buffer_hnd.index, "can't load image from buffer");
 
+    // Validate image's memory's format support linear filtering for mipmap generation.
+    uint32 image_mem_index = GetImageState(res_group, image_hnd.index)->image_mem_index;
+    VkFormat image_format = GetImageMemoryInfo(res_group, image_mem_index)->format;
+    VkFormatProperties format_properties = {};
+    vkGetPhysicalDeviceFormatProperties(GetPhysicalDevice()->hnd, image_format, &format_properties);
+    if (!(format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
+    {
+        CTK_FATAL("can't load image: image's memory's format properties does not support "
+                  "VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT required for mipmap generation.");
+    }
+
     HostBufferWrite image_data_write =
     {
         .size       = size,

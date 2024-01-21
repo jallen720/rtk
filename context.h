@@ -45,7 +45,7 @@ struct ResourceSharing
 
 struct PhysicalDevice
 {
-    VkPhysicalDevice                 handle;
+    VkPhysicalDevice                 hnd;
     VkFormat                         depth_image_format;
     QueueFamilies                    queue_families;
     ResourceSharing                  resource_sharing;
@@ -69,7 +69,7 @@ struct Swapchain
     uint32*       queue_family_indexes;
 
     // State
-    VkSwapchainKHR     handle;
+    VkSwapchainKHR     hnd;
     Array<VkImageView> image_views;
 };
 
@@ -391,7 +391,7 @@ static void InitSurface()
     {
         .sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR,
         .hinstance = window->instance,
-        .hwnd      = window->handle,
+        .hwnd      = window->hnd,
     };
     VkResult res = vkCreateWin32SurfaceKHR(g_context.instance, &info, NULL, &g_context.surface);
     Validate(res, "vkCreateWin32SurfaceKHR() failed");
@@ -424,46 +424,25 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
     {
         VkPhysicalDevice vk_physical_device = Get(&vk_physical_devices, physical_device_index);
 
-        // Collect all info about physical device.
+        // Collect info about physical device necessary to determine if it is capable of rendering.
         PhysicalDevice physical_device = {};
-        physical_device.handle             = vk_physical_device;
+        physical_device.hnd             = vk_physical_device;
         physical_device.depth_image_format = FindDepthImageFormat(vk_physical_device);
         physical_device.queue_families     = FindQueueFamilies(&frame, vk_physical_device, g_context.surface);
-        if (physical_device.queue_families.graphics != physical_device.queue_families.present)
-        {
-            physical_device.resource_sharing =
-            {
-                .mode                     = VK_SHARING_MODE_CONCURRENT,
-                .queue_family_index_count = sizeof(QueueFamilies) / sizeof(uint32),
-                .queue_family_indexes     = (const uint32*)&physical_device.queue_families,
-            };
-        }
-        else
-        {
-            physical_device.resource_sharing =
-            {
-                .mode                     = VK_SHARING_MODE_EXCLUSIVE,
-                .queue_family_index_count = 0,
-                .queue_family_indexes     = NULL,
-            };
-        }
-
-        vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
-        vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
 
         DeviceFeatures* device_features = &physical_device.features;
         InitDeviceFeatures(device_features);
-        GetDeviceFeatures(physical_device.handle, device_features);
+        GetDeviceFeatures(physical_device.hnd, device_features);
 
-        // Graphics and present queue families required.
-        if (physical_device.queue_families.graphics == UNSET_INDEX ||
-            physical_device.queue_families.present  == UNSET_INDEX)
+        // Depth image format required.
+        if (physical_device.depth_image_format == VK_FORMAT_UNDEFINED)
         {
             continue;
         }
 
-        // Depth image format required.
-        if (physical_device.depth_image_format == VK_FORMAT_UNDEFINED)
+        // Graphics and present queue families required.
+        if (physical_device.queue_families.graphics == UNSET_INDEX ||
+            physical_device.queue_families.present  == UNSET_INDEX)
         {
             continue;
         }
@@ -525,6 +504,32 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
         }
 
         // Physical device is capable.
+
+        // Store properties about physical device.
+        vkGetPhysicalDeviceProperties(vk_physical_device, &physical_device.properties);
+        vkGetPhysicalDeviceMemoryProperties(vk_physical_device, &physical_device.mem_properties);
+
+        // Store resource sharing settings based on queue family indexes.
+        if (physical_device.queue_families.graphics != physical_device.queue_families.present)
+        {
+            physical_device.resource_sharing =
+            {
+                .mode                     = VK_SHARING_MODE_CONCURRENT,
+                .queue_family_index_count = sizeof(QueueFamilies) / sizeof(uint32),
+                .queue_family_indexes     = (const uint32*)&physical_device.queue_families,
+            };
+        }
+        else
+        {
+            physical_device.resource_sharing =
+            {
+                .mode                     = VK_SHARING_MODE_EXCLUSIVE,
+                .queue_family_index_count = 0,
+                .queue_family_indexes     = NULL,
+            };
+        }
+
+        // Add physical device to list of capable physical devices for rendering.
         Push(&g_context.physical_devices, physical_device);
     }
 
@@ -574,7 +579,7 @@ static void InitDevice(DeviceFeatures* enabled_features)
         .ppEnabledExtensionNames = enabled_extensions,
         .pEnabledFeatures        = NULL,
     };
-    VkResult res = vkCreateDevice(g_context.physical_device->handle, &create_info, NULL, &g_context.device);
+    VkResult res = vkCreateDevice(g_context.physical_device->hnd, &create_info, NULL, &g_context.device);
     Validate(res, "vkCreateDevice() failed");
 }
 
@@ -643,12 +648,12 @@ static void CreateSwapchain(Stack* temp_stack, FreeList* free_list)
         .clipped               = VK_TRUE,
         .oldSwapchain          = VK_NULL_HANDLE,
     };
-    res = vkCreateSwapchainKHR(device, &info, NULL, &swapchain->handle);
+    res = vkCreateSwapchainKHR(device, &info, NULL, &swapchain->hnd);
     Validate(res, "vkCreateSwapchainKHR() failed");
 
     // Create swapchain image views.
     Array<VkImage> swapchain_images = {};
-    LoadVkSwapchainImages(&swapchain_images, &frame.allocator, device, swapchain->handle);
+    LoadVkSwapchainImages(&swapchain_images, &frame.allocator, device, swapchain->hnd);
     InitArrayFull(&swapchain->image_views, &free_list->allocator, swapchain_images.count);
     for (uint32 i = 0; i < swapchain_images.count; ++i)
     {
@@ -694,8 +699,8 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
     // Get surface info.
     Array<VkSurfaceFormatKHR> formats = {};
     Array<VkPresentModeKHR> present_modes = {};
-    LoadVkSurfaceFormats(&formats, &frame.allocator, physical_device->handle, surface);
-    LoadVkSurfacePresentModes(&present_modes, &frame.allocator, physical_device->handle, surface);
+    LoadVkSurfaceFormats(&formats, &frame.allocator, physical_device->hnd, surface);
+    LoadVkSurfacePresentModes(&present_modes, &frame.allocator, physical_device->hnd, surface);
     VkSurfaceCapabilitiesKHR surface_capabilities = {};
     GetSurfaceCapabilities(&surface_capabilities);
 
@@ -900,7 +905,7 @@ static PhysicalDevice* GetPhysicalDevice()
 
 static Swapchain* GetSwapchain()
 {
-    CTK_ASSERT(g_context.swapchain.handle != VK_NULL_HANDLE);
+    CTK_ASSERT(g_context.swapchain.hnd != VK_NULL_HANDLE);
     return &g_context.swapchain;
 }
 
@@ -945,7 +950,7 @@ static uint32 GetRenderThreadCount()
 static void GetSurfaceCapabilities(VkSurfaceCapabilitiesKHR* capabilities)
 {
     VkResult res =
-        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_context.physical_device->handle, g_context.surface, capabilities);
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_context.physical_device->hnd, g_context.surface, capabilities);
     Validate(res, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() failed");
 }
 
@@ -1000,7 +1005,7 @@ static void UpdateSwapchainSurfaceExtent(Stack* temp_stack, FreeList* free_list)
     g_context.swapchain.surface_extent = surface_capabilities.currentExtent;
 
     // Recreate swapchain.
-    vkDestroySwapchainKHR(g_context.device, swapchain->handle, NULL);
+    vkDestroySwapchainKHR(g_context.device, swapchain->hnd, NULL);
     CreateSwapchain(temp_stack, free_list);
 }
 

@@ -11,7 +11,7 @@ static VkResult AcquireSwapchainImage()
     Validate(res, "vkWaitForFences() failed");
 
     // Once frame is ready, acquire next swapchain image's index.
-    res = vkAcquireNextImageKHR(device, GetSwapchain()->handle, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
+    res = vkAcquireNextImageKHR(device, GetSwapchain()->hnd, UINT64_MAX, frame->image_acquired, VK_NULL_HANDLE,
                                 &frame->swapchain_image_index);
     if (res == VK_ERROR_OUT_OF_DATE_KHR)
     {
@@ -192,7 +192,7 @@ static VkResult SubmitRenderCommands(RenderTarget* render_target)
         .waitSemaphoreCount = 1,
         .pWaitSemaphores    = &frame->render_finished,
         .swapchainCount     = 1,
-        .pSwapchains        = &GetSwapchain()->handle,
+        .pSwapchains        = &GetSwapchain()->hnd,
         .pImageIndices      = &frame->swapchain_image_index,
         .pResults           = NULL,
     };

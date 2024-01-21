@@ -69,7 +69,7 @@ static void LoadImage(ImageHnd image_hnd, BufferHnd staging_buffer_hnd, uint32 f
     vkGetPhysicalDeviceFormatProperties(GetPhysicalDevice()->hnd, image_format, &format_properties);
     if (!(format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
     {
-        CTK_FATAL("can't load image: image's memory's format properties does not support "
+        CTK_FATAL("can't load image: image's memory's format properties do not support "
                   "VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT required for mipmap generation.");
     }
 

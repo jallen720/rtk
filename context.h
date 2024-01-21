@@ -282,14 +282,13 @@ static VkFormat FindDepthImageFormat(VkPhysicalDevice physical_device)
     };
 
     // Find format that supports depth-stencil attachment feature for physical device.
-    for (uint32 i = 0; i < CTK_ARRAY_SIZE(DEPTH_IMAGE_FORMATS); i++)
+    CTK_ITER_ARRAY(depth_image_format, DEPTH_IMAGE_FORMATS)
     {
-        VkFormat depth_image_format = DEPTH_IMAGE_FORMATS[i];
         VkFormatProperties format_properties = {};
-        vkGetPhysicalDeviceFormatProperties(physical_device, depth_image_format, &format_properties);
+        vkGetPhysicalDeviceFormatProperties(physical_device, *depth_image_format, &format_properties);
         if (format_properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
         {
-            return depth_image_format;
+            return *depth_image_format;
         }
     }
 

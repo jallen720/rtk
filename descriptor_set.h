@@ -212,7 +212,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                 if (data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                     data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
                 {
-                    write->pBufferInfo = End(desc_buffer_infos);
+                    write->pBufferInfo = IterEnd(desc_buffer_infos);
                     CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnds, data_binding->count)
                     {
                         VkDescriptorBufferInfo* desc_buffer_info = Push(desc_buffer_infos);
@@ -223,7 +223,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
                 {
-                    write->pImageInfo = End(desc_image_infos);
+                    write->pImageInfo = IterEnd(desc_image_infos);
                     CTK_ITER_PTR(sampler, data_binding->samplers, data_binding->count)
                     {
                         VkDescriptorImageInfo* desc_image_info = Push(desc_image_infos);
@@ -234,7 +234,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
                 {
-                    write->pImageInfo = End(desc_image_infos);
+                    write->pImageInfo = IterEnd(desc_image_infos);
                     CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
                     {
                         VkDescriptorImageInfo* desc_image_info = Push(desc_image_infos);
@@ -245,7 +245,7 @@ static void InitDescriptorSets(Stack* temp_stack)
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
                 {
-                    write->pImageInfo = End(desc_image_infos);
+                    write->pImageInfo = IterEnd(desc_image_infos);
                     CTK_ITER_PTR(image_hnd, data_binding->image_samplers.image_hnds, data_binding->count)
                     {
                         VkDescriptorImageInfo* desc_image_info = Push(desc_image_infos);

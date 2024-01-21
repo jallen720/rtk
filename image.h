@@ -44,7 +44,7 @@ static void LoadImageData(ImageData* image_data, const char* path)
     image_data->size = image_data->width * image_data->height * image_data->channel_count;
 }
 
-static uint32 MipLevels(ImageData* image_data)
+static uint32 GetMipLevels(ImageData* image_data)
 {
     return ((uint32)Log2((float32)Max(image_data->width, image_data->height))) + 1;
 }

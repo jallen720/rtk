@@ -186,7 +186,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     {
         ImageData texture_data = {};
         LoadImageData(&texture_data, TEXTURE_IMAGE_PATHS[i]);
-        uint32 mip_levels = MipLevels(&texture_data);
+        uint32 mip_levels = GetMipLevels(&texture_data);
         ImageInfo texture_info =
         {
             .extent =

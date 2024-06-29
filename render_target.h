@@ -115,23 +115,23 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
     }
 
     // Init framebuffers.
-    InitArray(&render_target->framebuffers, &free_list->allocator, swapchain->image_views.count);
+    render_target->framebuffers = CreateArray<VkFramebuffer>(&free_list->allocator, swapchain->image_views.count);
     auto attachments = CreateArray<VkImageView>(&frame.allocator, render_target->total_attachment_count);
     for (uint32 i = 0; i < swapchain->image_views.count; ++i)
     {
-        Push(attachments, Get(&swapchain->image_views, i));
+        Push(&attachments, Get(&swapchain->image_views, i));
 
         if (render_target->depth_testing)
         {
-            Push(attachments, GetImageView(render_target->depth_image, 0));
+            Push(&attachments, GetImageView(render_target->depth_image, 0));
         }
 
         VkFramebufferCreateInfo info =
         {
             .sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
             .renderPass      = render_target->render_pass,
-            .attachmentCount = attachments->count,
-            .pAttachments    = attachments->data,
+            .attachmentCount = attachments.count,
+            .pAttachments    = attachments.data,
             .width           = render_target->extent.width,
             .height          = render_target->extent.height,
             .layers          = 1,
@@ -140,7 +140,7 @@ static void SetupRenderTarget(RenderTarget* render_target, Stack* temp_stack, Fr
         Validate(res, "vkCreateFramebuffer() failed");
 
         // Clear attachments for next iteration.
-        Clear(attachments);
+        Clear(&attachments);
     }
 }
 
@@ -167,9 +167,12 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* perm_stack, Sta
     render_target->total_attachment_count = depth_attachment_count + color_attachment_count;
 
     // Init Render Pass
-    RenderPassAttachments attachments = {};
-    InitArray(&attachments.descriptions, &frame.allocator, render_target->total_attachment_count);
-    InitArray(&attachments.color, &frame.allocator, color_attachment_count);
+    RenderPassAttachments attachments =
+    {
+        .descriptions = CreateArray<VkAttachmentDescription>(&frame.allocator, render_target->total_attachment_count),
+        .color        = CreateArray<VkAttachmentReference>  (&frame.allocator, color_attachment_count),
+        .depth        = {},
+    };
     PushColorAttachment(&attachments,
                         {
                             .flags          = 0,
@@ -222,7 +225,8 @@ static void InitRenderTarget(RenderTarget* render_target, Stack* perm_stack, Sta
     Validate(res, "vkCreateRenderPass() failed");
 
     // Copy attachment clear values.
-    InitArray(&render_target->attachment_clear_values, &perm_stack->allocator, &info->attachment_clear_values);
+    render_target->attachment_clear_values =
+        CreateArray<VkClearValue>(&perm_stack->allocator, &info->attachment_clear_values);
 
     // Create depth images and framebuffers based on swapchain extent.
     SetupRenderTarget(render_target, &frame, free_list);
@@ -241,7 +245,7 @@ static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* te
     {
         vkDestroyFramebuffer(GetDevice(), Get(&render_target->framebuffers, i), NULL);
     }
-    DeinitArray(&render_target->framebuffers, &free_list->allocator);
+    DestroyArray(&render_target->framebuffers, &free_list->allocator);
 
     // Re-create depth images and framebuffers with new swapchain extent.
     SetupRenderTarget(render_target, temp_stack, free_list);

@@ -41,7 +41,7 @@ static DescriptorState g_desc_state;
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitDescriptorSetModule(const Allocator* allocator, DescriptorSetModuleInfo info)
+static void InitDescriptorSetModule(Allocator* allocator, DescriptorSetModuleInfo info)
 {
     uint32 frame_count = GetFrameCount();
     g_desc_state.data_bindings = Allocate<Array<DescriptorData>>(allocator, info.max_descriptor_sets);
@@ -53,7 +53,7 @@ static void InitDescriptorSetModule(const Allocator* allocator, DescriptorSetMod
     g_desc_state.frame_count   = frame_count;
 }
 
-static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* temp_stack, Array<DescriptorData> datas)
+static DescriptorSetHnd CreateDescriptorSet(Allocator* allocator, Stack* temp_stack, Array<DescriptorData> datas)
 {
     if (g_desc_state.set_count >= g_desc_state.max_sets)
     {
@@ -67,11 +67,10 @@ static DescriptorSetHnd CreateDescriptorSet(const Allocator* allocator, Stack* t
     ++g_desc_state.set_count;
 
     // Copy data bindings.
-    InitArray(&g_desc_state.data_bindings[hnd.index], allocator, &datas);
+    g_desc_state.data_bindings[hnd.index] = CreateArray<DescriptorData>(allocator, &datas);
 
     // Generate layout bindings.
-    Array<VkDescriptorSetLayoutBinding> layout_bindings = {};
-    InitArray(&layout_bindings, &frame.allocator, datas.count);
+    auto layout_bindings = CreateArray<VkDescriptorSetLayoutBinding>(&frame.allocator, datas.count);
     for (uint32 i = 0; i < datas.count; ++i)
     {
         DescriptorData* data = GetPtr(&datas, i);
@@ -187,10 +186,9 @@ static void InitDescriptorSets(Stack* temp_stack)
     }
 
     // Generate writes from data bindings.
-    auto desc_buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, buffer_write_count * frame_count);
-    auto desc_image_infos  = CreateArray<VkDescriptorImageInfo> (&frame.allocator, image_write_count  * frame_count);
-    auto desc_writes =
-        CreateArray<VkWriteDescriptorSet>(&frame.allocator, desc_buffer_infos->size + desc_image_infos->size);
+    auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, buffer_write_count * frame_count);
+    auto image_infos  = CreateArray<VkDescriptorImageInfo> (&frame.allocator, image_write_count  * frame_count);
+    auto writes       = CreateArray<VkWriteDescriptorSet>  (&frame.allocator, buffer_infos.size + image_infos.size);
     for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
     {
         uint32 frame_offset = frame_index * g_desc_state.set_count;
@@ -201,7 +199,7 @@ static void InitDescriptorSets(Stack* temp_stack)
             for (uint32 binding_index = 0; binding_index < data_bindings->count; ++binding_index)
             {
                 DescriptorData* data_binding = GetPtr(data_bindings, binding_index);
-                VkWriteDescriptorSet* write = Push(desc_writes);
+                VkWriteDescriptorSet* write = Push(&writes);
                 write->sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
                 write->dstSet          = descriptor_set;
                 write->dstBinding      = binding_index;
@@ -212,10 +210,10 @@ static void InitDescriptorSets(Stack* temp_stack)
                 if (data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
                     data_binding->type == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
                 {
-                    write->pBufferInfo = IterEnd(desc_buffer_infos);
+                    write->pBufferInfo = IterEnd(&buffer_infos);
                     CTK_ITER_PTR(buffer_hnd, data_binding->buffer_hnds, data_binding->count)
                     {
-                        VkDescriptorBufferInfo* desc_buffer_info = Push(desc_buffer_infos);
+                        VkDescriptorBufferInfo* desc_buffer_info = Push(&buffer_infos);
                         desc_buffer_info->buffer = GetBuffer(*buffer_hnd);
                         desc_buffer_info->offset = GetBufferFrameState(*buffer_hnd, frame_index)->res_mem_offset;
                         desc_buffer_info->range  = GetBufferState(*buffer_hnd)->size;
@@ -223,10 +221,10 @@ static void InitDescriptorSets(Stack* temp_stack)
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLER)
                 {
-                    write->pImageInfo = IterEnd(desc_image_infos);
+                    write->pImageInfo = IterEnd(&image_infos);
                     CTK_ITER_PTR(sampler, data_binding->samplers, data_binding->count)
                     {
-                        VkDescriptorImageInfo* desc_image_info = Push(desc_image_infos);
+                        VkDescriptorImageInfo* desc_image_info = Push(&image_infos);
                         desc_image_info->sampler     = *sampler;
                         desc_image_info->imageView   = VK_NULL_HANDLE;
                         desc_image_info->imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -234,10 +232,10 @@ static void InitDescriptorSets(Stack* temp_stack)
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
                 {
-                    write->pImageInfo = IterEnd(desc_image_infos);
+                    write->pImageInfo = IterEnd(&image_infos);
                     CTK_ITER_PTR(image_hnd, data_binding->image_hnds, data_binding->count)
                     {
-                        VkDescriptorImageInfo* desc_image_info = Push(desc_image_infos);
+                        VkDescriptorImageInfo* desc_image_info = Push(&image_infos);
                         desc_image_info->sampler     = VK_NULL_HANDLE;
                         desc_image_info->imageView   = GetImageView(*image_hnd, frame_index);
                         desc_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -245,10 +243,10 @@ static void InitDescriptorSets(Stack* temp_stack)
                 }
                 else if (data_binding->type == VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
                 {
-                    write->pImageInfo = IterEnd(desc_image_infos);
+                    write->pImageInfo = IterEnd(&image_infos);
                     CTK_ITER_PTR(image_hnd, data_binding->image_samplers.image_hnds, data_binding->count)
                     {
-                        VkDescriptorImageInfo* desc_image_info = Push(desc_image_infos);
+                        VkDescriptorImageInfo* desc_image_info = Push(&image_infos);
                         desc_image_info->sampler     = data_binding->image_samplers.sampler;
                         desc_image_info->imageView   = GetImageView(*image_hnd, frame_index);
                         desc_image_info->imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -263,7 +261,7 @@ static void InitDescriptorSets(Stack* temp_stack)
     }
 
     // Update all descriptor sets with writes from data bindings.
-    vkUpdateDescriptorSets(GetDevice(), desc_writes->count, desc_writes->data, 0, NULL);
+    vkUpdateDescriptorSets(GetDevice(), writes.count, writes.data, 0, NULL);
 }
 
 static VkDescriptorSetLayout GetLayout(DescriptorSetHnd hnd)

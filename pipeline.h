@@ -178,14 +178,15 @@ static VkShaderModule LoadShaderModule(Stack* temp_stack, const char* path)
     return shader_module;
 }
 
-static void InitVertexLayout(VertexLayout* layout, const Allocator* allocator, Array<BindingInfo> binding_infos)
+static void InitVertexLayout(VertexLayout* layout, Allocator* allocator, Array<BindingInfo> binding_infos)
 {
-    InitArray(&layout->bindings, allocator, binding_infos.size);
     CTK_ITER(binding_info, &binding_infos)
     {
         layout->attributes.size += binding_info->attribute_infos.count;
     }
-    InitArray(&layout->attributes, allocator, layout->attributes.size);
+
+    layout->bindings   = CreateArray<VkVertexInputBindingDescription>  (allocator, binding_infos.size);
+    layout->attributes = CreateArray<VkVertexInputAttributeDescription>(allocator, layout->attributes.size);
 
     CTK_ITER(binding_info, &binding_infos)
     {
@@ -252,15 +253,16 @@ static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_l
     Validate(res, "vkCreatePipelineLayout() failed");
 
     // Shader Stages
-    InitArray(&pipeline->shader_stage_create_infos, &free_list->allocator, info->shaders.count);
+    pipeline->shader_stage_create_infos =
+        CreateArray<VkPipelineShaderStageCreateInfo>(&free_list->allocator, info->shaders.count);
     for (uint32 i = 0; i < info->shaders.count; ++i)
     {
         Push(&pipeline->shader_stage_create_infos, DefaultShaderStageCreateInfo(GetPtr(&info->shaders, i)));
     }
 
     // Viewports/Scissors
-    InitArray(&pipeline->viewports, &free_list->allocator, &info->viewports);
-    InitArray(&pipeline->scissors, &free_list->allocator, pipeline->viewports.size);
+    pipeline->viewports = CreateArray<VkViewport>(&free_list->allocator, &info->viewports);
+    pipeline->scissors  = CreateArray<VkRect2D>  (&free_list->allocator, pipeline->viewports.size);
     InitScissors(pipeline);
 
     pipeline->vertex_layout = info->vertex_layout;
@@ -272,7 +274,7 @@ static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_l
     CreatePipeline(pipeline);
 }
 
-static Pipeline* CreatePipeline(const Allocator* allocator, Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
+static Pipeline* CreatePipeline(Allocator* allocator, Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
                                 PipelineLayoutInfo* layout_info)
 {
     auto pipeline = Allocate<Pipeline>(allocator, 1);

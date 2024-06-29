@@ -81,14 +81,14 @@ static void BindDescriptorSets(VkCommandBuffer command_buffer, Pipeline* pipelin
     auto descriptor_sets = CreateArray<VkDescriptorSet>(&frame.allocator, descriptor_set_hnds.count);
     for (uint32 i = 0; i < descriptor_set_hnds.count; ++i)
     {
-        Push(descriptor_sets, GetFrameSet(Get(&descriptor_set_hnds, i), frame_index));
+        Push(&descriptor_sets, GetFrameSet(Get(&descriptor_set_hnds, i), frame_index));
     }
 
     vkCmdBindDescriptorSets(command_buffer,
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
                             pipeline->layout,
                             first_binding, // First set
-                            descriptor_sets->count, descriptor_sets->data, // Descriptor Sets
+                            descriptor_sets.count, descriptor_sets.data, // Descriptor Sets
                             0, NULL); // Dynamic Offsets
 }
 

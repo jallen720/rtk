@@ -118,38 +118,38 @@ static void ValidateMeshDataLoad(MeshGroup* mesh_group, uint32 mesh_group_index,
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitMeshModule(const Allocator* allocator, MeshModuleInfo info)
+static void InitMeshModule(Allocator* allocator, MeshModuleInfo info)
 {
-    InitArray(&g_mesh_groups, allocator, info.max_mesh_groups);
+    g_mesh_groups = CreateArray<MeshGroup>(allocator, info.max_mesh_groups);
 };
 
-static MeshGroupHnd CreateMeshGroup(const Allocator* allocator, BufferHnd parent_buffer, MeshGroupInfo* info)
+static MeshGroupHnd CreateMeshGroup(Allocator* allocator, BufferHnd parent_buffer, MeshGroupInfo* info)
 {
     if (g_mesh_groups.count >= g_mesh_groups.size)
     {
         CTK_FATAL("can't create mesh group: already at max of %u", g_mesh_groups.size);
     }
 
-    MeshGroupHnd hnd = { .index = g_mesh_groups.count };
-
-    MeshGroup* mesh_group = Push(&g_mesh_groups);
-    InitArray(&mesh_group->meshes, allocator, info->max_meshes);
-    mesh_group->vertex_buffer_size = info->vertex_buffer_size;
-    mesh_group->index_buffer_size  = info->index_buffer_size;
     BufferInfo vertex_buffer_info =
     {
         .size      = info->vertex_buffer_size,
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = false,
     };
-    mesh_group->vertex_buffer = CreateBuffer(parent_buffer, &vertex_buffer_info);
     BufferInfo index_buffer_info =
     {
         .size      = info->index_buffer_size,
         .alignment = USE_MIN_OFFSET_ALIGNMENT,
         .per_frame = false,
     };
-    mesh_group->index_buffer = CreateBuffer(parent_buffer, &index_buffer_info);
+
+    MeshGroupHnd hnd = { .index = g_mesh_groups.count };
+    MeshGroup* mesh_group = Push(&g_mesh_groups);
+    mesh_group->meshes             = CreateArray<Mesh>(allocator, info->max_meshes);
+    mesh_group->vertex_buffer_size = info->vertex_buffer_size;
+    mesh_group->index_buffer_size  = info->index_buffer_size;
+    mesh_group->vertex_buffer      = CreateBuffer(parent_buffer, &vertex_buffer_info);
+    mesh_group->index_buffer       = CreateBuffer(parent_buffer, &index_buffer_info);
 
     return hnd;
 }
@@ -266,7 +266,7 @@ static void LoadDeviceMesh(MeshHnd mesh_hnd, BufferHnd staging_buffer_hnd, MeshD
     SubmitTempCommandBuffer();
 }
 
-static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const char* path,
+static void LoadMeshData(MeshData* mesh_data, Allocator* allocator, const char* path,
                          AttributeSwizzles* attribute_swizzles = NULL)
 {
     GLTF gltf = {};
@@ -370,7 +370,7 @@ static void LoadMeshData(MeshData* mesh_data, const Allocator* allocator, const 
     }
 }
 
-static void DestroyMeshData(MeshData* mesh_data, const Allocator* allocator)
+static void DestroyMeshData(MeshData* mesh_data, Allocator* allocator)
 {
     Deallocate(allocator, mesh_data->vertex_buffer);
     Deallocate(allocator, mesh_data->index_buffer);

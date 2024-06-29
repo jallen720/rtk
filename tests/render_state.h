@@ -94,10 +94,10 @@ static RenderState g_render_state;
 /// Utils
 ////////////////////////////////////////////////////////////
 template<typename StateType>
-static void InitThreadPoolJob(Job<StateType>* job, const Allocator* allocator, uint32 thread_count)
+static void InitThreadPoolJob(Job<StateType>* job, Allocator* allocator, uint32 thread_count)
 {
-    InitArrayFull(&job->states, allocator, thread_count);
-    InitArrayFull(&job->tasks,  allocator, thread_count);
+    job->states = CreateArrayFull<StateType>(allocator, thread_count);
+    job->tasks  = CreateArrayFull<TaskHnd>  (allocator, thread_count);
 }
 
 static void InitRenderCommandJob(Stack* perm_stack)
@@ -106,7 +106,7 @@ static void InitRenderCommandJob(Stack* perm_stack)
     InitThreadPoolJob(&g_render_state.render_command_job, &perm_stack->allocator, render_thread_count);
 
     // Initialize temp stacks for render_command_job threads.
-    InitArray(&g_render_state.render_thread_temp_stacks, &perm_stack->allocator, render_thread_count);
+    g_render_state.render_thread_temp_stacks = CreateArray<Stack>(&perm_stack->allocator, render_thread_count);
     for (uint32 i = 0; i < render_thread_count; ++i)
     {
         InitStack(Push(&g_render_state.render_thread_temp_stacks), &perm_stack->allocator, Kilobyte32<1>());
@@ -181,7 +181,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     g_render_state.entity_buffer = CreateBuffer(g_render_state.host_buffer, &entity_buffer_info);
 
     // Textures
-    InitArray(&g_render_state.textures, &perm_stack->allocator, TEXTURE_COUNT);
+    g_render_state.textures = CreateArray<ImageHnd>(&perm_stack->allocator, TEXTURE_COUNT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
         ImageData texture_data = {};
@@ -244,7 +244,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
 
     Swizzle position_swizzle = { 0, 2, 1 };
     AttributeSwizzles attribute_swizzles = { .POSITION = &position_swizzle };
-    InitArray(&g_render_state.meshes, &perm_stack->allocator, MESH_COUNT);
+    g_render_state.meshes = CreateArray<MeshHnd>(&perm_stack->allocator, MESH_COUNT);
     CTK_ITER_PTR(mesh_path, MESH_PATHS, MESH_COUNT)
     {
         MeshData mesh_data = {};
@@ -304,7 +304,7 @@ static void CreateSamplers(Stack* perm_stack)
             .unnormalizedCoordinates = VK_FALSE,
         },
     };
-    InitArray(&g_render_state.samplers, &perm_stack->allocator, MAX_SAMPLERS);
+    g_render_state.samplers = CreateArray<VkSampler>(&perm_stack->allocator, MAX_SAMPLERS);
     for (uint32 i = 0; i < MAX_SAMPLERS; ++i)
     {
         res = vkCreateSampler(device, &sampler_infos[i], NULL, Push(&g_render_state.samplers));

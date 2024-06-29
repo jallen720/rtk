@@ -347,15 +347,16 @@ static void InitInstance(InstanceInfo* info, Stack* temp_stack)
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
 #endif
     };
-    Array<const char*> extensions = {};
-    InitArray(&extensions, &frame.allocator, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS) + info->extensions.count);
+    auto extensions =
+        CreateArray<const char*>(&frame.allocator, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS) + info->extensions.count);
     PushRange(&extensions, REQUIRED_EXTENSIONS, CTK_ARRAY_SIZE(REQUIRED_EXTENSIONS));
     PushRange(&extensions, &info->extensions);
 
-    Array<const char*> layers = {};
 #ifdef RTK_ENABLE_VALIDATION
-    InitArray(&layers, &frame.allocator, 1);
+    auto layers = CreateArray<const char*>(&frame.allocator, 1);
     Push(&layers, "VK_LAYER_KHRONOS_validation");
+#else
+    Array<const char*> layers = {};
 #endif
 
     VkInstanceCreateInfo create_info = {};
@@ -416,7 +417,7 @@ LoadCapablePhysicalDevices(Stack* perm_stack, Stack* temp_stack, DeviceFeatures*
     }
 
     // Initialize physical devices array to hold all physical devices if necessary.
-    InitArray(&g_context.physical_devices, &perm_stack->allocator, vk_physical_devices.count);
+    g_context.physical_devices = CreateArray<PhysicalDevice>(&perm_stack->allocator, vk_physical_devices.count);
 
     // Check all physical devices, and load the ones capable of rendering into the context's physical device list.
     for (uint32 physical_device_index = 0; physical_device_index < vk_physical_devices.count; ++physical_device_index)
@@ -653,7 +654,7 @@ static void CreateSwapchain(Stack* temp_stack, FreeList* free_list)
     // Create swapchain image views.
     Array<VkImage> swapchain_images = {};
     LoadVkSwapchainImages(&swapchain_images, &frame.allocator, device, swapchain->hnd);
-    InitArrayFull(&swapchain->image_views, &free_list->allocator, swapchain_images.count);
+    swapchain->image_views = CreateArrayFull<VkImageView>(&free_list->allocator, swapchain_images.count);
     for (uint32 i = 0; i < swapchain_images.count; ++i)
     {
         VkImageViewCreateInfo view_info =
@@ -763,7 +764,7 @@ static void InitSwapchain(Stack* temp_stack, FreeList* free_list)
 
 static void InitRenderCommandPools(Stack* perm_stack)
 {
-    InitArray(&g_context.render_command_pools, &perm_stack->allocator, g_context.render_thread_count);
+    g_context.render_command_pools = CreateArray<VkCommandPool>(&perm_stack->allocator, g_context.render_thread_count);
     VkCommandPoolCreateInfo info =
     {
         .sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -822,7 +823,7 @@ static void InitFrames(Stack* perm_stack)
     uint32 frame_count = g_context.swapchain.image_views.count + 1;
     CTK_ASSERT(frame_count <= MAX_FRAME_COUNT);
 
-    InitRingBuffer(&g_context.frames, &perm_stack->allocator, frame_count);
+    g_context.frames = CreateRingBuffer<Frame>(&perm_stack->allocator, frame_count);
     CTK_ITER(frame, &g_context.frames)
     {
         // Sync State
@@ -844,7 +845,8 @@ static void InitFrames(Stack* perm_stack)
         }
 
         // render_command_buffers
-        InitArray(&frame->render_command_buffers, &perm_stack->allocator, g_context.render_command_pools.count);
+        frame->render_command_buffers =
+            CreateArray<VkCommandBuffer>(&perm_stack->allocator, g_context.render_command_pools.count);
         for (uint32 i = 0; i < g_context.render_command_pools.count; ++i)
         {
             VkCommandBufferAllocateInfo allocate_info =
@@ -996,7 +998,7 @@ static void UpdateSwapchainSurfaceExtent(Stack* temp_stack, FreeList* free_list)
     {
         vkDestroyImageView(g_context.device, Get(&swapchain->image_views, i), NULL);
     }
-    DeinitArray(&swapchain->image_views, &free_list->allocator);
+    DestroyArray(&swapchain->image_views, &free_list->allocator);
 
     // Update swapchain surface extent.
     VkSurfaceCapabilitiesKHR surface_capabilities = {};

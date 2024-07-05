@@ -357,8 +357,7 @@ void LoadGLTF(GLTF* gltf, Allocator* allocator, const char* path)
         // Append buffer uri in GLTF file to GLTF file directory.
         GLTFBuffer* buffer = Push(&gltf->buffers);
         buffer->uri = CreateString(allocator, path_dir_size + json_uri->size + 1);
-        PushRange(&buffer->uri, path, path_dir_size);
-        PushRange(&buffer->uri, json_uri);
+        Write(&buffer->uri, "%.*s%.*s", path_dir_size, path, json_uri->size, json_uri->data);
         ReadFile(&buffer->data, &buffer->size, allocator, buffer->uri.data);
         CTK_ASSERT(buffer->size == GetUInt32(&json, json_buffer, "byteLength"));
     }

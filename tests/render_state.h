@@ -106,10 +106,10 @@ static void InitRenderCommandJob(Stack* perm_stack)
     InitThreadPoolJob(&g_render_state.render_command_job, &perm_stack->allocator, render_thread_count);
 
     // Initialize temp stacks for render_command_job threads.
-    g_render_state.render_thread_temp_stacks = CreateArray<Stack>(&perm_stack->allocator, render_thread_count);
+    g_render_state.render_thread_temp_stacks = CreateArrayFull<Stack>(&perm_stack->allocator, render_thread_count);
     for (uint32 i = 0; i < render_thread_count; ++i)
     {
-        InitStack(Push(&g_render_state.render_thread_temp_stacks), &perm_stack->allocator, Kilobyte32<1>());
+        g_render_state.render_thread_temp_stacks.data[i] = CreateStack(&perm_stack->allocator, Kilobyte32<1>());
     }
 }
 
@@ -536,7 +536,7 @@ static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
         .minDepth = 0,
         .maxDepth = 1,
     };
-    UpdatePipelineViewports(&g_render_state.pipeline, free_list, CTK_WRAP_ARRAY_1(&viewport));
+    UpdatePipelineViewports(&g_render_state.pipeline, CTK_WRAP_ARRAY_1(&viewport));
 
     UpdateRenderTargetAttachments(&g_render_state.render_target, temp_stack, free_list);
 }

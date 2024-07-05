@@ -245,7 +245,7 @@ static void UpdateRenderTargetAttachments(RenderTarget* render_target, Stack* te
     {
         vkDestroyFramebuffer(GetDevice(), Get(&render_target->framebuffers, i), NULL);
     }
-    DestroyArray(&render_target->framebuffers, &free_list->allocator);
+    DestroyArray(&render_target->framebuffers);
 
     // Re-create depth images and framebuffers with new swapchain extent.
     SetupRenderTarget(render_target, temp_stack, free_list);

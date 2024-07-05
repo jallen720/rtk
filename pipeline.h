@@ -282,15 +282,15 @@ static Pipeline* CreatePipeline(Allocator* allocator, Stack* temp_stack, FreeLis
     return pipeline;
 }
 
-static void UpdatePipelineViewports(Pipeline* pipeline, FreeList* free_list, Array<VkViewport> viewports)
+static void UpdatePipelineViewports(Pipeline* pipeline, Array<VkViewport> viewports)
 {
     // Update viewports and scissors arrays.
     Clear(&pipeline->viewports);
     Clear(&pipeline->scissors);
     if (!CanPush(&pipeline->viewports, viewports.count))
     {
-        Resize(&pipeline->viewports, &free_list->allocator, viewports.count);
-        Resize(&pipeline->scissors, &free_list->allocator, viewports.count);
+        Resize(&pipeline->viewports, viewports.count);
+        Resize(&pipeline->scissors,  viewports.count);
     }
     PushRange(&pipeline->viewports, &viewports);
     InitScissors(pipeline);

@@ -11,7 +11,7 @@
 #include "rtk/stb/stb_image.h"
 #pragma warning(pop)
 
-#include "ctk3/ctk.h"
+#include "ctk/ctk.h"
 using namespace CTK;
 
 namespace RTK

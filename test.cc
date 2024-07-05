@@ -1,9 +1,5 @@
-#include "ctk3/ctk.h"
-
 #define RTK_ENABLE_VALIDATION
 #include "rtk/rtk.h"
-
-using namespace CTK;
 using namespace RTK;
 
 #include "rtk/tests/defs.h"
@@ -12,11 +8,12 @@ using namespace RTK;
 
 sint32 main()
 {
-    Stack*    perm_stack = CreateStack   (&std_allocator,         Megabyte32<8>());
-    Stack*    temp_stack = CreateStack   (&perm_stack->allocator, Megabyte32<1>());
-    FreeList* free_list  = CreateFreeList(&perm_stack->allocator, Kilobyte32<16>(), { .max_range_count = 256 });
+    Stack    perm_stack = CreateStack   (&std_allocator,        Megabyte32<8>());
+    Stack    temp_stack = CreateStack   (&perm_stack.allocator, Megabyte32<1>());
+    FreeList free_list  = CreateFreeList(&perm_stack.allocator, Kilobyte32<16>(), { .max_range_count = 256 });
 
-    ThreadPool* thread_pool = CreateThreadPool(&perm_stack->allocator, 8);
+    ThreadPool thread_pool = {};
+    InitThreadPool(&thread_pool, &perm_stack.allocator, 8);
 
     // Make win32 process DPI aware so windows scale properly.
     SetProcessDPIAware();
@@ -55,12 +52,12 @@ sint32 main()
     context_info.enabled_features.vulkan_1_2.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
     context_info.enabled_features.vulkan_1_2.scalarBlockLayout                         = VK_TRUE;
 
-    InitContext(perm_stack, temp_stack, free_list, &context_info);
+    InitContext(&perm_stack, &temp_stack, &free_list, &context_info);
 // LogPhysicalDevice(GetPhysicalDevice());
 
     // Initialize other test state.
-    InitRenderState(perm_stack, temp_stack, free_list, thread_pool->size);
-    InitGameState(perm_stack);
+    InitRenderState(&perm_stack, &temp_stack, &free_list, thread_pool.size);
+    InitGameState(&perm_stack);
 LogResourceGroups();
 
     // Run game.
@@ -101,7 +98,7 @@ LogResourceGroups();
             // Swapchain image acquisition failed, recreate swapchain, skip rendering and move to next iteration to
             // retry acquiring swapchain image.
 
-            RecreateSwapchain(temp_stack, free_list);
+            RecreateSwapchain(&temp_stack, &free_list);
             continue;
         }
         else if (acquire_swapchain_image_res == VK_SUBOPTIMAL_KHR)
@@ -113,15 +110,15 @@ LogResourceGroups();
         }
 
         EntityData* entity_data = GetEntityData();
-        UpdateMVPMatrixes(thread_pool, GetView(), entity_data->transforms, entity_data->count);
-        RecordRenderCommands(thread_pool, entity_data->count);
+        UpdateMVPMatrixes(&thread_pool, GetView(), entity_data->transforms, entity_data->count);
+        RecordRenderCommands(&thread_pool, entity_data->count);
         VkResult submit_render_commands_res = SubmitRenderCommands(GetRenderTarget());
 
         if (recreate_swapchain ||
             submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR ||
             submit_render_commands_res == VK_SUBOPTIMAL_KHR)
         {
-            RecreateSwapchain(temp_stack, free_list);
+            RecreateSwapchain(&temp_stack, &free_list);
             recreate_swapchain = false;
         }
     }

@@ -998,7 +998,7 @@ static void UpdateSwapchainSurfaceExtent(Stack* temp_stack, FreeList* free_list)
     {
         vkDestroyImageView(g_context.device, Get(&swapchain->image_views, i), NULL);
     }
-    DestroyArray(&swapchain->image_views, &free_list->allocator);
+    DestroyArray(&swapchain->image_views);
 
     // Update swapchain surface extent.
     VkSurfaceCapabilitiesKHR surface_capabilities = {};

@@ -161,8 +161,7 @@ static VkShaderModule LoadShaderModule(Stack* temp_stack, const char* path)
 {
     Stack frame = CreateFrame(temp_stack);
 
-    Array<uint32> bytecode = {};
-    ReadFile(&bytecode, &frame.allocator, path);
+    Array<uint32> bytecode = ReadFile<uint32>(&frame.allocator, path);
     VkShaderModuleCreateInfo info =
     {
         .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,

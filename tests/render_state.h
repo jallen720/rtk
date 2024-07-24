@@ -43,7 +43,6 @@ struct RenderCommandState
     BatchRange batch_range;
     uint32     thread_index;
     MeshHnd    mesh;
-    Stack*     temp_stack;
 };
 
 struct RenderState
@@ -51,7 +50,6 @@ struct RenderState
     // Render Job
     Job<RenderCommandState> render_command_job;
     Job<MVPMatrixState>     mvp_matrix_job;
-    Array<Stack>            render_thread_temp_stacks;
 
     // Resources
     ResourceGroupHnd res_group;
@@ -100,22 +98,9 @@ static void InitThreadPoolJob(Job<StateType>* job, Allocator* allocator, uint32 
     job->tasks  = CreateArrayFull<TaskHnd>  (allocator, thread_count);
 }
 
-static void InitRenderCommandJob(Stack* perm_stack)
+static void CreateResources(Stack* perm_stack, FreeList* free_list)
 {
-    uint32 render_thread_count = GetRenderThreadCount();
-    InitThreadPoolJob(&g_render_state.render_command_job, &perm_stack->allocator, render_thread_count);
-
-    // Initialize temp stacks for render_command_job threads.
-    g_render_state.render_thread_temp_stacks = CreateArrayFull<Stack>(&perm_stack->allocator, render_thread_count);
-    for (uint32 i = 0; i < render_thread_count; ++i)
-    {
-        g_render_state.render_thread_temp_stacks.data[i] = CreateStack(&perm_stack->allocator, Kilobyte32<1>());
-    }
-}
-
-static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
-{
-    InitResourceModule(&perm_stack->allocator, { .max_resource_groups = 4 });
+    InitResourceModule(perm_stack, { .max_resource_groups = 4 });
 
     ResourceGroupInfo res_group_info =
     {
@@ -123,7 +108,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
         .max_image_mems = 4,
         .max_images     = 8,
     };
-    g_render_state.res_group = CreateResourceGroup(&perm_stack->allocator, &res_group_info);
+    g_render_state.res_group = CreateResourceGroup(perm_stack, &res_group_info);
 
     BufferInfo host_buffer_info =
     {
@@ -181,7 +166,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     g_render_state.entity_buffer = CreateBuffer(g_render_state.host_buffer, &entity_buffer_info);
 
     // Textures
-    g_render_state.textures = CreateArray<ImageHnd>(&perm_stack->allocator, TEXTURE_COUNT);
+    g_render_state.textures = CreateArray<ImageHnd>(perm_stack, TEXTURE_COUNT);
     for (uint32 i = 0; i < TEXTURE_COUNT; ++i)
     {
         ImageData texture_data = {};
@@ -231,7 +216,7 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
     };
     static constexpr uint32 MESH_COUNT = CTK_ARRAY_SIZE(MESH_PATHS);
 
-    InitMeshModule(&perm_stack->allocator, { .max_mesh_groups = 1 });
+    InitMeshModule(perm_stack, { .max_mesh_groups = 1 });
 
     MeshGroupInfo mesh_group_info =
     {
@@ -239,20 +224,19 @@ static void CreateResources(Stack* perm_stack, Stack* temp_stack, FreeList* free
         .vertex_buffer_size = Kilobyte32<8>(),
         .index_buffer_size  = Kilobyte32<8>(),
     };
-    g_render_state.mesh_group = CreateMeshGroup(&perm_stack->allocator, g_render_state.device_buffer,
-                                                &mesh_group_info);
+    g_render_state.mesh_group = CreateMeshGroup(perm_stack, g_render_state.device_buffer, &mesh_group_info);
 
     Swizzle position_swizzle = { 0, 2, 1 };
     AttributeSwizzles attribute_swizzles = { .POSITION = &position_swizzle };
-    g_render_state.meshes = CreateArray<MeshHnd>(&perm_stack->allocator, MESH_COUNT);
+    g_render_state.meshes = CreateArray<MeshHnd>(perm_stack, MESH_COUNT);
     CTK_ITER_PTR(mesh_path, MESH_PATHS, MESH_COUNT)
     {
         MeshData mesh_data = {};
-        LoadMeshData(&mesh_data, &free_list->allocator, *mesh_path, &attribute_swizzles);
+        LoadMeshData(&mesh_data, free_list, *mesh_path, &attribute_swizzles);
         MeshHnd mesh = CreateMesh(g_render_state.mesh_group, &mesh_data.info);
         Push(&g_render_state.meshes, mesh);
         LoadDeviceMesh(mesh, g_render_state.staging_buffer, &mesh_data);
-        DestroyMeshData(&mesh_data, &free_list->allocator);
+        DestroyMeshData(&mesh_data, free_list);
     }
 }
 
@@ -304,7 +288,7 @@ static void CreateSamplers(Stack* perm_stack)
             .unnormalizedCoordinates = VK_FALSE,
         },
     };
-    g_render_state.samplers = CreateArray<VkSampler>(&perm_stack->allocator, MAX_SAMPLERS);
+    g_render_state.samplers = CreateArray<VkSampler>(perm_stack, MAX_SAMPLERS);
     for (uint32 i = 0; i < MAX_SAMPLERS; ++i)
     {
         res = vkCreateSampler(device, &sampler_infos[i], NULL, Push(&g_render_state.samplers));
@@ -312,9 +296,9 @@ static void CreateSamplers(Stack* perm_stack)
     }
 }
 
-static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
+static void CreateDescriptorSets(Stack* perm_stack)
 {
-    InitDescriptorSetModule(&perm_stack->allocator, { .max_descriptor_sets = 16 });
+    InitDescriptorSetModule(perm_stack, { .max_descriptor_sets = 16 });
 
     // Entity
     {
@@ -327,8 +311,7 @@ static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
                 .buffer_hnds = &g_render_state.entity_buffer,
             },
         };
-        g_render_state.entity_descriptor_set =
-            CreateDescriptorSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+        g_render_state.entity_descriptor_set = CreateDescriptorSet(perm_stack, CTK_WRAP_ARRAY(datas));
     }
 
     // Textures
@@ -348,14 +331,13 @@ static void CreateDescriptorSets(Stack* perm_stack, Stack* temp_stack)
                 .samplers = g_render_state.samplers.data,
             },
         };
-        g_render_state.textures_descriptor_set =
-            CreateDescriptorSet(&perm_stack->allocator, temp_stack, CTK_WRAP_ARRAY(datas));
+        g_render_state.textures_descriptor_set = CreateDescriptorSet(perm_stack, CTK_WRAP_ARRAY(datas));
     }
 
-    InitDescriptorSets(temp_stack);
+    InitDescriptorSets();
 }
 
-static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* free_list)
+static void InitRenderTargets(Stack* perm_stack, FreeList* free_list)
 {
     VkClearValue attachment_clear_values[] =
     {
@@ -367,13 +349,13 @@ static void InitRenderTargets(Stack* perm_stack, Stack* temp_stack, FreeList* fr
         .depth_testing           = true,
         .attachment_clear_values = CTK_WRAP_ARRAY(attachment_clear_values),
     };
-    InitRenderTarget(&g_render_state.render_target, perm_stack, temp_stack, free_list, &info);
+    InitRenderTarget(&g_render_state.render_target, perm_stack, free_list, &info);
 }
 
-static void InitShaders(Stack* temp_stack)
+static void InitShaders()
 {
-    g_render_state.vert_shader = LoadShaderModule(temp_stack, "shaders/bin/3d.vert.spv");
-    g_render_state.frag_shader = LoadShaderModule(temp_stack, "shaders/bin/3d.frag.spv");
+    g_render_state.vert_shader = LoadShaderModule("shaders/bin/3d.vert.spv");
+    g_render_state.frag_shader = LoadShaderModule("shaders/bin/3d.frag.spv");
 }
 
 static void InitVertexLayout(Stack* perm_stack)
@@ -390,10 +372,10 @@ static void InitVertexLayout(Stack* perm_stack)
             .attribute_infos = CTK_WRAP_ARRAY(attribute_infos),
         },
     };
-    InitVertexLayout(&g_render_state.vertex_layout, &perm_stack->allocator, CTK_WRAP_ARRAY(binding_infos));
+    InitVertexLayout(&g_render_state.vertex_layout, perm_stack, CTK_WRAP_ARRAY(binding_infos));
 }
 
-static void InitPipelines(Stack* temp_stack, FreeList* free_list)
+static void InitPipelines(FreeList* free_list)
 {
     // Pipeline Layout
     VkDescriptorSetLayout descriptor_set_layouts[] =
@@ -448,7 +430,7 @@ static void InitPipelines(Stack* temp_stack, FreeList* free_list)
         .render_target = &g_render_state.render_target,
     };
 
-    InitPipeline(&g_render_state.pipeline, temp_stack, free_list, &pipeline_info, &pipeline_layout_info);
+    InitPipeline(&g_render_state.pipeline, free_list, &pipeline_info, &pipeline_layout_info);
 }
 
 static void RecordRenderCommandsThread(void* data)
@@ -461,7 +443,7 @@ static void RecordRenderCommandsThread(void* data)
             g_render_state.entity_descriptor_set,
             g_render_state.textures_descriptor_set,
         };
-        BindDescriptorSets(command_buffer, pipeline, state->temp_stack, CTK_WRAP_ARRAY(descriptor_sets), 0);
+        BindDescriptorSets(command_buffer, pipeline, CTK_WRAP_ARRAY(descriptor_sets), 0);
         BindPipeline(command_buffer, pipeline);
         BindMeshGroup(command_buffer, g_render_state.mesh_group);
 #if 1
@@ -520,11 +502,11 @@ static void UpdateMVPMatrixesThread(void* data)
     }
 }
 
-static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
+static void RecreateSwapchain(FreeList* free_list)
 {
     WaitIdle();
 
-    UpdateSwapchainSurfaceExtent(temp_stack, free_list);
+    UpdateSwapchainSurfaceExtent(free_list);
 
     VkExtent2D swapchain_extent = GetSwapchain()->surface_extent;
     VkViewport viewport =
@@ -538,27 +520,26 @@ static void RecreateSwapchain(Stack* temp_stack, FreeList* free_list)
     };
     UpdatePipelineViewports(&g_render_state.pipeline, CTK_WRAP_ARRAY_1(&viewport));
 
-    UpdateRenderTargetAttachments(&g_render_state.render_target, temp_stack, free_list);
+    UpdateRenderTargetAttachments(&g_render_state.render_target, free_list);
 }
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static void InitRenderState(Stack* perm_stack, Stack* temp_stack, FreeList* free_list,
-                            uint32 mvp_matrix_job_thread_count)
+static void InitRenderState(Stack* perm_stack, FreeList* free_list, uint32 mvp_matrix_job_thread_count)
 {
-    InitRenderCommandJob(perm_stack);
-    InitThreadPoolJob(&g_render_state.mvp_matrix_job, &perm_stack->allocator, mvp_matrix_job_thread_count);
+    InitThreadPoolJob(&g_render_state.render_command_job, perm_stack, GetRenderThreadCount());
+    InitThreadPoolJob(&g_render_state.mvp_matrix_job, perm_stack, mvp_matrix_job_thread_count);
 
     // Resources
-    CreateResources(perm_stack, temp_stack, free_list);
+    CreateResources(perm_stack, free_list);
 
     // Assets
     CreateSamplers(perm_stack);
-    CreateDescriptorSets(perm_stack, temp_stack);
-    InitRenderTargets(perm_stack, temp_stack, free_list);
-    InitShaders(temp_stack);
+    CreateDescriptorSets(perm_stack);
+    InitRenderTargets(perm_stack, free_list);
+    InitShaders();
     InitVertexLayout(perm_stack);
-    InitPipelines(temp_stack, free_list);
+    InitPipelines(free_list);
 }
 
 static void SetTextureIndexes(uint32* texture_indexes, uint32 entity_count, uint32 frame_index)
@@ -615,7 +596,6 @@ static void RecordRenderCommands(ThreadPool* thread_pool, uint32 entity_count)
         state->batch_range  = GetBatchRange(thread_index, thread_count, entity_count);
         state->thread_index = thread_index;
         state->mesh         = Get(&g_render_state.meshes, thread_index % g_render_state.meshes.count);
-        state->temp_stack   = GetPtr(&g_render_state.render_thread_temp_stacks, thread_index);
 
         Set(&job->tasks, thread_index, SubmitTask(thread_pool, state, RecordRenderCommandsThread));
     }

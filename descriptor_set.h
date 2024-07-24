@@ -53,14 +53,14 @@ static void InitDescriptorSetModule(Allocator* allocator, DescriptorSetModuleInf
     g_desc_state.frame_count   = frame_count;
 }
 
-static DescriptorSetHnd CreateDescriptorSet(Allocator* allocator, Stack* temp_stack, Array<DescriptorData> datas)
+static DescriptorSetHnd CreateDescriptorSet(Allocator* allocator, Array<DescriptorData> datas)
 {
     if (g_desc_state.set_count >= g_desc_state.max_sets)
     {
         CTK_FATAL("can't create descriptor set: already at max of %u", g_desc_state.max_sets);
     }
 
-    Stack frame = CreateFrame(temp_stack);
+    CTK::Frame frame = CreateFrame();
 
     // Assign handle.
     DescriptorSetHnd hnd = { .index = g_desc_state.set_count };
@@ -70,7 +70,7 @@ static DescriptorSetHnd CreateDescriptorSet(Allocator* allocator, Stack* temp_st
     g_desc_state.data_bindings[hnd.index] = CreateArray<DescriptorData>(allocator, &datas);
 
     // Generate layout bindings.
-    auto layout_bindings = CreateArray<VkDescriptorSetLayoutBinding>(&frame.allocator, datas.count);
+    auto layout_bindings = CreateArray<VkDescriptorSetLayoutBinding>(&frame, datas.count);
     for (uint32 i = 0; i < datas.count; ++i)
     {
         DescriptorData* data = GetPtr(&datas, i);
@@ -99,9 +99,9 @@ static DescriptorSetHnd CreateDescriptorSet(Allocator* allocator, Stack* temp_st
     return hnd;
 }
 
-static void InitDescriptorSets(Stack* temp_stack)
+static void InitDescriptorSets()
 {
-    Stack frame = CreateFrame(temp_stack);
+    CTK::Frame frame = CreateFrame();
     VkDevice device = GetDevice();
     uint32 frame_count = g_desc_state.frame_count;
 
@@ -186,9 +186,9 @@ static void InitDescriptorSets(Stack* temp_stack)
     }
 
     // Generate writes from data bindings.
-    auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame.allocator, buffer_write_count * frame_count);
-    auto image_infos  = CreateArray<VkDescriptorImageInfo> (&frame.allocator, image_write_count  * frame_count);
-    auto writes       = CreateArray<VkWriteDescriptorSet>  (&frame.allocator, buffer_infos.size + image_infos.size);
+    auto buffer_infos = CreateArray<VkDescriptorBufferInfo>(&frame, buffer_write_count * frame_count);
+    auto image_infos  = CreateArray<VkDescriptorImageInfo> (&frame, image_write_count  * frame_count);
+    auto writes       = CreateArray<VkWriteDescriptorSet>  (&frame, buffer_infos.size + image_infos.size);
     for (uint32 frame_index = 0; frame_index < frame_count; ++frame_index)
     {
         uint32 frame_offset = frame_index * g_desc_state.set_count;

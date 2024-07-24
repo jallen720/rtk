@@ -157,11 +157,11 @@ static void CreatePipeline(Pipeline* pipeline)
 
 /// Interface
 ////////////////////////////////////////////////////////////
-static VkShaderModule LoadShaderModule(Stack* temp_stack, const char* path)
+static VkShaderModule LoadShaderModule(const char* path)
 {
-    Stack frame = CreateFrame(temp_stack);
+    CTK::Frame frame = CreateFrame();
 
-    Array<uint32> bytecode = ReadFile<uint32>(&frame.allocator, path);
+    Array<uint32> bytecode = ReadFile<uint32>(&frame, path);
     VkShaderModuleCreateInfo info =
     {
         .sType    = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -233,10 +233,10 @@ static void InitVertexLayout(VertexLayout* layout, Allocator* allocator, Array<B
     }
 }
 
-static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
+static void InitPipeline(Pipeline* pipeline, FreeList* free_list, PipelineInfo* info,
                          PipelineLayoutInfo* layout_info)
 {
-    Stack frame = CreateFrame(temp_stack);
+    CTK::Frame frame = CreateFrame();
 
     /// Configure Pipeline
     ////////////////////////////////////////////////////////////
@@ -252,16 +252,15 @@ static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_l
     Validate(res, "vkCreatePipelineLayout() failed");
 
     // Shader Stages
-    pipeline->shader_stage_create_infos =
-        CreateArray<VkPipelineShaderStageCreateInfo>(&free_list->allocator, info->shaders.count);
+    pipeline->shader_stage_create_infos = CreateArray<VkPipelineShaderStageCreateInfo>(free_list, info->shaders.count);
     for (uint32 i = 0; i < info->shaders.count; ++i)
     {
         Push(&pipeline->shader_stage_create_infos, DefaultShaderStageCreateInfo(GetPtr(&info->shaders, i)));
     }
 
     // Viewports/Scissors
-    pipeline->viewports = CreateArray<VkViewport>(&free_list->allocator, &info->viewports);
-    pipeline->scissors  = CreateArray<VkRect2D>  (&free_list->allocator, pipeline->viewports.size);
+    pipeline->viewports = CreateArray<VkViewport>(free_list, &info->viewports);
+    pipeline->scissors  = CreateArray<VkRect2D>  (free_list, pipeline->viewports.size);
     InitScissors(pipeline);
 
     pipeline->vertex_layout = info->vertex_layout;
@@ -273,11 +272,11 @@ static void InitPipeline(Pipeline* pipeline, Stack* temp_stack, FreeList* free_l
     CreatePipeline(pipeline);
 }
 
-static Pipeline* CreatePipeline(Allocator* allocator, Stack* temp_stack, FreeList* free_list, PipelineInfo* info,
+static Pipeline* CreatePipeline(Allocator* allocator, FreeList* free_list, PipelineInfo* info,
                                 PipelineLayoutInfo* layout_info)
 {
     auto pipeline = Allocate<Pipeline>(allocator, 1);
-    InitPipeline(pipeline, temp_stack, free_list, info, layout_info);
+    InitPipeline(pipeline, free_list, info, layout_info);
     return pipeline;
 }
 

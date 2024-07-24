@@ -8,12 +8,12 @@ using namespace RTK;
 
 sint32 main()
 {
-    Stack    perm_stack = CreateStack   (&std_allocator,        Megabyte32<8>());
-    Stack    temp_stack = CreateStack   (&perm_stack.allocator, Megabyte32<1>());
-    FreeList free_list  = CreateFreeList(&perm_stack.allocator, Kilobyte32<16>(), { .max_range_count = 256 });
+    Stack perm_stack = CreateStack(&g_std_allocator, Megabyte32<8>());
+    FreeList free_list = CreateFreeList(&perm_stack, Kilobyte32<16>(), { .max_range_count = 256 });
+    CreateThreadFrameStack(&perm_stack, Kilobyte32<4>());
 
     ThreadPool thread_pool = {};
-    InitThreadPool(&thread_pool, &perm_stack.allocator, 8);
+    InitThreadPool(&thread_pool, &perm_stack, 8, Kilobyte32<4>());
 
     // Make win32 process DPI aware so windows scale properly.
     SetProcessDPIAware();
@@ -52,11 +52,11 @@ sint32 main()
     context_info.enabled_features.vulkan_1_2.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
     context_info.enabled_features.vulkan_1_2.scalarBlockLayout                         = VK_TRUE;
 
-    InitContext(&perm_stack, &temp_stack, &free_list, &context_info);
+    InitContext(&perm_stack, &free_list, &context_info);
 // LogPhysicalDevice(GetPhysicalDevice());
 
     // Initialize other test state.
-    InitRenderState(&perm_stack, &temp_stack, &free_list, thread_pool.size);
+    InitRenderState(&perm_stack, &free_list, thread_pool.thread_count);
     InitGameState(&perm_stack);
 LogResourceGroups();
 
@@ -98,7 +98,7 @@ LogResourceGroups();
             // Swapchain image acquisition failed, recreate swapchain, skip rendering and move to next iteration to
             // retry acquiring swapchain image.
 
-            RecreateSwapchain(&temp_stack, &free_list);
+            RecreateSwapchain(&free_list);
             continue;
         }
         else if (acquire_swapchain_image_res == VK_SUBOPTIMAL_KHR)
@@ -118,7 +118,7 @@ LogResourceGroups();
             submit_render_commands_res == VK_ERROR_OUT_OF_DATE_KHR ||
             submit_render_commands_res == VK_SUBOPTIMAL_KHR)
         {
-            RecreateSwapchain(&temp_stack, &free_list);
+            RecreateSwapchain(&free_list);
             recreate_swapchain = false;
         }
     }

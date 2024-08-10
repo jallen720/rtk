@@ -236,11 +236,6 @@ static void InitVertexLayout(VertexLayout* layout, Allocator* allocator, Array<B
 static void InitPipeline(Pipeline* pipeline, FreeList* free_list, PipelineInfo* info,
                          PipelineLayoutInfo* layout_info)
 {
-    CTK::Frame frame = CreateFrame();
-
-    /// Configure Pipeline
-    ////////////////////////////////////////////////////////////
-
     // Layout
     VkPipelineLayoutCreateInfo layout_create_info = DEFAULT_LAYOUT_CREATE_INFO;
     layout_create_info.setLayoutCount         = layout_info->descriptor_set_layouts.count;
@@ -263,12 +258,11 @@ static void InitPipeline(Pipeline* pipeline, FreeList* free_list, PipelineInfo* 
     pipeline->scissors  = CreateArray<VkRect2D>  (free_list, pipeline->viewports.size);
     InitScissors(pipeline);
 
+    // Misc.
     pipeline->vertex_layout = info->vertex_layout;
     pipeline->depth_testing = info->depth_testing;
     pipeline->render_pass   = info->render_target->render_pass;
 
-    /// Create Pipeline
-    ////////////////////////////////////////////////////////////
     CreatePipeline(pipeline);
 }
 

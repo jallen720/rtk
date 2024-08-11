@@ -10,7 +10,7 @@ sint32 main()
 {
     Stack perm_stack = CreateStack(&g_std_allocator, Megabyte32<8>());
     FreeList free_list = CreateFreeList(&perm_stack, Kilobyte32<16>(), { .max_range_count = 256 });
-    CreateThreadFrameStack(&perm_stack, Kilobyte32<4>());
+    InitFrameAllocator(&perm_stack, Kilobyte32<4>());
 
     ThreadPool thread_pool = {};
     InitThreadPool(&thread_pool, &perm_stack, 8, Kilobyte32<4>());

@@ -353,11 +353,10 @@ MigrationBackup/
 .ionide/
 
 # Custom
-*.swp
 *.spv
 *.sublime-*
 *.blend1
 *.cap
-todo.txt
-old/
 *.rdbg
+_todo.txt
+archive/
